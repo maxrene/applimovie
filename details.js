@@ -4,7 +4,7 @@ const BASE_URL = 'https://api.themoviedb.org/3';
 const IMG_BASE_POSTER = 'https://image.tmdb.org/t/p/w500';
 const IMG_BASE_BANNER = 'https://image.tmdb.org/t/p/original';
 const IMG_BASE_PROFILE = 'https://image.tmdb.org/t/p/w185';
-const API_KEY = 'f1b07b5d2ac7a9f55c5b49a93b18bd33';
+const TMDB_API_KEY = 'f1b07b5d2ac7a9f55c5b49a93b18bd33';
 
 let currentCastData = [];
 let isCastExpanded = false;
