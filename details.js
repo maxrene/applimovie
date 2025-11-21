@@ -126,7 +126,26 @@ async function fetchUpdates(id, type) {
             }
             updatePersonUI(creator, 'tv');
 
-            // 2. Mettre à jour les saisons
+            // 2. Mettre à jour l'année de diffusion (cas où le statut a changé)
+            const firstAirDate = seriesDetailsData.first_air_date;
+            const lastAirDate = seriesDetailsData.last_air_date;
+            const status = seriesDetailsData.status;
+            const startYear = firstAirDate?.split('-')[0] || '';
+
+            if(startYear) {
+                let yearText = startYear;
+                if (status === 'Ended') {
+                    const endYear = lastAirDate?.split('-')[0] || '';
+                    if (endYear && startYear !== endYear) {
+                        yearText = `${startYear} - ${endYear}`;
+                    }
+                } else {
+                    yearText = `${startYear} - `;
+                }
+                document.getElementById('media-year').textContent = yearText;
+            }
+
+            // 3. Mettre à jour les saisons
             if (seriesDetailsData.seasons) {
                 updateSeasonsUI(seriesDetailsData.seasons, id);
             }
@@ -432,7 +451,28 @@ function formatTMDBData(data, type) {
     return {
         id: data.id,
         title: isMovie ? data.title : data.name,
-        year: (isMovie ? data.release_date : data.first_air_date)?.split('-')[0] || 'N/A',
+        year: (() => {
+            if (isMovie) {
+                return data.release_date?.split('-')[0] || 'N/A';
+            }
+            // TV Show Logic
+            const firstAirDate = data.first_air_date;
+            const lastAirDate = data.last_air_date;
+            const status = data.status;
+            const startYear = firstAirDate?.split('-')[0] || '';
+
+            if (!startYear) return 'N/A';
+
+            if (status === 'Ended') {
+                const endYear = lastAirDate?.split('-')[0] || '';
+                if (endYear && startYear !== endYear) {
+                    return `${startYear} - ${endYear}`;
+                }
+                return startYear;
+            }
+
+            return `${startYear} - `; // For ongoing series
+        })(),
         genres: data.genres || [], // Array of objects {id, name}
         duration: isMovie ? `${Math.floor(data.runtime/60)}h ${data.runtime%60}m` : '',
         seasons: !isMovie ? data.number_of_seasons : null,
