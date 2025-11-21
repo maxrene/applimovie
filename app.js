@@ -1,5 +1,10 @@
 // app.js
+
+const BASE_URL = 'https://api.themoviedb.org/3';
+const IMG_BASE_POSTER = 'https://image.tmdb.org/t/p/w500';
+
 document.addEventListener('DOMContentLoaded', () => {
+    // Containers
     const popularContainer = document.getElementById('popular-container');
     const netflixContainer = document.getElementById('netflix-container');
     const primeVideoContainer = document.getElementById('prime-video-container');
@@ -7,69 +12,108 @@ document.addEventListener('DOMContentLoaded', () => {
     const disneyPlusContainer = document.getElementById('disney-plus-container');
     const canalPlusContainer = document.getElementById('canal-plus-container');
 
+    // Filter Buttons
     const filterBothBtn = document.getElementById('filter-both');
     const filterMoviesBtn = document.getElementById('filter-movies');
     const filterSeriesBtn = document.getElementById('filter-series');
+    const loadingSpinner = document.getElementById('loading-spinner');
 
     const platforms = [
-        { name: 'Netflix', container: netflixContainer, section: document.getElementById('netflix-section') },
-        { name: 'Amazon Prime Video', container: primeVideoContainer, section: document.getElementById('prime-video-section') },
-        { name: 'Apple TV+', container: appleTvContainer, section: document.getElementById('apple-tv-section') },
-        { name: 'Disney+', container: disneyPlusContainer, section: document.getElementById('disney-plus-section') },
-        { name: 'Canal+', container: canalPlusContainer, section: document.getElementById('canal-plus-section') }
+        { id: 8, name: 'Netflix', container: netflixContainer, section: document.getElementById('netflix-section') },
+        { id: 119, name: 'Amazon Prime Video', container: primeVideoContainer, section: document.getElementById('prime-video-section') },
+        { id: 350, name: 'Apple TV+', container: appleTvContainer, section: document.getElementById('apple-tv-section') },
+        { id: 337, name: 'Disney+', container: disneyPlusContainer, section: document.getElementById('disney-plus-section') },
+        { id: 392, name: 'Canal+', container: canalPlusContainer, section: document.getElementById('canal-plus-section') }
     ];
 
-    function createMediaCard(media) {
-        const link = media.type === 'movie' ? `film.html?id=${media.id}` : `serie.html?id=${media.id}`;
-        const cardWidth = media.type === 'movie' ? 'w-48' : 'w-36';
+    async function fetchAPI(endpoint) {
+        try {
+            const response = await fetch(`${BASE_URL}/${endpoint}&api_key=${API_KEY}&watch_region=FR`);
+            if (!response.ok) {
+                throw new Error(`API error: ${response.statusText}`);
+            }
+            const data = await response.json();
+            return data.results;
+        } catch (error) {
+            console.error(`Failed to fetch from ${endpoint}:`, error);
+            return []; // Return empty array on error
+        }
+    }
+
+    function createMediaCard(media, cardType = 'platform') {
+        const cardWidth = cardType === 'popular' ? 'w-48' : 'w-36';
+        const posterRadius = cardType === 'popular' ? 'rounded-lg' : 'rounded';
+
+        // More robust media type detection. '/discover' endpoints don't have 'media_type'.
+        // We can reliably check for the presence of a 'title' (movie) vs 'name' (tv).
+        const isMovie = media.media_type === 'movie' || media.hasOwnProperty('title');
+        const title = isMovie ? media.title : media.name;
+        const id = media.id;
+        const posterPath = media.poster_path;
+
+        if (!posterPath) return ''; // Skip items without a poster image
+
+        const link = isMovie ? `film.html?id=${id}` : `serie.html?id=${id}`;
+        const posterUrl = IMG_BASE_POSTER + posterPath;
 
         return `
             <a href="${link}" class="flex-shrink-0 ${cardWidth} snap-start">
-                <div class="w-full bg-center bg-no-repeat aspect-[2/3] bg-cover rounded-lg" style='background-image: url("${media.posterUrl}");'></div>
-                <p class="mt-2 text-sm font-medium text-gray-800 dark:text-gray-200 truncate">${media.title}</p>
+                <div class="w-full bg-center bg-no-repeat aspect-[2/3] bg-cover ${posterRadius}" style='background-image: url("${posterUrl}");'></div>
+                <p class="mt-2 text-sm font-medium text-gray-800 dark:text-gray-200 truncate">${title}</p>
                 <div class="flex items-center gap-2 mt-1 text-xs text-gray-500 dark:text-gray-400">
                     <div class="flex items-center gap-1">
                         <svg class="w-4 h-4 text-yellow-400" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path></svg>
-                        <span>${media.imdb}</span>
+                        <span>${media.vote_average ? media.vote_average.toFixed(1) : 'N/A'}</span>
                     </div>
                 </div>
             </a>
         `;
     }
 
-    function renderMedia(filter = 'both') {
-        // Clear all containers
-        popularContainer.innerHTML = '';
-        platforms.forEach(p => p.container.innerHTML = '');
+    function renderContent(container, content, cardType = 'platform') {
+        container.innerHTML = content.map(media => createMediaCard(media, cardType)).join('');
+    }
 
-        const filteredMedia = mediaData.filter(item => {
-            if (filter === 'both') return true;
-            return item.type === filter;
-        });
+    async function fetchAndDisplayContent(filter = 'both') {
+        loadingSpinner.style.display = 'flex';
+        try {
+            // Clear all containers first
+            popularContainer.innerHTML = '';
+            platforms.forEach(p => p.container.innerHTML = '');
 
-        // Populate Popular section
-        filteredMedia.forEach(media => {
-            popularContainer.innerHTML += createMediaCard(media);
-        });
+            // 1. Fetch Popular
+        let popularEndpoint = 'trending/all/week?language=en-US';
+        if (filter === 'movie') popularEndpoint = 'trending/movie/week?language=en-US';
+        if (filter === 'serie') popularEndpoint = 'trending/tv/week?language=en-US';
 
-        // Populate platform-specific sections
-        filteredMedia.forEach(media => {
-            if (media.availableOn && Array.isArray(media.availableOn)) {
-                media.availableOn.forEach(platformOnMedia => {
-                    const platformConfig = platforms.find(p => p.name === platformOnMedia.name);
-                    if (platformConfig) {
-                        platformConfig.container.innerHTML += createMediaCard(media);
-                    }
-                });
+        const popularContent = await fetchAPI(popularEndpoint);
+        renderContent(popularContainer, popularContent, 'popular');
+
+        // 2. Fetch for each platform
+        for (const platform of platforms) {
+            let platformContent = [];
+
+            if (filter === 'movie' || filter === 'both') {
+                const movies = await fetchAPI(`discover/movie?sort_by=popularity.desc&with_watch_providers=${platform.id}`);
+                platformContent.push(...movies);
             }
-        });
+            if (filter === 'serie' || filter === 'both') {
+                const series = await fetchAPI(`discover/tv?sort_by=popularity.desc&with_watch_providers=${platform.id}`);
+                platformContent.push(...series);
+            }
 
-        // Hide empty platform sections
-        platforms.forEach(p => {
-            p.section.style.display = p.container.innerHTML === '' ? 'none' : 'block';
-        });
+            // Sort combined content by popularity
+            platformContent.sort((a, b) => b.popularity - a.popularity);
 
-        document.getElementById('popular-section').style.display = popularContainer.innerHTML === '' ? 'none' : 'block';
+            renderContent(platform.container, platformContent, 'platform');
+
+            // Hide section if no content
+            platform.section.style.display = platformContent.length > 0 ? 'block' : 'none';
+        }
+        document.getElementById('popular-section').style.display = popularContent.length > 0 ? 'block' : 'none';
+        } finally {
+            loadingSpinner.style.display = 'none';
+        }
     }
 
     function updateFilterButtons(activeButton) {
@@ -82,20 +126,20 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     filterBothBtn.addEventListener('click', () => {
-        renderMedia('both');
+        fetchAndDisplayContent('both');
         updateFilterButtons(filterBothBtn);
     });
 
     filterMoviesBtn.addEventListener('click', () => {
-        renderMedia('movie');
+        fetchAndDisplayContent('movie');
         updateFilterButtons(filterMoviesBtn);
     });
 
     filterSeriesBtn.addEventListener('click', () => {
-        renderMedia('serie');
+        fetchAndDisplayContent('serie');
         updateFilterButtons(filterSeriesBtn);
     });
 
-    // Initial display
-    renderMedia('both');
+    // Initial Load
+    fetchAndDisplayContent('both');
 });
