@@ -101,11 +101,32 @@ async function fetchUpdates(id, type) {
 
             updateSimilarMoviesUI(similarMovies);
         } else if (type === 'tv') {
-            // Pour les séries, récupérer les détails des saisons
-            const seriesDetailsUrl = `${BASE_URL}/tv/${id}?api_key=${API_KEY}`;
+            // Pour les séries, on va chercher plus de détails (créateur, saisons etc)
+            const seriesDetailsUrl = `${BASE_URL}/tv/${id}?api_key=${API_KEY}&append_to_response=credits`;
             const seriesDetailsRes = await fetch(seriesDetailsUrl);
             const seriesDetailsData = await seriesDetailsRes.json();
 
+            // 1. Mettre à jour le créateur/directeur
+            let creator = null;
+            if (seriesDetailsData.created_by && seriesDetailsData.created_by.length > 0) {
+                const c = seriesDetailsData.created_by[0];
+                creator = {
+                    name: c.name,
+                    imageUrl: c.profile_path ? IMG_BASE_PROFILE + c.profile_path : 'https://placehold.co/64x64'
+                };
+            } else {
+                // Fallback: Chercher un directeur si pas de créateur
+                const director = seriesDetailsData.credits?.crew?.find(c => c.job === 'Director');
+                if (director) {
+                    creator = {
+                        name: director.name,
+                        imageUrl: director.profile_path ? IMG_BASE_PROFILE + director.profile_path : 'https://placehold.co/64x64'
+                    };
+                }
+            }
+            updatePersonUI(creator, 'tv');
+
+            // 2. Mettre à jour les saisons
             if (seriesDetailsData.seasons) {
                 updateSeasonsUI(seriesDetailsData.seasons, id);
             }
@@ -154,16 +175,7 @@ function updateUI(data, type, isLocal) {
     }
 
     // Director / Creator
-    const dirSection = document.getElementById('director-section');
-    if(dirSection && data.director) {
-        dirSection.style.display = 'block';
-        document.getElementById('director-image').src = data.director.imageUrl;
-        document.getElementById('director-name').textContent = data.director.name;
-        // Reset text content based on type if needed
-        const roleTitle = document.getElementById('director-title');
-        if (roleTitle) roleTitle.textContent = (type === 'serie') ? 'Creator' : 'Director';
-        document.getElementById('director-role').textContent = (type === 'serie') ? 'Creator' : 'Director';
-    }
+    updatePersonUI(data.director, type);
 
     // Similar Movies
     if (type === 'movie' && data.similarMovies) {
@@ -281,6 +293,28 @@ function renderCastList() {
 function toggleCastExpansion(linkElement) {
     isCastExpanded = !isCastExpanded;
     renderCastList();
+}
+
+function updatePersonUI(person, type) {
+    const section = document.getElementById('director-section');
+    if (!section) return;
+
+    if (!person || !person.name || person.name === 'Unknown') {
+        section.style.display = 'none';
+        return;
+    }
+
+    section.style.display = 'block';
+    document.getElementById('director-image').src = person.imageUrl;
+    document.getElementById('director-name').textContent = person.name;
+
+    const roleTitle = document.getElementById('director-title');
+    const roleText = document.getElementById('director-role');
+
+    const role = (type === 'tv') ? 'Creator' : 'Director';
+
+    if (roleTitle) roleTitle.textContent = role;
+    if (roleText) roleText.textContent = role;
 }
 
 function updateSeasonsUI(seasons, seriesId) {
