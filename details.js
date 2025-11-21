@@ -87,6 +87,21 @@ async function fetchUpdates(id, type) {
         
         updateCastUI(cast);
 
+        // Fetch Similar Movies (only for movies)
+        if (type === 'movie') {
+            const similarUrl = `${BASE_URL}/${type}/${id}/similar?api_key=${API_KEY}`;
+            const similarRes = await fetch(similarUrl);
+            const similarData = await similarRes.json();
+
+            const similarMovies = similarData.results?.map(s => ({
+                id: s.id,
+                title: s.title,
+                posterUrl: s.poster_path ? IMG_BASE_POSTER + s.poster_path : 'https://placehold.co/200x300'
+            })) || [];
+
+            updateSimilarMoviesUI(similarMovies);
+        }
+
     } catch (e) {
         console.error("Erreur mise à jour", e);
     }
@@ -141,20 +156,29 @@ function updateUI(data, type, isLocal) {
         document.getElementById('director-role').textContent = (type === 'serie') ? 'Creator' : 'Director';
     }
 
-    // Similar Movies (Seulement si présent)
+    // Similar Movies
+    if (type === 'movie' && data.similarMovies) {
+        updateSimilarMoviesUI(data.similarMovies);
+    }
+}
+
+function updateSimilarMoviesUI(similarMovies) {
     const simSection = document.getElementById('similar-movies-section');
     const simContainer = document.getElementById('similar-movies-container');
-    if(simSection && type === 'movie' && data.similarMovies && data.similarMovies.length > 0) {
+
+    if(simSection && similarMovies && similarMovies.length > 0) {
         simSection.style.display = 'block';
         simContainer.innerHTML = '';
-        data.similarMovies.slice(0,4).forEach(sim => {
+        similarMovies.slice(0,4).forEach(sim => {
             simContainer.innerHTML += `
                 <div class="w-32 flex-shrink-0 cursor-pointer" onclick="window.location.href='film.html?id=${sim.id}'">
                     <img class="w-full rounded-lg" src="${sim.posterUrl}"/>
                     <p class="mt-2 truncate text-sm font-semibold text-white">${sim.title}</p>
                 </div>`;
         });
-    } else if(simSection) { simSection.style.display = 'none'; }
+    } else if(simSection) {
+        simSection.style.display = 'none';
+    }
 }
 
 function updateStreamingUI(providers) {
