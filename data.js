@@ -12,7 +12,7 @@ const mediaData = [
       "Action"
     ],
     "duration": "2h 46m",
-    "imdb": "8.9",
+    "imdb": "8.4",
     "rottenTomatoes": "93",
     "synopsis": "Follow the mythic journey of Paul Atreides as he unites with Chani and the Fremen while on a warpath of revenge against the conspirators who destroyed his family. Facing a choice between the love of his life and the fate of the known universe, he endeavors to prevent a terrible future only he can foresee.",
     "posterUrl": "https://image.tmdb.org/t/p/w500/8b8R8l88Qje9dn9OE8PY05Nxl1X.jpg",
@@ -260,7 +260,7 @@ const mediaData = [
       "Crime"
     ],
     "duration": "1h 40m",
-    "imdb": "5.3",
+    "imdb": "xx",
     "rottenTomatoes": "xx",
     "synopsis": "Former Special Forces operative, Jack Johnson, uses the Stand Your Ground law to seek vengeance for his wife’s murder, igniting a brutal war against a local crime lord’s family and ending in an explosive showdown.",
     "posterUrl": "https://image.tmdb.org/t/p/w500/vKB59pPIYvjRxxEXoRoyUfaiBoD.jpg",
@@ -280,7 +280,7 @@ const mediaData = [
       "Thriller"
     ],
     "duration": "1h 31m",
-    "imdb": "2.5",
+    "imdb": "xx",
     "rottenTomatoes": "xx",
     "synopsis": "Will Radford is a top analyst for Homeland Security who tracks potential threats through a mass surveillance program, until one day an attack by an unknown entity leads him to question whether the government is hiding something from him... and from the rest of the world.",
     "posterUrl": "https://image.tmdb.org/t/p/w500/yvirUYrva23IudARHn3mMGVxWqM.jpg",
@@ -300,7 +300,7 @@ const mediaData = [
       "Mystery"
     ],
     "seasons": 1,
-    "imdb": "xx",
+    "imdb": "7.7",
     "rottenTomatoes": "xx",
     "synopsis": "In 1962, a couple with their son move to Derry, Maine just as a young boy disappears. With their arrival, very bad things begin to happen in the town.",
     "posterUrl": "https://image.tmdb.org/t/p/w500/nyy3BITeIjviv6PFIXtqvc8i6xi.jpg",
@@ -350,21 +350,69 @@ const mediaData = [
       "imageUrl": "https://image.tmdb.org/t/p/w185/kN1HdFViQkcJOQlNcvvFJIx9Uju.jpg"
     },
     "cast": [
-      { "name": "Winona Ryder", "character": "Joyce Byers", "imageUrl": "https://image.tmdb.org/t/p/w185/5k2sYsjOF94a4wcfMtlK9WnS2b4.jpg" },
-      { "name": "David Harbour", "character": "Jim Hopper", "imageUrl": "https://image.tmdb.org/t/p/w185/chPekukMF5ApUrE57C31iLw5LAb.jpg" },
-      { "name": "Finn Wolfhard", "character": "Mike Wheeler", "imageUrl": "https://image.tmdb.org/t/p/w185/dDR0aDBAz9ihol3nO0aJc4QcnM5.jpg" },
-      { "name": "Millie Bobby Brown", "character": "Eleven", "imageUrl": "https://image.tmdb.org/t/p/w185/zJgOxdcfLGD1aW70sNhvQfAM9sP.jpg" }
+      {
+        "name": "Winona Ryder",
+        "character": "Joyce Byers",
+        "imageUrl": "https://image.tmdb.org/t/p/w185/5k2sYsjOF94a4wcfMtlK9WnS2b4.jpg"
+      },
+      {
+        "name": "David Harbour",
+        "character": "Jim Hopper",
+        "imageUrl": "https://image.tmdb.org/t/p/w185/chPekukMF5ApUrE57C31iLw5LAb.jpg"
+      },
+      {
+        "name": "Finn Wolfhard",
+        "character": "Mike Wheeler",
+        "imageUrl": "https://image.tmdb.org/t/p/w185/dDR0aDBAz9ihol3nO0aJc4QcnM5.jpg"
+      },
+      {
+        "name": "Millie Bobby Brown",
+        "character": "Eleven",
+        "imageUrl": "https://image.tmdb.org/t/p/w185/zJgOxdcfLGD1aW70sNhvQfAM9sP.jpg"
+      }
     ],
     "episodes": {
       "season1": [
-        { "episode": 1, "title": "Chapter One: The Vanishing of Will Byers", "duration": "47m" },
-        { "episode": 2, "title": "Chapter Two: The Weirdo on Maple Street", "duration": "55m" },
-        { "episode": 3, "title": "Chapter Three: Holly, Jolly", "duration": "51m" },
-        { "episode": 4, "title": "Chapter Four: The Body", "duration": "49m" },
-        { "episode": 5, "title": "Chapter Five: The Flea and the Acrobat", "duration": "52m" },
-        { "episode": 6, "title": "Chapter Six: The Monster", "duration": "46m" },
-        { "episode": 7, "title": "Chapter Seven: The Bathtub", "duration": "41m" },
-        { "episode": 8, "title": "Chapter Eight: The Upside Down", "duration": "54m" }
+        {
+          "episode": 1,
+          "title": "Chapter One: The Vanishing of Will Byers",
+          "duration": "47m"
+        },
+        {
+          "episode": 2,
+          "title": "Chapter Two: The Weirdo on Maple Street",
+          "duration": "55m"
+        },
+        {
+          "episode": 3,
+          "title": "Chapter Three: Holly, Jolly",
+          "duration": "51m"
+        },
+        {
+          "episode": 4,
+          "title": "Chapter Four: The Body",
+          "duration": "49m"
+        },
+        {
+          "episode": 5,
+          "title": "Chapter Five: The Flea and the Acrobat",
+          "duration": "52m"
+        },
+        {
+          "episode": 6,
+          "title": "Chapter Six: The Monster",
+          "duration": "46m"
+        },
+        {
+          "episode": 7,
+          "title": "Chapter Seven: The Bathtub",
+          "duration": "41m"
+        },
+        {
+          "episode": 8,
+          "title": "Chapter Eight: The Upside Down",
+          "duration": "54m"
+        }
       ]
     }
   },
