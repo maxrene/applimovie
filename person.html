@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta charset="utf-8"/>
+<link crossorigin="" href="https://fonts.gstatic.com/" rel="preconnect"/>
+<link as="style" href="https://fonts.googleapis.com/css2?display=swap&amp;family=Noto+Sans%3Awght%40400%3B500%3B700%3B900&amp;family=Spline+Sans%3Awght%40400%3B500%3B700" onload="this.rel='stylesheet'" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script>
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "primary": "#ea2a33",
+            "background-light": "#f8f6f6",
+            "background-dark": "#211111",
+          },
+          fontFamily: {
+            "display": ["Spline Sans"]
+          },
+          borderRadius: {
+            "DEFAULT": "0.25rem",
+            "lg": "0.5rem",
+            "xl": "0.75rem",
+            "full": "9999px"
+          },
+        },
+      },
+    }
+  </script>
+<title>Actor Profile</title>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet"/>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-dark font-display text-gray-200">
+<div class="flex h-screen flex-col" x-data="{ activeTab: 'films' }">
+<header class="absolute top-0 left-0 right-0 z-10 flex items-center justify-between p-4">
+<button class="rounded-full bg-black/50 p-2 text-white" onclick="history.back()">
+<svg class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+<path d="M15 19l-7-7 7-7" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button>
+<button class="rounded-full bg-black/50 p-2 text-white">
+<svg class="h-6 w-6" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+<path d="M5 4a2 2 0 012-2h6a2 2 0 012 2v12l-5-3-5 3V4z"></path>
+</svg>
+</button>
+</header>
+<main class="flex-1 overflow-y-auto">
+<div class="flex flex-col items-center p-4 pt-16">
+<div class="relative">
+<img alt="Millie Bobby Brown" class="h-40 w-40 rounded-full object-cover shadow-lg" id="person-image" src=""/>
+</div>
+<h1 class="mt-4 text-3xl font-bold text-white" id="person-name"></h1>
+<p class="mt-4 max-w-md text-center text-sm text-gray-400" id="person-bio">
+        </p>
+</div>
+<div class="px-4 pb-8">
+<div class="mt-6">
+<div class="mb-4 flex items-center justify-center space-x-2 rounded-full bg-black/30 p-1">
+<button :class="{'bg-primary text-white': activeTab === 'films', 'text-gray-400': activeTab !== 'films'}" @click="activeTab = 'films'" class="w-full rounded-full py-2 px-4 text-center text-sm font-semibold transition-colors duration-300">
+              Films
+            </button>
+<button :class="{'bg-primary text-white': activeTab === 'series', 'text-gray-400': activeTab !== 'series'}" @click="activeTab = 'series'" class="w-full rounded-full py-2 px-4 text-center text-sm font-semibold transition-colors duration-300">
+              Series
+            </button>
+</div>
+<div x-cloak="" x-show="activeTab === 'films'">
+<div class="mt-4 space-y-4" id="films-container">
+</div>
+</div>
+<div x-cloak="" x-show="activeTab === 'series'">
+<div class="mt-4 space-y-4" id="series-container">
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+<script defer="" src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+<script src="config.js"></script>
+<script src="person.js"></script>
+</body></html>
