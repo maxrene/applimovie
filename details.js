@@ -42,24 +42,36 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
+        // Gestion du Casting
         const castContainer = document.getElementById('full-cast-container');
+        const castSection = document.getElementById('cast-section');
+        
         if (mediaItem.cast && mediaItem.cast.length > 0) {
-            document.getElementById('cast-section').style.display = 'block';
+            if (castSection) castSection.style.display = 'block';
             castContainer.innerHTML = '';
-            mediaItem.cast.forEach(member => {
+            
+            // On affiche les 4 premiers acteurs comme sur la maquette
+            mediaItem.cast.slice(0, 4).forEach(member => {
                 const castMemberDiv = document.createElement('div');
+                // Classes copiées de votre code.html
                 castMemberDiv.className = 'flex items-center gap-3';
+                
                 castMemberDiv.innerHTML = `
-                    <img alt="${member.name}" class="h-14 w-14 rounded-full object-cover flex-shrink-0" src="${member.imageUrl}"/>
+                    <img 
+                        alt="${member.name}" 
+                        class="h-14 w-14 rounded-full object-cover flex-shrink-0" 
+                        src="${member.imageUrl}"
+                        onerror="this.src='https://placehold.co/64x64?text=No+Img'"
+                    />
                     <div>
-                        <p class="font-semibold text-white">${member.name}</p>
+                        <p class="font-semibold text-white text-sm">${member.name}</p>
                         <p class="text-xs text-gray-400">${member.character}</p>
                     </div>
                 `;
                 castContainer.appendChild(castMemberDiv);
             });
         } else {
-            document.getElementById('cast-section').style.display = 'none';
+            if (castSection) castSection.style.display = 'none';
         }
 
         if (mediaItem.type === 'movie') {
