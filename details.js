@@ -8,6 +8,9 @@ const IMG_BASE_POSTER = 'https://image.tmdb.org/t/p/w500';
 const IMG_BASE_BANNER = 'https://image.tmdb.org/t/p/original';
 const IMG_BASE_PROFILE = 'https://image.tmdb.org/t/p/w185';
 
+let currentCastData = [];
+let isCastExpanded = false;
+
 document.addEventListener('DOMContentLoaded', async () => {
     const urlParams = new URLSearchParams(window.location.search);
     const mediaId = parseInt(urlParams.get('id')); // ID de l'URL
@@ -18,6 +21,15 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (!mediaId) return console.error("Pas d'ID");
 
+    // Setup 'See All' listener
+    const seeAllLink = document.querySelector('#cast-section a') || document.querySelector('a[href="#"][class*="text-primary"]');
+    if (seeAllLink) {
+        seeAllLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            toggleCastExpansion(seeAllLink);
+        });
+    }
+
     // ÉTAPE 1 : Chercher dans le cache local (data.js)
     // On suppose que mediaData est chargé via <script src="data.js">
     let localData = (typeof mediaData !== 'undefined') ? mediaData.find(m => m.id === mediaId) : null;
@@ -27,8 +39,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Affiche immédiatement ce qu'on a (Titre, Notes IMDb/RT scrapées, etc.)
         updateUI(localData, type, true); 
         
-        // ÉTAPE 2 : Aller chercher juste le Streaming frais en arrière-plan
-        fetchStreamingAndUpdates(mediaId, type);
+        // ÉTAPE 2 : Aller chercher le Streaming ET le Casting frais en arrière-plan
+        fetchUpdates(mediaId, type);
     } else {
         console.log("🌍 Film inconnu localement, recherche sur TMDB...");
         // Le film n'est pas dans data.js (nouveau film ?), on charge tout depuis TMDB
@@ -52,17 +64,31 @@ async function fetchFullFromTMDB(id, type) {
     }
 }
 
-// Fonction pour récupérer uniquement le streaming frais pour un film déjà en cache
-async function fetchStreamingAndUpdates(id, type) {
+// Fonction pour récupérer les mises à jour (Streaming + Casting)
+async function fetchUpdates(id, type) {
     try {
-        const url = `${BASE_URL}/${type}/${id}/watch/providers?api_key=${API_KEY}`;
-        const res = await fetch(url);
-        const data = await res.json();
+        // Fetch Streaming
+        const streamingUrl = `${BASE_URL}/${type}/${id}/watch/providers?api_key=${API_KEY}`;
+        const streamingRes = await fetch(streamingUrl);
+        const streamingData = await streamingRes.json();
+        updateStreamingUI(streamingData.results?.IE?.flatrate || []);
+
+        // Fetch Credits (Cast & Crew)
+        const creditsUrl = `${BASE_URL}/${type}/${id}/credits?api_key=${API_KEY}`;
+        const creditsRes = await fetch(creditsUrl);
+        const creditsData = await creditsRes.json();
+
+        // Format and Update Cast
+        const cast = creditsData.cast?.map(c => ({
+            name: c.name,
+            character: c.character,
+            imageUrl: c.profile_path ? IMG_BASE_PROFILE + c.profile_path : 'https://placehold.co/64x64'
+        })) || [];
         
-        // Mise à jour uniquement de la section streaming
-        updateStreamingUI(data.results?.IE?.flatrate || []);
+        updateCastUI(cast);
+
     } catch (e) {
-        console.error("Erreur mise à jour streaming", e);
+        console.error("Erreur mise à jour", e);
     }
 }
 
@@ -95,26 +121,13 @@ function updateUI(data, type, isLocal) {
         genresContainer.innerHTML += `<span class="font-medium">${g}</span>${i < genreList.length - 1 ? '<span class="h-3 w-px bg-gray-600 mx-2"></span>' : ''}`;
     });
 
-    // Streaming (Si local, on affiche ce qu'on a, puis ça sera mis à jour par fetchStreamingAndUpdates)
+    // Streaming (Si local, on affiche ce qu'on a, puis ça sera mis à jour par fetchUpdates)
     if (data.availableOn) updateStreamingUI(data.availableOn);
 
     // Casting
-    const castContainer = document.getElementById('full-cast-container');
-    const castSection = document.getElementById('cast-section');
     if (data.cast && data.cast.length > 0) {
-        if(castSection) castSection.style.display = 'block';
-        castContainer.innerHTML = '';
-        data.cast.slice(0, 4).forEach(member => {
-            castContainer.innerHTML += `
-                <div class="flex items-center gap-3">
-                    <img class="h-14 w-14 rounded-full object-cover flex-shrink-0" src="${member.imageUrl}" onerror="this.src='https://placehold.co/64x64'"/>
-                    <div>
-                        <p class="font-semibold text-white text-sm">${member.name}</p>
-                        <p class="text-xs text-gray-400">${member.character}</p>
-                    </div>
-                </div>`;
-        });
-    } else if(castSection) { castSection.style.display = 'none'; }
+        updateCastUI(data.cast);
+    }
 
     // Director / Creator
     const dirSection = document.getElementById('director-section');
@@ -166,6 +179,75 @@ function updateStreamingUI(providers) {
     } else {
         container.innerHTML = '<span class="text-gray-500 text-xs">Not available in IE</span>';
     }
+}
+
+function updateCastUI(cast) {
+    currentCastData = cast;
+    const castContainer = document.getElementById('full-cast-container');
+    const castSection = document.getElementById('cast-section');
+
+    // Try to find elements using alternate IDs if not found (for serie.html compatibility if not fixed yet)
+    // But better to fix HTML. Assuming HTML is correct or being fixed.
+    // Wait, plan step 3 is fixing HTML. So I will rely on IDs being 'cast-section' and 'full-cast-container'.
+    // Wait, looking at serie.html content I read:
+    // <div class="flex items-center justify-between"><h2 ...>Full Cast</h2>...</div>
+    // <div id="full-cast-container" ...>
+    // It does NOT have an ID on the parent div like 'cast-section'.
+    // film.html HAS id="cast-section".
+    // I should handle this gracefully.
+
+    let container = castContainer;
+    let section = castSection;
+
+    // Fallback for serie.html structure if id is missing on parent
+    if (!section && container) {
+        section = container.parentElement.parentElement; // Assuming structure
+    }
+
+    if (currentCastData && currentCastData.length > 0) {
+        if(section) section.style.display = 'block'; // Or remove hidden class
+        renderCastList();
+    } else if(section) {
+        section.style.display = 'none';
+    }
+}
+
+function renderCastList() {
+    const castContainer = document.getElementById('full-cast-container');
+    if (!castContainer) return;
+
+    const seeAllLink = document.querySelector('#cast-section a') || castContainer.parentElement.querySelector('a');
+
+    castContainer.innerHTML = '';
+
+    const limit = isCastExpanded ? 20 : 4;
+    const displayList = currentCastData.slice(0, limit);
+
+    displayList.forEach(member => {
+        castContainer.innerHTML += `
+            <div class="flex items-center gap-3">
+                <img class="h-14 w-14 rounded-full object-cover flex-shrink-0" src="${member.imageUrl}" onerror="this.src='https://placehold.co/64x64'"/>
+                <div>
+                    <p class="font-semibold text-white text-sm">${member.name}</p>
+                    <p class="text-xs text-gray-400">${member.character}</p>
+                </div>
+            </div>`;
+    });
+
+    // Toggle button visibility/text
+    if (seeAllLink) {
+        if (currentCastData.length <= 4) {
+            seeAllLink.style.display = 'none';
+        } else {
+            seeAllLink.style.display = 'inline-block';
+            seeAllLink.textContent = isCastExpanded ? 'Show Less' : 'See All';
+        }
+    }
+}
+
+function toggleCastExpansion(linkElement) {
+    isCastExpanded = !isCastExpanded;
+    renderCastList();
 }
 
 // Utilitaire pour transformer les données brutes TMDB en format "data.js"
