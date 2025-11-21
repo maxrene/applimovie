@@ -1,198 +1,221 @@
-// details.js
-document.addEventListener('DOMContentLoaded', () => {
+// details.js - Version Hybride (Cache Local + Mise à jour dynamique)
+
+// ⚠️ VOTRE CLÉ API ICI ⚠️
+const API_KEY = 'f1b07b5d2ac7a9f55c5b49a93b18bd33'; 
+
+const BASE_URL = 'https://api.themoviedb.org/3';
+const IMG_BASE_POSTER = 'https://image.tmdb.org/t/p/w500';
+const IMG_BASE_BANNER = 'https://image.tmdb.org/t/p/original';
+const IMG_BASE_PROFILE = 'https://image.tmdb.org/t/p/w185';
+
+document.addEventListener('DOMContentLoaded', async () => {
     const urlParams = new URLSearchParams(window.location.search);
-    const mediaId = parseInt(urlParams.get('id'));
-    const mediaItem = mediaData.find(m => m.id === mediaId);
+    const mediaId = parseInt(urlParams.get('id')); // ID de l'URL
+    
+    // Vérifie si on est sur un film ou une série
+    const isMovie = window.location.pathname.includes('film.html');
+    const type = isMovie ? 'movie' : 'tv';
 
-    if (mediaItem) {
-        // Common details
-        document.getElementById('media-title').textContent = mediaItem.title;
-        document.getElementById('media-banner').src = mediaItem.bannerUrl;
-        document.getElementById('media-poster').src = mediaItem.posterUrl;
-        document.getElementById('media-year').textContent = mediaItem.year;
-        document.getElementById('media-duration').textContent = mediaItem.duration;
-        document.getElementById('media-imdb').textContent = mediaItem.imdb;
-        const rtScore = mediaItem.rottenTomatoes;
-        document.getElementById('media-rt').textContent = (rtScore && rtScore !== 'xx') ? `${rtScore}%` : rtScore;
-        document.getElementById('media-synopsis').textContent = mediaItem.synopsis;
+    if (!mediaId) return console.error("Pas d'ID");
 
-        const genresContainer = document.getElementById('media-genres');
-        genresContainer.innerHTML = '';
-        mediaItem.genres.forEach((genre, index) => {
-            const genreSpan = document.createElement('span');
-            genreSpan.className = 'font-medium';
-            genreSpan.textContent = genre;
-            genresContainer.appendChild(genreSpan);
-            if (index < mediaItem.genres.length - 1) {
-                const separator = document.createElement('span');
-                separator.className = 'h-3 w-px bg-gray-600';
-                genresContainer.appendChild(separator);
-            }
-        });
+    // ÉTAPE 1 : Chercher dans le cache local (data.js)
+    // On suppose que mediaData est chargé via <script src="data.js">
+    let localData = (typeof mediaData !== 'undefined') ? mediaData.find(m => m.id === mediaId) : null;
 
-        const availableOnContainer = document.getElementById('available-on-container');
-        if (mediaItem.availableOn) {
-            availableOnContainer.innerHTML = '';
-            mediaItem.availableOn.forEach(platform => {
-                const img = document.createElement('img');
-                img.alt = `${platform.name} logo`;
-                img.className = 'h-6 w-6 rounded-md';
-                img.src = platform.logoUrl;
-                availableOnContainer.appendChild(img);
-            });
-        }
-
-        // Gestion du Casting
-        const castContainer = document.getElementById('full-cast-container');
-        const castSection = document.getElementById('cast-section');
+    if (localData) {
+        console.log("✅ Film trouvé dans le cache local (data.js)");
+        // Affiche immédiatement ce qu'on a (Titre, Notes IMDb/RT scrapées, etc.)
+        updateUI(localData, type, true); 
         
-        if (mediaItem.cast && mediaItem.cast.length > 0) {
-            if (castSection) castSection.style.display = 'block';
-            castContainer.innerHTML = '';
-            
-            // On affiche les 4 premiers acteurs comme sur la maquette
-            mediaItem.cast.slice(0, 4).forEach(member => {
-                const castMemberDiv = document.createElement('div');
-                // Classes copiées de votre code.html
-                castMemberDiv.className = 'flex items-center gap-3';
-                
-                castMemberDiv.innerHTML = `
-                    <img 
-                        alt="${member.name}" 
-                        class="h-14 w-14 rounded-full object-cover flex-shrink-0" 
-                        src="${member.imageUrl}"
-                        onerror="this.src='https://placehold.co/64x64?text=No+Img'"
-                    />
+        // ÉTAPE 2 : Aller chercher juste le Streaming frais en arrière-plan
+        fetchStreamingAndUpdates(mediaId, type);
+    } else {
+        console.log("🌍 Film inconnu localement, recherche sur TMDB...");
+        // Le film n'est pas dans data.js (nouveau film ?), on charge tout depuis TMDB
+        fetchFullFromTMDB(mediaId, type);
+    }
+});
+
+// Fonction pour tout récupérer si le film n'est pas en cache
+async function fetchFullFromTMDB(id, type) {
+    try {
+        const url = `${BASE_URL}/${type}/${id}?api_key=${API_KEY}&append_to_response=credits,watch/providers,similar,external_ids`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error("Erreur TMDB");
+        const data = await res.json();
+        
+        // On transforme les données TMDB pour qu'elles ressemblent à notre format local
+        const formattedData = formatTMDBData(data, type);
+        updateUI(formattedData, type, false);
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+// Fonction pour récupérer uniquement le streaming frais pour un film déjà en cache
+async function fetchStreamingAndUpdates(id, type) {
+    try {
+        const url = `${BASE_URL}/${type}/${id}/watch/providers?api_key=${API_KEY}`;
+        const res = await fetch(url);
+        const data = await res.json();
+        
+        // Mise à jour uniquement de la section streaming
+        updateStreamingUI(data.results?.IE?.flatrate || []);
+    } catch (e) {
+        console.error("Erreur mise à jour streaming", e);
+    }
+}
+
+// Mise à jour de l'interface
+function updateUI(data, type, isLocal) {
+    // Images & Titres
+    document.getElementById('media-banner').src = data.bannerUrl;
+    document.getElementById('media-poster').src = data.posterUrl;
+    document.getElementById('media-title').textContent = data.title;
+    document.getElementById('media-year').textContent = data.year;
+    document.getElementById('media-synopsis').textContent = data.synopsis;
+
+    // Notes (Si c'est local, on a les vraies notes IMDb/RT scrapées !)
+    document.getElementById('media-imdb').textContent = data.imdb;
+    document.getElementById('media-rt').textContent = data.rottenTomatoes === 'xx' ? '' : (data.rottenTomatoes.includes('%') ? data.rottenTomatoes : data.rottenTomatoes + '%');
+
+    // Durée / Saisons
+    if (type === 'movie') {
+        document.getElementById('media-duration').textContent = data.duration;
+    } else {
+        document.getElementById('media-seasons').textContent = typeof data.seasons === 'number' ? `${data.seasons} Seasons` : data.seasons;
+    }
+
+    // Genres
+    const genresContainer = document.getElementById('media-genres');
+    genresContainer.innerHTML = '';
+    // Gère le format string (local) ou objet (TMDB)
+    const genreList = data.genres.map(g => typeof g === 'string' ? g : g.name); 
+    genreList.forEach((g, i) => {
+        genresContainer.innerHTML += `<span class="font-medium">${g}</span>${i < genreList.length - 1 ? '<span class="h-3 w-px bg-gray-600 mx-2"></span>' : ''}`;
+    });
+
+    // Streaming (Si local, on affiche ce qu'on a, puis ça sera mis à jour par fetchStreamingAndUpdates)
+    if (data.availableOn) updateStreamingUI(data.availableOn);
+
+    // Casting
+    const castContainer = document.getElementById('full-cast-container');
+    const castSection = document.getElementById('cast-section');
+    if (data.cast && data.cast.length > 0) {
+        if(castSection) castSection.style.display = 'block';
+        castContainer.innerHTML = '';
+        data.cast.slice(0, 4).forEach(member => {
+            castContainer.innerHTML += `
+                <div class="flex items-center gap-3">
+                    <img class="h-14 w-14 rounded-full object-cover flex-shrink-0" src="${member.imageUrl}" onerror="this.src='https://placehold.co/64x64'"/>
                     <div>
                         <p class="font-semibold text-white text-sm">${member.name}</p>
                         <p class="text-xs text-gray-400">${member.character}</p>
                     </div>
-                `;
-                castContainer.appendChild(castMemberDiv);
-            });
-        } else {
-            if (castSection) castSection.style.display = 'none';
-        }
+                </div>`;
+        });
+    } else if(castSection) { castSection.style.display = 'none'; }
 
-        if (mediaItem.type === 'movie') {
-            document.getElementById('director-section').style.display = 'block';
-            document.getElementById('similar-movies-section').style.display = 'block';
-            document.getElementById('series-section').style.display = 'none';
-
-            const directorInfo = mediaItem.director;
-            if (directorInfo) {
-                document.getElementById('director-image').src = directorInfo.imageUrl;
-                document.getElementById('director-name').textContent = directorInfo.name;
-                document.getElementById('director-role').textContent = 'Director';
-            }
-
-            const similarMoviesContainer = document.getElementById('similar-movies-container');
-            if (mediaItem.similarMovies) {
-                similarMoviesContainer.innerHTML = '';
-                mediaItem.similarMovies.forEach(movie => {
-                    const movieDiv = document.createElement('div');
-                    movieDiv.className = 'w-32 flex-shrink-0';
-                    movieDiv.innerHTML = `
-                        <img alt="${movie.title} poster" class="w-full rounded-lg" src="${movie.posterUrl}"/>
-                        <p class="mt-2 truncate text-sm font-semibold text-white">${movie.title}</p>
-                    `;
-                    similarMoviesContainer.appendChild(movieDiv);
-                });
-            }
-
-        } else if (mediaItem.type === 'serie') {
-            document.getElementById('director-section').style.display = 'block';
-            document.getElementById('similar-movies-section').style.display = 'none';
-            document.getElementById('series-section').style.display = 'block';
-
-            const creatorInfo = mediaItem.creator;
-            if (creatorInfo) {
-                document.getElementById('director-image').src = creatorInfo.imageUrl;
-                document.getElementById('director-name').textContent = creatorInfo.name;
-                document.getElementById('director-title').textContent = 'Creator';
-                document.getElementById('director-role').textContent = 'Creator';
-            }
-
-            const seasonSelect = document.getElementById('season-select');
-            const episodesContainer = document.getElementById('episodes-container');
-
-            if (typeof mediaItem.seasons === 'number' && mediaItem.episodes) {
-                for (let i = 1; i <= mediaItem.seasons; i++) {
-                    const option = document.createElement('option');
-                    option.value = i;
-                    option.textContent = `Season ${i}`;
-                    seasonSelect.appendChild(option);
-                }
-
-                const displayEpisodes = (seasonNumber) => {
-                    const seasonKey = `season${seasonNumber}`;
-                    const season = mediaItem.episodes[seasonKey];
-                    episodesContainer.innerHTML = '';
-                    if (season) {
-                        season.forEach(episode => {
-                            const episodeElement = document.createElement('div');
-                            episodeElement.className = 'flex items-center gap-4 rounded-lg bg-gray-800 p-3';
-                            episodeElement.innerHTML = `
-                                <img alt="Episode thumbnail" class="h-16 w-28 rounded-md object-cover" src="${episode.thumbnail || 'https://placehold.co/112x64'}"/>
-                                <div class="flex-1">
-                                    <p class="font-semibold text-white">${episode.episode} - ${episode.title}</p>
-                                    <p class="text-sm text-gray-400">${episode.duration}</p>
-                                </div>
-                                <button class="text-white">
-                                    <svg class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                        <path d="M4 6h16M4 12h16m-7 6h7" stroke-linecap="round" stroke-linejoin="round"></path>
-                                    </svg>
-                                </button>
-                            `;
-                            episodesContainer.appendChild(episodeElement);
-                        });
-                    }
-                };
-
-                displayEpisodes(1);
-                seasonSelect.addEventListener('change', (e) => {
-                    displayEpisodes(e.target.value);
-                });
-
-            } else if (Array.isArray(mediaItem.seasons)) {
-                mediaItem.seasons.forEach((season, index) => {
-                    const option = document.createElement('option');
-                    option.value = index;
-                    option.textContent = `Season ${season.season}`;
-                    seasonSelect.appendChild(option);
-                });
-
-                const displayEpisodes = (seasonIndex) => {
-                    const season = mediaItem.seasons[seasonIndex];
-                    episodesContainer.innerHTML = '';
-                    if (season && season.episodes) {
-                        season.episodes.forEach(episode => {
-                            const episodeElement = document.createElement('div');
-                            episodeElement.className = 'flex items-center gap-4 rounded-lg bg-gray-800 p-3';
-                            episodeElement.innerHTML = `
-                                <img alt="Episode thumbnail" class="h-16 w-28 rounded-md object-cover" src="${episode.thumbnail || 'https://placehold.co/112x64'}"/>
-                                <div class="flex-1">
-                                    <p class="font-semibold text-white">${episode.episode} - ${episode.title}</p>
-                                    <p class="text-sm text-gray-400">${episode.duration}</p>
-                                </div>
-                                <button class="text-white">
-                                    <svg class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                        <path d="M4 6h16M4 12h16m-7 6h7" stroke-linecap="round" stroke-linejoin="round"></path>
-                                    </svg>
-                                </button>
-                            `;
-                            episodesContainer.appendChild(episodeElement);
-                        });
-                    }
-                };
-
-                displayEpisodes(0);
-                seasonSelect.addEventListener('change', (e) => {
-                    displayEpisodes(e.target.value);
-                });
-            }
-        }
-    } else {
-        console.error('Media not found');
+    // Director / Creator
+    const dirSection = document.getElementById('director-section');
+    if(dirSection && data.director) {
+        dirSection.style.display = 'block';
+        document.getElementById('director-image').src = data.director.imageUrl;
+        document.getElementById('director-name').textContent = data.director.name;
+        // Reset text content based on type if needed
+        const roleTitle = document.getElementById('director-title');
+        if (roleTitle) roleTitle.textContent = (type === 'serie') ? 'Creator' : 'Director';
+        document.getElementById('director-role').textContent = (type === 'serie') ? 'Creator' : 'Director';
     }
-});
+
+    // Similar Movies (Seulement si présent)
+    const simSection = document.getElementById('similar-movies-section');
+    const simContainer = document.getElementById('similar-movies-container');
+    if(simSection && type === 'movie' && data.similarMovies && data.similarMovies.length > 0) {
+        simSection.style.display = 'block';
+        simContainer.innerHTML = '';
+        data.similarMovies.slice(0,4).forEach(sim => {
+            simContainer.innerHTML += `
+                <div class="w-32 flex-shrink-0 cursor-pointer" onclick="window.location.href='film.html?id=${sim.id}'">
+                    <img class="w-full rounded-lg" src="${sim.posterUrl}"/>
+                    <p class="mt-2 truncate text-sm font-semibold text-white">${sim.title}</p>
+                </div>`;
+        });
+    } else if(simSection) { simSection.style.display = 'none'; }
+}
+
+function updateStreamingUI(providers) {
+    const container = document.getElementById('available-on-container');
+    if (!container) return;
+    container.innerHTML = '';
+    
+    // Standardisation : parfois TMDB renvoie raw, parfois notre cache a déjà traité
+    let list = [];
+    if (providers.length > 0 && providers[0].provider_name) {
+        // Format Brut TMDB
+        list = providers.map(p => ({ name: p.provider_name, logoUrl: IMG_BASE_PROFILE + p.logo_path }));
+    } else {
+        // Format Cache data.js
+        list = providers;
+    }
+
+    if (list.length > 0) {
+        list.forEach(p => {
+            container.innerHTML += `<img src="${p.logoUrl}" alt="${p.name}" title="${p.name}" class="h-6 w-6 rounded-md"/>`;
+        });
+    } else {
+        container.innerHTML = '<span class="text-gray-500 text-xs">Not available in IE</span>';
+    }
+}
+
+// Utilitaire pour transformer les données brutes TMDB en format "data.js"
+function formatTMDBData(data, type) {
+    const isMovie = type === 'movie';
+    
+    // Director / Creator
+    let dir = { name: 'Unknown', imageUrl: 'https://placehold.co/64x64' };
+    if(isMovie) {
+        const d = data.credits?.crew?.find(c => c.job === 'Director');
+        if(d) dir = { name: d.name, imageUrl: d.profile_path ? IMG_BASE_PROFILE + d.profile_path : dir.imageUrl };
+    } else if(data.created_by?.length > 0) {
+        dir = { name: data.created_by[0].name, imageUrl: data.created_by[0].profile_path ? IMG_BASE_PROFILE + data.created_by[0].profile_path : dir.imageUrl };
+    }
+
+    // Cast
+    const cast = data.credits?.cast?.map(c => ({
+        name: c.name,
+        character: c.character,
+        imageUrl: c.profile_path ? IMG_BASE_PROFILE + c.profile_path : 'https://placehold.co/64x64'
+    })) || [];
+
+    // Similar
+    const similar = data.similar?.results?.map(s => ({
+        id: s.id,
+        title: s.title,
+        posterUrl: s.poster_path ? IMG_BASE_POSTER + s.poster_path : 'https://placehold.co/200x300'
+    })) || [];
+
+    // Streaming IE
+    const streaming = data['watch/providers']?.results?.IE?.flatrate?.map(p => ({
+        name: p.provider_name,
+        logoUrl: IMG_BASE_PROFILE + p.logo_path
+    })) || [];
+
+    return {
+        id: data.id,
+        title: isMovie ? data.title : data.name,
+        year: (isMovie ? data.release_date : data.first_air_date)?.split('-')[0] || 'N/A',
+        genres: data.genres || [], // Array of objects {id, name}
+        duration: isMovie ? `${Math.floor(data.runtime/60)}h ${data.runtime%60}m` : '',
+        seasons: !isMovie ? data.number_of_seasons : null,
+        imdb: data.vote_average?.toFixed(1) || 'N/A', // Fallback TMDB
+        rottenTomatoes: 'TMDB', // Indication
+        synopsis: data.overview,
+        posterUrl: data.poster_path ? IMG_BASE_POSTER + data.poster_path : '',
+        bannerUrl: data.backdrop_path ? IMG_BASE_BANNER + data.backdrop_path : '',
+        director: dir,
+        cast: cast,
+        similarMovies: similar,
+        availableOn: streaming
+    };
+}
