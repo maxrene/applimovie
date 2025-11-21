@@ -100,6 +100,15 @@ async function fetchUpdates(id, type) {
             })) || [];
 
             updateSimilarMoviesUI(similarMovies);
+        } else if (type === 'tv') {
+            // Pour les séries, récupérer les détails des saisons
+            const seriesDetailsUrl = `${BASE_URL}/tv/${id}?api_key=${API_KEY}`;
+            const seriesDetailsRes = await fetch(seriesDetailsUrl);
+            const seriesDetailsData = await seriesDetailsRes.json();
+
+            if (seriesDetailsData.seasons) {
+                updateSeasonsUI(seriesDetailsData.seasons, id);
+            }
         }
 
     } catch (e) {
@@ -272,6 +281,85 @@ function renderCastList() {
 function toggleCastExpansion(linkElement) {
     isCastExpanded = !isCastExpanded;
     renderCastList();
+}
+
+function updateSeasonsUI(seasons, seriesId) {
+    const container = document.getElementById('seasons-episodes-container');
+    if (!container) return;
+
+    container.innerHTML = ''; // Vide le contenu précédent
+
+    seasons.forEach(season => {
+        // Ignore "Season 0" or specials which often have episode_count: 0
+        if (season.season_number === 0 || season.episode_count === 0) {
+            return;
+        }
+
+        const seasonCardHTML = `
+            <div class="season-card rounded-lg bg-gray-800" data-season-number="${season.season_number}">
+                <div class="flex items-center justify-between p-3 cursor-pointer">
+                    <h3 class="font-semibold text-white">${season.name}</h3>
+                    <span class="text-xs text-gray-400">${season.episode_count} Episodes</span>
+                </div>
+        <div class="episodes-container">
+                    <!-- Les épisodes seront chargés ici -->
+                </div>
+            </div>
+        `;
+        container.innerHTML += seasonCardHTML;
+    });
+
+    // Ajoute les écouteurs d'événements pour le clic
+    document.querySelectorAll('.season-card .cursor-pointer').forEach(header => {
+        header.addEventListener('click', async () => {
+            const card = header.closest('.season-card');
+            const episodesContainer = card.querySelector('.episodes-container');
+            const seasonNumber = card.dataset.seasonNumber;
+
+            // Toggle l'affichage
+            const cardIsOpen = card.classList.contains('open');
+
+            if (cardIsOpen) {
+                card.classList.remove('open');
+            } else {
+                card.classList.add('open');
+                // Fetch and render episodes if not already loaded
+                if (!episodesContainer.dataset.loaded) {
+                    episodesContainer.innerHTML = '<div class="p-3 border-t border-gray-700"><p class="text-gray-400">Loading episodes...</p></div>';
+                    try {
+                        const url = `${BASE_URL}/tv/${seriesId}/season/${seasonNumber}?api_key=${API_KEY}`;
+                        const res = await fetch(url);
+                        if (!res.ok) throw new Error('Failed to fetch season details');
+                        const seasonDetails = await res.json();
+
+                        const episodes = seasonDetails.episodes;
+                        if (!episodes || episodes.length === 0) {
+                            episodesContainer.innerHTML = '<div class="p-3 border-t border-gray-700"><p class="text-gray-400">No episode information available.</p></div>';
+                        } else {
+                            const episodesListHTML = episodes.map(episode => {
+                                 const runtime = episode.runtime ? `${episode.runtime}m` : '';
+                                 return `
+                                    <div class="flex items-center gap-4">
+                                        <span class="text-sm font-medium text-gray-400">${episode.episode_number}</span>
+                                        <div class="flex-1">
+                                            <p class="font-semibold text-white">${episode.name}</p>
+                                            <p class="text-xs text-gray-500">${runtime}</p>
+                                        </div>
+                                    </div>`;
+                            }).join('');
+
+                            episodesContainer.innerHTML = `<div class="border-t border-gray-700 px-3 py-4 space-y-4">${episodesListHTML}</div>`;
+                        }
+
+                        episodesContainer.dataset.loaded = 'true';
+                    } catch (e) {
+                        console.error('Error fetching episodes:', e);
+                        episodesContainer.innerHTML = '<div class="p-3 border-t border-gray-700"><p class="text-red-500">Could not load episodes.</p></div>';
+                    }
+                }
+            }
+        });
+    });
 }
 
 // Utilitaire pour transformer les données brutes TMDB en format "data.js"
