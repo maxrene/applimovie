@@ -1,8 +1,5 @@
 // details.js - Version Hybride (Cache Local + Mise à jour dynamique)
 
-// ⚠️ VOTRE CLÉ API ICI ⚠️
-const API_KEY = 'f1b07b5d2ac7a9f55c5b49a93b18bd33'; 
-
 const BASE_URL = 'https://api.themoviedb.org/3';
 const IMG_BASE_POSTER = 'https://image.tmdb.org/t/p/w500';
 const IMG_BASE_BANNER = 'https://image.tmdb.org/t/p/original';
@@ -51,7 +48,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 // Fonction pour tout récupérer si le film n'est pas en cache
 async function fetchFullFromTMDB(id, type) {
     try {
-        const url = `${BASE_URL}/${type}/${id}?api_key=${API_KEY}&append_to_response=credits,watch/providers,similar,external_ids`;
+        const url = `${BASE_URL}/${type}/${id}?api_key=${TMDB_API_KEY}&append_to_response=credits,watch/providers,similar,external_ids`;
         const res = await fetch(url);
         if (!res.ok) throw new Error("Erreur TMDB");
         const data = await res.json();
@@ -59,6 +56,11 @@ async function fetchFullFromTMDB(id, type) {
         // On transforme les données TMDB pour qu'elles ressemblent à notre format local
         const formattedData = formatTMDBData(data, type);
         updateUI(formattedData, type, false);
+
+        // S'il s'agit d'une série, on doit aussi afficher les saisons
+        if (type === 'tv' && data.seasons) {
+            updateSeasonsUI(data.seasons, id);
+        }
     } catch (e) {
         console.error(e);
     }
@@ -68,13 +70,13 @@ async function fetchFullFromTMDB(id, type) {
 async function fetchUpdates(id, type) {
     try {
         // Fetch Streaming
-        const streamingUrl = `${BASE_URL}/${type}/${id}/watch/providers?api_key=${API_KEY}`;
+        const streamingUrl = `${BASE_URL}/${type}/${id}/watch/providers?api_key=${TMDB_API_KEY}`;
         const streamingRes = await fetch(streamingUrl);
         const streamingData = await streamingRes.json();
         updateStreamingUI(streamingData.results?.IE?.flatrate || []);
 
         // Fetch Credits (Cast & Crew)
-        const creditsUrl = `${BASE_URL}/${type}/${id}/credits?api_key=${API_KEY}`;
+        const creditsUrl = `${BASE_URL}/${type}/${id}/credits?api_key=${TMDB_API_KEY}`;
         const creditsRes = await fetch(creditsUrl);
         const creditsData = await creditsRes.json();
 
@@ -89,7 +91,7 @@ async function fetchUpdates(id, type) {
 
         // Fetch Similar Movies (only for movies)
         if (type === 'movie') {
-            const similarUrl = `${BASE_URL}/${type}/${id}/similar?api_key=${API_KEY}`;
+            const similarUrl = `${BASE_URL}/${type}/${id}/similar?api_key=${TMDB_API_KEY}`;
             const similarRes = await fetch(similarUrl);
             const similarData = await similarRes.json();
 
@@ -102,7 +104,7 @@ async function fetchUpdates(id, type) {
             updateSimilarMoviesUI(similarMovies);
         } else if (type === 'tv') {
             // Pour les séries, on va chercher plus de détails (créateur, saisons etc)
-            const seriesDetailsUrl = `${BASE_URL}/tv/${id}?api_key=${API_KEY}&append_to_response=credits`;
+            const seriesDetailsUrl = `${BASE_URL}/tv/${id}?api_key=${TMDB_API_KEY}&append_to_response=credits`;
             const seriesDetailsRes = await fetch(seriesDetailsUrl);
             const seriesDetailsData = await seriesDetailsRes.json();
 
@@ -380,7 +382,7 @@ function updateSeasonsUI(seasons, seriesId) {
                 if (!episodesContainer.dataset.loaded) {
                     episodesContainer.innerHTML = '<div class="p-3 border-t border-gray-700"><p class="text-gray-400">Loading episodes...</p></div>';
                     try {
-                        const url = `${BASE_URL}/tv/${seriesId}/season/${seasonNumber}?api_key=${API_KEY}`;
+                        const url = `${BASE_URL}/tv/${seriesId}/season/${seasonNumber}?api_key=${TMDB_API_KEY}`;
                         const res = await fetch(url);
                         if (!res.ok) throw new Error('Failed to fetch season details');
                         const seasonDetails = await res.json();
@@ -414,6 +416,7 @@ function updateSeasonsUI(seasons, seriesId) {
         });
     });
 }
+
 
 // Utilitaire pour transformer les données brutes TMDB en format "data.js"
 function formatTMDBData(data, type) {
