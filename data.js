@@ -269,6 +269,24 @@ const mediaData = [
     "creator": {
       "name": "Ross Duffer",
       "imageUrl": "https://image.tmdb.org/t/p/w185/kN1HdFViQkcJOQlNcvvFJIx9Uju.jpg"
+    },
+    "cast": [
+      { "name": "Winona Ryder", "character": "Joyce Byers", "imageUrl": "https://image.tmdb.org/t/p/w185/5k2sYsjOF94a4wcfMtlK9WnS2b4.jpg" },
+      { "name": "David Harbour", "character": "Jim Hopper", "imageUrl": "https://image.tmdb.org/t/p/w185/chPekukMF5ApUrE57C31iLw5LAb.jpg" },
+      { "name": "Finn Wolfhard", "character": "Mike Wheeler", "imageUrl": "https://image.tmdb.org/t/p/w185/dDR0aDBAz9ihol3nO0aJc4QcnM5.jpg" },
+      { "name": "Millie Bobby Brown", "character": "Eleven", "imageUrl": "https://image.tmdb.org/t/p/w185/zJgOxdcfLGD1aW70sNhvQfAM9sP.jpg" }
+    ],
+    "episodes": {
+      "season1": [
+        { "episode": 1, "title": "Chapter One: The Vanishing of Will Byers", "duration": "47m" },
+        { "episode": 2, "title": "Chapter Two: The Weirdo on Maple Street", "duration": "55m" },
+        { "episode": 3, "title": "Chapter Three: Holly, Jolly", "duration": "51m" },
+        { "episode": 4, "title": "Chapter Four: The Body", "duration": "49m" },
+        { "episode": 5, "title": "Chapter Five: The Flea and the Acrobat", "duration": "52m" },
+        { "episode": 6, "title": "Chapter Six: The Monster", "duration": "46m" },
+        { "episode": 7, "title": "Chapter Seven: The Bathtub", "duration": "41m" },
+        { "episode": 8, "title": "Chapter Eight: The Upside Down", "duration": "54m" }
+      ]
     }
   },
   {
