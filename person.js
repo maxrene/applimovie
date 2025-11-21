@@ -38,7 +38,31 @@ function updateUI(person) {
     personImage.alt = person.name;
 
     document.getElementById('person-name').textContent = person.name;
-    document.getElementById('person-bio').textContent = person.biography || "No biography available.";
+
+    const bioElement = document.getElementById('person-bio');
+    const readMoreBtn = document.getElementById('read-more-btn');
+    const fullBio = person.biography || "No biography available.";
+    const bioMaxLength = 300; // Character limit
+    let isExpanded = false;
+
+    bioElement.textContent = fullBio;
+
+    if (fullBio.length > bioMaxLength) {
+        bioElement.textContent = `${fullBio.substring(0, bioMaxLength)}...`;
+        readMoreBtn.style.display = 'inline';
+        readMoreBtn.textContent = 'Read More';
+
+        readMoreBtn.addEventListener('click', () => {
+            isExpanded = !isExpanded;
+            if (isExpanded) {
+                bioElement.textContent = fullBio;
+                readMoreBtn.textContent = 'Read Less';
+            } else {
+                bioElement.textContent = `${fullBio.substring(0, bioMaxLength)}...`;
+                readMoreBtn.textContent = 'Read More';
+            }
+        });
+    }
 
     const films = (person.movie_credits.cast || []).concat(person.movie_credits.crew || []);
     const series = (person.tv_credits.cast || []).concat(person.tv_credits.crew || []);
