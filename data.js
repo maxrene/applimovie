@@ -2,6 +2,85 @@
 // Generated from TMDB API
 const mediaData = [
   {
+    "id": 693134,
+    "type": "movie",
+    "title": "Dune: Part Two",
+    "year": 2024,
+    "genres": [
+      "Sci-Fi",
+      "Adventure",
+      "Action"
+    ],
+    "duration": "2h 46m",
+    "imdb": "8.9",
+    "rottenTomatoes": "93",
+    "synopsis": "Follow the mythic journey of Paul Atreides as he unites with Chani and the Fremen while on a warpath of revenge against the conspirators who destroyed his family. Facing a choice between the love of his life and the fate of the known universe, he endeavors to prevent a terrible future only he can foresee.",
+    "posterUrl": "https://image.tmdb.org/t/p/w500/8b8R8l88Qje9dn9OE8PY05Nxl1X.jpg",
+    "bannerUrl": "https://image.tmdb.org/t/p/original/xOMo8BRK7PfcJv9JCnx7s5hj0PX.jpg",
+    "director": {
+      "name": "Denis Villeneuve",
+      "imageUrl": "https://image.tmdb.org/t/p/w185/2TsE1IebHpa4i4ot3uYpDJMjs9A.jpg"
+    },
+    "availableOn": [
+      {
+        "name": "Netflix",
+        "logoUrl": "https://lh3.googleusercontent.com/aida-public/AB6AXuBVZeIxDgVFhON-Sg753T60AJTKiddA24VxME4qfQ_o5LioSAO36mJiQJWANPHqCEEXu9JolRHZxyCYfg0uNRk-VDPM4iceCVn4aY-2_hhJt2GEWfiwrx3RFy7qpg1mUkSju2C-lKA5c8rWAMuu3S1Ahk1D6j_uz0R27Ct10irozgxkVq32_Um_BxT2S0KPHXTJ_izmaHuWs1IJpo_MCGexg5RkRZaH2l8n6ANr0cExo0DsuL4YuGeBxoy7oSFiQeeCy05-n7_6ZW--"
+      },
+      {
+        "name": "Disney+",
+        "logoUrl": "https://lh3.googleusercontent.com/aida-public/AB6AXuBhEnZa-eJjtwou1J0S2F3EDKw02hNj69ekyMPcad9K69wqbNaUY75_K7kYWScKPrjsme_hBhCGVdv0YOD8iomBzCc-M2Agez-hibU4Ccml-zgwHnNpC5IdHbPpK7WBP4Xj7pdr3fZ5bTBD5dPADD36MFChEuu2Pu-QRBfjR9ldQKhfMp3JA6y6etNnUEMqWAcHjtcbxey50gtLfn7VKgbabMepPsu6ntZR5lQNzF5IOG9SNjg4PqTw86X9woJ47UP_4QPovpln1E1d"
+      },
+      {
+        "name": "Amazon Prime Video",
+        "logoUrl": "https://lh3.googleusercontent.com/aida-public/AB6AXuDsmsh29Fkq99CTCApkAGm4M3fNvpqbpmJLxeIkep2UjfbLL18PGOXsrc7qzE8dcn4FXdhLG4pZTmgiJfZycnTCT9ZwxUUX_zqcnvJs_bUbk5r4KpbJgy6QwyWoRW4Zzx79Wi8_5B3eh5bORXEKXP3-vTLUo0LNgmEyFzZdPUdLsfgjyx6ZYXSu2w156qKyx1BuabLrNaUcqcaCRz_BctyxuPTeAQCpygVE8NsawIlgTnvPQiW7CLLuN4wIOhNOc7c_bo7-ovLT76lp"
+      }
+    ],
+    "cast": [
+      {
+        "name": "Timothée Chalamet",
+        "character": "Paul Atreides",
+        "imageUrl": "https://image.tmdb.org/t/p/w185/sZ2dJazYjEVbI7exIe3g2uUDAI6.jpg"
+      },
+      {
+        "name": "Zendaya",
+        "character": "Chani",
+        "imageUrl": "https://image.tmdb.org/t/p/w185/3Wk0r26Sg9L2oefxIroASQdCSoT.jpg"
+      },
+      {
+        "name": "Rebecca Ferguson",
+        "character": "Lady Jessica",
+        "imageUrl": "https://image.tmdb.org/t/p/w185/6NRlV9oUw7kwe5cW0nswIri2h83.jpg"
+      },
+      {
+        "name": "Javier Bardem",
+        "character": "Stilgar",
+        "imageUrl": "https://image.tmdb.org/t/p/w185/8V1uCUk1pRB2nsedCcoX1uN5nnd.jpg"
+      }
+    ],
+    "similarMovies": [
+      {
+        "id": 370172,
+        "title": "Blade Runner 2049",
+        "posterUrl": "https://image.tmdb.org/t/p/w500/gajva2L0rPYkEWjzgFlBXCAVBE5.jpg"
+      },
+      {
+        "id": 329865,
+        "title": "Arrival",
+        "posterUrl": "https://image.tmdb.org/t/p/w500/x2FJsf1ElAgr63Y3PNPtJrcmpoe.jpg"
+      },
+      {
+        "id": 157336,
+        "title": "Interstellar",
+        "posterUrl": "https://image.tmdb.org/t/p/w500/gEU2QniE6E77NI6lCU6MxlNBvIx.jpg"
+      },
+      {
+        "id": 286217,
+        "title": "The Martian",
+        "posterUrl": "https://image.tmdb.org/t/p/w500/5wQnBf4G9P4069O46vLyKeI25aA.jpg"
+      }
+    ]
+  },
+  {
     "id": 1419406,
     "type": "movie",
     "title": "The Shadow's Edge",
