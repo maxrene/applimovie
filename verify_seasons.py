@@ -7,8 +7,8 @@ async def main():
         browser = await p.chromium.launch()
         page = await browser.new_page()
 
-        # Navigate to the Breaking Bad series page
-        await page.goto('http://localhost:8080/serie.html?id=1396')
+        # Navigate to the Slow Horses series page
+        await page.goto('http://localhost:8080/serie.html?id=95480')
 
         # Wait for season cards to be loaded
         await page.wait_for_selector('.season-card', timeout=10000)

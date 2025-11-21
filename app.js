@@ -28,7 +28,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function fetchAPI(endpoint) {
         try {
-            const response = await fetch(`${BASE_URL}/${endpoint}&api_key=${API_KEY}&watch_region=FR`);
+            const response = await fetch(`${BASE_URL}/${endpoint}&api_key=${TMDB_API_KEY}&watch_region=FR`);
             if (!response.ok) {
                 throw new Error(`API error: ${response.statusText}`);
             }
