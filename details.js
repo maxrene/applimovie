@@ -15,7 +15,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('media-year').textContent = mediaItem.year;
         document.getElementById('media-genres').textContent = mediaItem.genres.join(' - ');
         document.getElementById('media-imdb').textContent = mediaItem.imdb;
-        document.getElementById('media-rt').textContent = mediaItem.rottenTomatoes + '%';
+        document.getElementById('media-rt').textContent = mediaItem.rottenTomatoes === 'xx' ? 'xx' : mediaItem.rottenTomatoes + '%';
         document.getElementById('media-synopsis').textContent = mediaItem.synopsis;
 
         // Met à jour les éléments spécifiques au type (film ou série)
