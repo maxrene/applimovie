@@ -4,7 +4,6 @@ const BASE_URL = 'https://api.themoviedb.org/3';
 const IMG_BASE_POSTER = 'https://image.tmdb.org/t/p/w500';
 const IMG_BASE_BANNER = 'https://image.tmdb.org/t/p/original';
 const IMG_BASE_PROFILE = 'https://image.tmdb.org/t/p/w185';
-const TMDB_API_KEY = 'f1b07b5d2ac7a9f55c5b49a93b18bd33';
 
 let currentCastData = [];
 let isCastExpanded = false;
@@ -74,7 +73,7 @@ async function fetchUpdates(id, type) {
         const streamingUrl = `${BASE_URL}/${type}/${id}/watch/providers?api_key=${TMDB_API_KEY}`;
         const streamingRes = await fetch(streamingUrl);
         const streamingData = await streamingRes.json();
-        updateStreamingUI(streamingData.results?.IE?.flatrate || []);
+        updateStreamingUI(streamingData.results?.FR?.flatrate || []);
 
         // Fetch Credits (Cast & Crew)
         const creditsUrl = `${BASE_URL}/${type}/${id}/credits?api_key=${TMDB_API_KEY}`;
@@ -245,7 +244,7 @@ function updateStreamingUI(providers) {
             container.innerHTML += `<img src="${p.logoUrl}" alt="${p.name}" title="${p.name}" class="h-6 w-6 rounded-md"/>`;
         });
     } else {
-        container.innerHTML = '<span class="text-gray-500 text-xs">Not available in IE</span>';
+        container.innerHTML = '<span class="text-gray-500 text-xs">Not available in FR</span>';
     }
 }
 
