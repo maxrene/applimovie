@@ -28,7 +28,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function fetchAPI(endpoint) {
         try {
-            const response = await fetch(`${BASE_URL}/${endpoint}&api_key=${TMDB_API_KEY}&watch_region=FR`);
+            // CORRECTION ICI : Vérifie si l'endpoint contient déjà un '?' pour choisir le bon séparateur
+            const separator = endpoint.includes('?') ? '&' : '?';
+            const url = `${BASE_URL}/${endpoint}${separator}api_key=${TMDB_API_KEY}&watch_region=FR`;
+
+            const response = await fetch(url);
             if (!response.ok) {
                 throw new Error(`API error: ${response.statusText}`);
             }
@@ -55,9 +59,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const link = isMovie ? `film.html?id=${id}` : `serie.html?id=${id}`;
     const posterUrl = IMG_BASE_POSTER + posterPath;
 
-    // --- MODIFICATION ICI ---
     // Création de la pastille TV si ce n'est pas un film
-    // Style: Jaune, texte noir, gras, petite taille, en haut à gauche
     const badgeHTML = !isMovie 
         ? `<span class="absolute top-2 left-2 z-10 bg-yellow-400 text-black text-[10px] font-bold px-1.5 py-0.5 rounded-sm shadow-md uppercase tracking-wide">TV</span>`
         : '';
