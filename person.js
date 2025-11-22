@@ -2,8 +2,9 @@ const BASE_URL = 'https://api.themoviedb.org/3';
 const IMG_BASE_POSTER = 'https://image.tmdb.org/t/p/w500';
 const IMG_BASE_PROFILE = 'https://image.tmdb.org/t/p/w185';
 
-document.addEventListener('alpine:init', () => {
-    Alpine.data('personProfile', () => ({
+// On déclare une fonction globale simple
+function personProfile() {
+    return {
         person: {
             name: '',
             biography: '',
@@ -58,19 +59,15 @@ document.addEventListener('alpine:init', () => {
         },
 
         processData(data) {
-            // Update Person Info
             document.title = `${data.name} | Actor Profile`;
             this.person = data;
 
-            // Process Credits
             const films = (data.movie_credits.cast || []).concat(data.movie_credits.crew || []);
             const series = (data.tv_credits.cast || []).concat(data.tv_credits.crew || []);
 
-            // Normalize and deduplicate
             const processedFilms = this.normalizeMedia(films, 'movie');
             const processedSeries = this.normalizeMedia(series, 'tv');
 
-            // Combine all unique credits
             this.credits = [...processedFilms, ...processedSeries];
         },
 
@@ -78,7 +75,6 @@ document.addEventListener('alpine:init', () => {
             const uniqueMap = new Map();
 
             list.forEach(item => {
-                // Use strict type checking and fallbacks
                 const id = item.id;
                 if (id && !uniqueMap.has(id)) {
                     uniqueMap.set(id, {
@@ -120,20 +116,17 @@ document.addEventListener('alpine:init', () => {
         get filteredCredits() {
             let filtered = this.credits;
 
-            // Filter by Tab
             if (this.activeTab !== 'tout') {
                 filtered = filtered.filter(item => item.type === this.activeTab);
             }
 
-            // Sort
             return filtered.sort((a, b) => {
                 if (this.sortBy === 'popularity') {
                     return b.popularity - a.popularity;
                 } else {
-                    // Sort by date descending
                     const dateA = new Date(a.date || '0000-01-01');
                     const dateB = new Date(b.date || '0000-01-01');
-                    return dateB - dateA; // Recent first
+                    return dateB - dateA;
                 }
             });
         },
@@ -154,5 +147,5 @@ document.addEventListener('alpine:init', () => {
         get sortLabel() {
             return this.sortBy === 'popularity' ? 'Popularité' : 'Année';
         }
-    }));
-});
+    };
+}
