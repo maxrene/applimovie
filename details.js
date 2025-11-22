@@ -197,7 +197,7 @@ function updateStreamingUI(providers) {
     const container = document.getElementById('available-on-container');
     if (!container) return;
     container.innerHTML = '';
-    
+
     let list = [];
     if (providers.length > 0 && providers[0].provider_name) {
         list = providers.map(p => ({ name: p.provider_name, logoUrl: IMG_BASE_PROFILE + p.logo_path }));
@@ -205,12 +205,40 @@ function updateStreamingUI(providers) {
         list = providers;
     }
 
-    if (list.length > 0) {
-        list.forEach(p => {
+    const saved = localStorage.getItem('selectedPlatforms');
+    const selectedPlatforms = saved ? JSON.parse(saved) : [];
+
+    let displayList = list;
+    if (selectedPlatforms.length > 0) {
+        const platformNameMap = {
+            'Netflix': 'netflix',
+            'Prime Video': 'prime',
+            'Amazon Prime Video': 'prime',
+            'Max': 'max',
+            'Disney+': 'disney',
+            'Hulu': 'hulu',
+            'Apple TV+': 'apple',
+            'Paramount+': 'paramount',
+            'Peacock': 'peacock',
+            'Canal+': 'canal'
+        };
+
+        displayList = list.filter(provider => {
+            const platformId = platformNameMap[provider.name];
+            return platformId && selectedPlatforms.includes(platformId);
+        });
+    }
+
+    if (displayList.length > 0) {
+        displayList.forEach(p => {
             container.innerHTML += `<img src="${p.logoUrl}" alt="${p.name}" title="${p.name}" class="h-6 w-6 rounded-md"/>`;
         });
     } else {
-        container.innerHTML = '<span class="text-gray-500 text-xs">Not available in FR</span>';
+        if(list.length > 0 && selectedPlatforms.length > 0) {
+             container.innerHTML = '<span class="text-gray-500 text-xs">Not available on your selected platforms in FR</span>';
+        } else {
+            container.innerHTML = '<span class="text-gray-500 text-xs">Not available in FR</span>';
+        }
     }
 }
 
