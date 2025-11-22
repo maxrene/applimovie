@@ -18,6 +18,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!mediaId) return console.error("Pas d'ID");
 
     initializeWatchlistButton(mediaId);
+    initializeWatchedButton(mediaId);
 
     const seeAllLink = document.querySelector('#cast-section a') || document.querySelector('a[href="#"][class*="text-primary"]');
     if (seeAllLink) {
@@ -538,12 +539,83 @@ function toggleWatchlist(mediaId) {
 
     if (index > -1) {
         watchlist.splice(index, 1);
+        // If removed from watchlist, also remove from watched list
+        const isMovie = window.location.pathname.includes('film.html');
+        const watchedListKey = isMovie ? 'watchedMovies' : 'watchedSeries';
+        let watchedList = JSON.parse(localStorage.getItem(watchedListKey)) || [];
+        const watchedIndex = watchedList.indexOf(mediaIdNum);
+        if (watchedIndex > -1) {
+            watchedList.splice(watchedIndex, 1);
+            localStorage.setItem(watchedListKey, JSON.stringify(watchedList));
+            updateWatchedButton(mediaId);
+        }
     } else {
         watchlist.push({ id: mediaIdNum, added_at: new Date().toISOString() });
     }
 
     localStorage.setItem('watchlist', JSON.stringify(watchlist));
     updateWatchlistButton(mediaId);
+}
+
+function initializeWatchedButton(mediaId) {
+    const watchedButton = document.getElementById('watched-button');
+    if (!watchedButton) return;
+
+    updateWatchedButton(mediaId);
+
+    watchedButton.addEventListener('click', () => {
+        toggleWatched(mediaId);
+    });
+}
+
+function toggleWatched(mediaId) {
+    const isMovie = window.location.pathname.includes('film.html');
+    const watchedListKey = isMovie ? 'watchedMovies' : 'watchedSeries';
+    let watchedList = JSON.parse(localStorage.getItem(watchedListKey)) || [];
+    const mediaIdNum = parseInt(mediaId, 10);
+    const index = watchedList.indexOf(mediaIdNum);
+
+    if (index > -1) {
+        watchedList.splice(index, 1);
+    } else {
+        watchedList.push(mediaIdNum);
+        // Also add to watchlist if not already there
+        let watchlist = JSON.parse(localStorage.getItem('watchlist')) || [];
+        if (!watchlist.some(item => item.id === mediaIdNum)) {
+            watchlist.push({ id: mediaIdNum, added_at: new Date().toISOString() });
+            localStorage.setItem('watchlist', JSON.stringify(watchlist));
+            updateWatchlistButton(mediaId);
+        }
+    }
+
+    localStorage.setItem(watchedListKey, JSON.stringify(watchedList));
+    updateWatchedButton(mediaId);
+}
+
+function updateWatchedButton(mediaId) {
+    const watchedButton = document.getElementById('watched-button');
+    if (!watchedButton) return;
+
+    const isMovie = window.location.pathname.includes('film.html');
+    const watchedListKey = isMovie ? 'watchedMovies' : 'watchedSeries';
+    let watchedList = JSON.parse(localStorage.getItem(watchedListKey)) || [];
+    const mediaIdNum = parseInt(mediaId, 10);
+    const isWatched = watchedList.includes(mediaIdNum);
+
+    const icon = watchedButton.querySelector('.material-symbols-outlined');
+    const text = watchedButton.querySelector('span:last-child');
+
+    if (isWatched) {
+        watchedButton.classList.remove('bg-gray-700');
+        watchedButton.classList.add('bg-green-600');
+        icon.textContent = 'visibility';
+        text.textContent = 'Watched';
+    } else {
+        watchedButton.classList.remove('bg-green-600');
+        watchedButton.classList.add('bg-gray-700');
+        icon.textContent = 'visibility_off';
+        text.textContent = 'Mark Watched';
+    }
 }
 
 function updateWatchlistButton(mediaId) {

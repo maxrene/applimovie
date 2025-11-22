@@ -73,6 +73,16 @@
                     </div>
                 </label>
             </div>
+            <div class="flex items-center justify-end" x-show="activeTab === 'movie'">
+                <label class="flex cursor-pointer items-center gap-2" for="hide-watched">
+                    <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Hide Watched Movies</span>
+                    <div class="relative">
+                        <input class="sr-only peer" id="hide-watched" type="checkbox" x-model="hideWatched"/>
+                        <div class="w-11 h-6 bg-gray-200 rounded-full dark:bg-gray-700 peer-checked:bg-primary"></div>
+                        <div class="absolute left-1 top-1 h-4 w-4 rounded-full bg-white transition-all peer-checked:translate-x-full"></div>
+                    </div>
+                </label>
+            </div>
         </div>
     </header>
     <main class="flex-1 overflow-y-auto" x-cloak>
