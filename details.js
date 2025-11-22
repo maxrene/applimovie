@@ -10,7 +10,7 @@ let isCastExpanded = false;
 
 document.addEventListener('DOMContentLoaded', async () => {
     const urlParams = new URLSearchParams(window.location.search);
-    const mediaId = parseInt(urlParams.get('id')); // ID de l'URL
+    const mediaId = urlParams.get('id'); // ID de l'URL (garder en string)
     
     // Vérifie si on est sur un film ou une série
     const isMovie = window.location.pathname.includes('film.html');
@@ -29,7 +29,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // ÉTAPE 1 : Chercher dans le cache local (data.js)
     // On suppose que mediaData est chargé via <script src="data.js">
-    let localData = (typeof mediaData !== 'undefined') ? mediaData.find(m => m.id === mediaId) : null;
+    let localData = (typeof mediaData !== 'undefined') ? mediaData.find(m => String(m.id) === mediaId) : null;
 
     if (localData) {
         console.log("✅ Film trouvé dans le cache local (data.js)");

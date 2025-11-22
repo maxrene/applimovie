@@ -33,7 +33,7 @@ document.addEventListener('alpine:init', () => {
             try {
                 const response = await fetch(`https://api.themoviedb.org/3/search/multi?api_key=${window.TMDB_API_KEY}&language=fr-FR&query=${encodeURIComponent(this.searchQuery)}&include_adult=false&watch_region=FR`);
                 const data = await response.json();
-                this.searchResults = data.results.filter(item => ['movie', 'tv', 'person'].includes(item.media_type));
+                this.searchResults = data.results.filter(item => ['movie', 'tv'].includes(item.media_type));
             } catch (error) {
                 console.error('Erreur lors de la recherche:', error);
             }
