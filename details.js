@@ -206,6 +206,24 @@ function updateUI(data, type, isLocal) {
     if (type === 'movie' && data.similarMovies) {
         updateSimilarMoviesUI(data.similarMovies);
     }
+
+    // Awards
+    updateAwardsUI(data.id);
+}
+
+function updateAwardsUI(mediaId) {
+    const awardsSection = document.getElementById('awards-section');
+    if (!awardsSection) return;
+
+    const awardInfo = window.awardsData && window.awardsData[mediaId];
+
+    if (awardInfo) {
+        document.getElementById('awards-wins').textContent = awardInfo.wins;
+        document.getElementById('awards-nominations').textContent = awardInfo.nominations;
+        awardsSection.style.display = 'block';
+    } else {
+        awardsSection.style.display = 'none';
+    }
 }
 
 function updateSimilarMoviesUI(similarMovies) {
