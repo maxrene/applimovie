@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html class="dark" lang="fr">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>Recherche - CineMatch</title>
+    <link crossorigin="" href="https://fonts.gstatic.com/" rel="preconnect"/>
+    <link as="style" href="https://fonts.googleapis.com/css2?display=swap&family=Spline+Sans:wght@400;500;700" onload="this.rel='stylesheet'" rel="stylesheet"/>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet"/>
+    <script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: { "primary": "#ea2a33", "background-light": "#f8f6f6", "background-dark": "#211111" },
+                    fontFamily: { "display": ["Spline Sans"] },
+                },
+            },
+        }
+    </script>
+    <style> body { min-height: 100vh; } [x-cloak] { display: none !important; } </style>
+    
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script src="config.js"></script> </head>
+<body class="bg-background-light dark:bg-background-dark font-display text-gray-900 dark:text-gray-100">
+
+    <div x-data="search" class="flex flex-col min-h-screen">
+        
+        <header class="sticky top-0 z-10 bg-background-light/95 dark:bg-background-dark/95 backdrop-blur-sm border-b border-gray-200 dark:border-gray-800">
+            <div class="container mx-auto px-4 py-3 flex items-center gap-4">
+                <a href="index.html" class="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors">
+                    <span class="material-symbols-outlined">arrow_back</span>
+                </a>
+                <div class="relative flex-1">
+                    <span class="absolute inset-y-0 left-3 flex items-center text-gray-400">
+                        <span class="material-symbols-outlined">search</span>
+                    </span>
+                    <input 
+                        x-model="searchQuery" 
+                        type="text" 
+                        placeholder="Films, séries, acteurs..." 
+                        class="w-full pl-10 pr-4 py-2 rounded-full bg-gray-100 dark:bg-gray-800 border-none focus:ring-2 focus:ring-primary text-gray-900 dark:text-gray-100 placeholder-gray-500"
+                        autofocus
+                    >
+                    <button 
+                        x-show="searchQuery.length > 0" 
+                        @click="searchQuery = ''; searchResults = []" 
+                        class="absolute inset-y-0 right-3 flex items-center text-gray-400 hover:text-gray-600"
+                    >
+                        <span class="material-symbols-outlined text-sm">close</span>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <main class="flex-grow container mx-auto px-4 py-6">
+            
+            <div x-show="searchQuery.length > 1" x-cloak>
+                <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">Résultats</h2>
+                
+                <div class="space-y-4">
+                    <template x-for="item in searchResults" :key="item.id">
+                        <div @click="handleItemClick(item)" class="flex items-center gap-4 p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-800 cursor-pointer transition-colors">
+                            <div class="flex-shrink-0 h-16 w-12 bg-gray-700 rounded overflow-hidden relative">
+                                <template x-if="item.poster_path || item.profile_path">
+                                    <img :src="'https://image.tmdb.org/t/p/w92' + (item.poster_path || item.profile_path)" class="w-full h-full object-cover">
+                                </template>
+                                <template x-if="!item.poster_path && !item.profile_path">
+                                    <div class="flex items-center justify-center h-full w-full text-gray-500">
+                                        <span class="material-symbols-outlined text-lg">image_not_supported</span>
+                                    </div>
+                                </template>
+                            </div>
+                            
+                            <div>
+                                <h3 class="font-semibold text-gray-900 dark:text-gray-100" x-text="item.title || item.name"></h3>
+                                <div class="flex items-center gap-2 text-sm text-gray-500">
+                                    <span class="capitalize" x-text="getItemType(item)"></span>
+                                    <span x-show="item.vote_average" class="flex items-center text-yellow-500 text-xs">
+                                        <span class="material-symbols-outlined text-[14px] mr-0.5">star</span>
+                                        <span x-text="item.vote_average?.toFixed(1)"></span>
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+                    
+                    <div x-show="searchResults.length === 0" class="text-center py-10 text-gray-500">
+                        Aucun résultat trouvé pour "<span x-text="searchQuery"></span>"
+                    </div>
+                </div>
+            </div>
+
+            <div x-show="searchQuery.length <= 1">
+                
+                <div x-show="previousSearches.length > 0" class="mb-8">
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wider">Récents</h2>
+                        <button @click="previousSearches = []; localStorage.removeItem('previousSearches')" class="text-xs text-primary hover:underline">Effacer</button>
+                    </div>
+                    <div class="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+                        <template x-for="item in previousSearches" :key="item.id">
+                            <div @click="handleItemClick(item)" class="flex-shrink-0 w-24 cursor-pointer group">
+                                <div class="aspect-[2/3] rounded-lg overflow-hidden bg-gray-800 mb-2 relative">
+                                    <img :src="'https://image.tmdb.org/t/p/w154' + (item.poster_path || item.profile_path)" class="w-full h-full object-cover group-hover:scale-105 transition-transform">
+                                </div>
+                                <p class="text-xs font-medium truncate text-center text-gray-700 dark:text-gray-300" x-text="item.title || item.name"></p>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
+                <div>
+                    <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">Tendances cette semaine</h2>
+                    <div class="grid grid-cols-1 gap-4">
+                         <template x-for="(item, index) in popularSearches" :key="item.id">
+                            <div @click="handleItemClick(item)" class="flex items-center gap-4 p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-800 cursor-pointer transition-colors">
+                                <span class="text-lg font-bold text-gray-400 w-6 text-center" x-text="index + 1"></span>
+                                <div class="flex-1 font-medium text-gray-900 dark:text-gray-100" x-text="item.title || item.name"></div>
+                                <span class="text-xs text-gray-500 capitalize" x-text="getItemType(item, true)"></span>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+        
+        <footer class="sticky bottom-0 bg-background-light/90 dark:bg-background-dark/90 backdrop-blur-sm border-t border-gray-200 dark:border-gray-800">
+            <nav class="flex justify-around items-center h-16">
+                <a href="index.html" class="flex flex-col items-center gap-1 text-gray-500 dark:text-gray-400 hover:text-primary transition-colors">
+                    <span class="material-symbols-outlined">home</span>
+                    <span class="text-xs font-medium">Accueil</span>
+                </a>
+                <a href="search.html" class="flex flex-col items-center gap-1 text-primary">
+                    <span class="material-symbols-outlined">search</span>
+                    <span class="text-xs font-medium">Recherche</span>
+                </a>
+                <a href="#" class="flex flex-col items-center gap-1 text-gray-500 dark:text-gray-400 hover:text-primary transition-colors">
+                    <span class="material-symbols-outlined">bookmark</span>
+                    <span class="text-xs font-medium">Ma Liste</span>
+                </a>
+                <a href="#" class="flex flex-col items-center gap-1 text-gray-500 dark:text-gray-400 hover:text-primary transition-colors">
+                    <span class="material-symbols-outlined">person</span>
+                    <span class="text-xs font-medium">Profil</span>
+                </a>
+            </nav>
+        </footer>
+    </div>
+
+    <script src="js/search.js"></script>
+</body>
+</html>
