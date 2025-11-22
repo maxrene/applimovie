@@ -1,7 +1,6 @@
 const BASE_URL = 'https://api.themoviedb.org/3';
 const IMG_BASE_POSTER = 'https://image.tmdb.org/t/p/w500';
 const IMG_BASE_PROFILE = 'https://image.tmdb.org/t/p/w185';
-const TMDB_API_KEY = 'f1b07b5d2ac7a9f55c5b49a93b18bd33';
 
 document.addEventListener('DOMContentLoaded', async () => {
     const urlParams = new URLSearchParams(window.location.search);
