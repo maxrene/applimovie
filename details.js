@@ -292,15 +292,18 @@ function renderCastList() {
     const displayList = currentCastData.slice(0, limit);
 
     displayList.forEach(member => {
-        castContainer.innerHTML += `
-            <div class="flex items-center gap-3">
-                <img class="h-14 w-14 rounded-full object-cover flex-shrink-0" src="${member.imageUrl}" onerror="this.src='https://placehold.co/64x64'"/>
-                <div>
-                    <p class="font-semibold text-white text-sm">${member.name}</p>
-                    <p class="text-xs text-gray-400">${member.character}</p>
-                </div>
-            </div>`;
-    });
+    // On vérifie si on a un ID, sinon on met un lien vide '#'
+    const link = member.id ? `person.html?id=${member.id}` : '#';
+    
+    castContainer.innerHTML += `
+        <a href="${link}" class="flex items-center gap-3 group hover:bg-white/10 p-2 rounded-lg transition-colors duration-200">
+            <img class="h-14 w-14 rounded-full object-cover flex-shrink-0 group-hover:scale-105 transition-transform duration-200" src="${member.imageUrl}" onerror="this.src='https://placehold.co/64x64'"/>
+            <div>
+                <p class="font-semibold text-white text-sm group-hover:text-primary transition-colors">${member.name}</p>
+                <p class="text-xs text-gray-400">${member.character}</p>
+            </div>
+        </a>`;
+});
 
     // Toggle button visibility/text
     if (seeAllLink) {
