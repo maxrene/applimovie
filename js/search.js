@@ -50,18 +50,22 @@ document.addEventListener('alpine:init', () => {
             localStorage.setItem('previousSearches', JSON.stringify(history));
 
             // Navigate to the correct page
-            const itemType = this.getItemType(item);
             let url = '';
-            if (itemType === 'Film') {
-                url = `/film.html?id=${item.id}`;
-            } else if (itemType === 'Série TV') {
-                url = `/serie.html?id=${item.id}`;
-            } else if (itemType === 'Acteur') {
-                url = `/person.html?id=${item.id}`;
+            switch (item.media_type) {
+                case 'movie':
+                    url = `film.html?id=${item.id}`;
+                    break;
+                case 'tv':
+                    url = `serie.html?id=${item.id}`;
+                    break;
+                case 'person':
+                    url = `person.html?id=${item.id}`;
+                    break;
+                default:
+                    console.warn(`Unknown media type for navigation: ${item.media_type}`);
+                    return; // Do not navigate for unknown types
             }
-            if (url) {
-                window.location.href = url;
-            }
+            window.location.href = url;
         },
 
         getItemType(item, forPopular = false) {
