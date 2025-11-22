@@ -129,6 +129,7 @@ async function fetchMovies(genresMap) {
 
         // 2. CAST (Top 4)
         const cast = details.credits?.cast?.slice(0, 4).map(actor => ({
+            id: actor.id,
             name: actor.name,
             character: actor.character,
             imageUrl: actor.profile_path ? `${IMG_BASE_PROFILE}${actor.profile_path}` : PLACEHOLDER_IMG
