@@ -199,6 +199,9 @@ function updateUI(data, type, isLocal) {
     // Director / Creator
     updatePersonUI(data.director, type);
 
+    // Awards
+    updateAwardsUI(data);
+
     // Similar Movies
     if (type === 'movie' && data.similarMovies) {
         updateSimilarMoviesUI(data.similarMovies);
@@ -494,4 +497,44 @@ function formatTMDBData(data, type) {
         similarMovies: similar,
         availableOn: streaming
     };
+}
+
+const awardIconSVG = `
+    <svg class="h-5 w-5 text-amber-400" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+        <path clip-rule="evenodd" d="M15.11 4.414a.75.75 0 01.07 1.058l-1.95 2.438a.75.75 0 01-1.127.001l-1.95-2.437a.75.75 0 011.058-1.06l1.39 1.737 1.39-1.737a.75.75 0 011.058-.07zM10 2a1.5 1.5 0 011.5 1.5v1.25a.75.75 0 01-1.5 0V3.5A1.5 1.5 0 0110 2zM3.53 5.472a.75.75 0 011.06-.07l1.95 2.438a.75.75 0 01-.001 1.127l-1.95 2.437a.75.75 0 11-1.128-1.059l1.39-1.737-1.39-1.737a.75.75 0 01-.07-1.058zM10 18a1.5 1.5 0 01-1.5-1.5v-1.25a.75.75 0 011.5 0V16.5A1.5 1.5 0 0110 18zM16.47 5.472a.75.75 0 01.07 1.058l-1.95 2.438a.75.75 0 01-1.127-.001L11.52 6.53a.75.75 0 111.058-1.06l1.39 1.737 1.39-1.737a.75.75 0 011.104.07zM10 12.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5z" fill-rule="evenodd"></path>
+        <path d="M7.163 15.023a.75.75 0 01.623.834 3.5 3.5 0 006.428 0 .75.75 0 011.39.55 5 5 0 01-9.208 0 .75.75 0 01.768-.834z"></path>
+    </svg>`;
+
+function updateAwardsUI(data) {
+    const awardsSection = document.getElementById('awards-section');
+    if (!awardsSection) return;
+
+    let awardsHTML = '';
+    const isMovie = data.type === 'movie';
+    const awardName = isMovie ? 'Oscar' : 'Emmy';
+    const wins = isMovie ? data.oscarWins : data.emmyWins;
+    const nominations = isMovie ? data.oscarNominations : data.emmyNominations;
+
+    if (wins > 0) {
+        awardsHTML += `
+            <div class="flex items-center gap-2 text-sm">
+                ${awardIconSVG}
+                <span class="font-medium text-gray-300">${wins} ${awardName} win${wins > 1 ? 's' : ''}</span>
+            </div>`;
+    }
+
+    if (nominations > 0) {
+        awardsHTML += `
+            <div class="flex items-center gap-2 text-sm">
+                ${awardIconSVG}
+                <span class="font-medium text-gray-300">${nominations} ${awardName} nomination${nominations > 1 ? 's' : ''}</span>
+            </div>`;
+    }
+
+    if (awardsHTML) {
+        awardsSection.innerHTML = awardsHTML;
+        awardsSection.style.display = 'flex';
+    } else {
+        awardsSection.style.display = 'none';
+    }
 }
