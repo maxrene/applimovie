@@ -10,15 +10,13 @@ let isCastExpanded = false;
 
 document.addEventListener('DOMContentLoaded', async () => {
     const urlParams = new URLSearchParams(window.location.search);
-    const mediaId = urlParams.get('id'); // ID de l'URL (garder en string)
+    const mediaId = urlParams.get('id');
     
-    // Vérifie si on est sur un film ou une série
     const isMovie = window.location.pathname.includes('film.html');
     const type = isMovie ? 'movie' : 'tv';
 
     if (!mediaId) return console.error("Pas d'ID");
 
-    // Setup 'See All' listener
     const seeAllLink = document.querySelector('#cast-section a') || document.querySelector('a[href="#"][class*="text-primary"]');
     if (seeAllLink) {
         seeAllLink.addEventListener('click', (e) => {
@@ -27,25 +25,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    // ÉTAPE 1 : Chercher dans le cache local (data.js)
-    // On suppose que mediaData est chargé via <script src="data.js">
     let localData = (typeof mediaData !== 'undefined') ? mediaData.find(m => String(m.id) === mediaId) : null;
 
     if (localData) {
         console.log("✅ Film trouvé dans le cache local (data.js)");
-        // Affiche immédiatement ce qu'on a (Titre, Notes IMDb/RT scrapées, etc.)
         updateUI(localData, type, true); 
-        
-        // ÉTAPE 2 : Aller chercher le Streaming ET le Casting frais en arrière-plan
         fetchUpdates(mediaId, type);
     } else {
         console.log("🌍 Film inconnu localement, recherche sur TMDB...");
-        // Le film n'est pas dans data.js (nouveau film ?), on charge tout depuis TMDB
         fetchFullFromTMDB(mediaId, type);
     }
 });
 
-// Fonction pour tout récupérer si le film n'est pas en cache
 async function fetchFullFromTMDB(id, type) {
     try {
         const url = `${BASE_URL}/${type}/${id}?api_key=${TMDB_API_KEY}&append_to_response=credits,watch/providers,similar,external_ids`;
@@ -53,11 +44,9 @@ async function fetchFullFromTMDB(id, type) {
         if (!res.ok) throw new Error("Erreur TMDB");
         const data = await res.json();
         
-        // On transforme les données TMDB pour qu'elles ressemblent à notre format local
         const formattedData = formatTMDBData(data, type);
         updateUI(formattedData, type, false);
 
-        // S'il s'agit d'une série, on doit aussi afficher les saisons
         if (type === 'tv' && data.seasons) {
             updateSeasonsUI(data.seasons, id);
         }
@@ -66,21 +55,17 @@ async function fetchFullFromTMDB(id, type) {
     }
 }
 
-// Fonction pour récupérer les mises à jour (Streaming + Casting)
 async function fetchUpdates(id, type) {
     try {
-        // Fetch Streaming
         const streamingUrl = `${BASE_URL}/${type}/${id}/watch/providers?api_key=${TMDB_API_KEY}`;
         const streamingRes = await fetch(streamingUrl);
         const streamingData = await streamingRes.json();
         updateStreamingUI(streamingData.results?.FR?.flatrate || []);
 
-        // Fetch Credits (Cast & Crew)
         const creditsUrl = `${BASE_URL}/${type}/${id}/credits?api_key=${TMDB_API_KEY}`;
         const creditsRes = await fetch(creditsUrl);
         const creditsData = await creditsRes.json();
 
-        // Format and Update Cast
         const cast = creditsData.cast?.map(c => ({
             id: c.id,
             name: c.name,
@@ -90,7 +75,6 @@ async function fetchUpdates(id, type) {
         
         updateCastUI(cast);
 
-        // Fetch Similar Movies (only for movies)
         if (type === 'movie') {
             const similarUrl = `${BASE_URL}/${type}/${id}/similar?api_key=${TMDB_API_KEY}`;
             const similarRes = await fetch(similarUrl);
@@ -104,12 +88,10 @@ async function fetchUpdates(id, type) {
 
             updateSimilarMoviesUI(similarMovies);
         } else if (type === 'tv') {
-            // Pour les séries, on va chercher plus de détails (créateur, saisons etc)
             const seriesDetailsUrl = `${BASE_URL}/tv/${id}?api_key=${TMDB_API_KEY}&append_to_response=credits`;
             const seriesDetailsRes = await fetch(seriesDetailsUrl);
             const seriesDetailsData = await seriesDetailsRes.json();
 
-            // 1. Mettre à jour le créateur/directeur
             let creator = null;
             if (seriesDetailsData.created_by && seriesDetailsData.created_by.length > 0) {
                 const c = seriesDetailsData.created_by[0];
@@ -118,7 +100,6 @@ async function fetchUpdates(id, type) {
                     imageUrl: c.profile_path ? IMG_BASE_PROFILE + c.profile_path : 'https://placehold.co/64x64'
                 };
             } else {
-                // Fallback: Chercher un directeur si pas de créateur
                 const director = seriesDetailsData.credits?.crew?.find(c => c.job === 'Director');
                 if (director) {
                     creator = {
@@ -129,7 +110,6 @@ async function fetchUpdates(id, type) {
             }
             updatePersonUI(creator, 'tv');
 
-            // 2. Mettre à jour l'année de diffusion (cas où le statut a changé)
             const firstAirDate = seriesDetailsData.first_air_date;
             const lastAirDate = seriesDetailsData.last_air_date;
             const status = seriesDetailsData.status;
@@ -148,7 +128,6 @@ async function fetchUpdates(id, type) {
                 document.getElementById('media-year').textContent = yearText;
             }
 
-            // 3. Mettre à jour les saisons
             if (seriesDetailsData.seasons) {
                 updateSeasonsUI(seriesDetailsData.seasons, id);
             }
@@ -159,70 +138,39 @@ async function fetchUpdates(id, type) {
     }
 }
 
-// Mise à jour de l'interface
 function updateUI(data, type, isLocal) {
-    // Images & Titres
     document.getElementById('media-banner').src = data.bannerUrl;
     document.getElementById('media-poster').src = data.posterUrl;
     document.getElementById('media-title').textContent = data.title;
     document.getElementById('media-year').textContent = data.year;
     document.getElementById('media-synopsis').textContent = data.synopsis;
 
-    // Notes (Si c'est local, on a les vraies notes IMDb/RT scrapées !)
     document.getElementById('media-imdb').textContent = data.imdb;
     document.getElementById('media-rt').textContent = data.rottenTomatoes === 'xx' ? '' : (data.rottenTomatoes.includes('%') ? data.rottenTomatoes : data.rottenTomatoes + '%');
 
-    // Durée / Saisons
     if (type === 'movie') {
         document.getElementById('media-duration').textContent = data.duration;
     } else {
         document.getElementById('media-seasons').textContent = typeof data.seasons === 'number' ? `${data.seasons} Seasons` : data.seasons;
     }
 
-    // Genres
     const genresContainer = document.getElementById('media-genres');
     genresContainer.innerHTML = '';
-    // Gère le format string (local) ou objet (TMDB)
     const genreList = data.genres.map(g => typeof g === 'string' ? g : g.name); 
     genreList.forEach((g, i) => {
         genresContainer.innerHTML += `<span class="font-medium">${g}</span>${i < genreList.length - 1 ? '<span class="h-3 w-px bg-gray-600 mx-2"></span>' : ''}`;
     });
 
-    // Streaming (Si local, on affiche ce qu'on a, puis ça sera mis à jour par fetchUpdates)
     if (data.availableOn) updateStreamingUI(data.availableOn);
-
-    // Casting
-    if (data.cast && data.cast.length > 0) {
-        updateCastUI(data.cast);
-    }
-
-    // Director / Creator
+    if (data.cast && data.cast.length > 0) updateCastUI(data.cast);
+    
     updatePersonUI(data.director, type);
 
-    // Awards
+    // CORRECTION : Appel unique et unifié pour les Awards
     updateAwardsUI(data);
 
-    // Similar Movies
     if (type === 'movie' && data.similarMovies) {
         updateSimilarMoviesUI(data.similarMovies);
-    }
-
-    // Awards
-    updateAwardsUI(data.id);
-}
-
-function updateAwardsUI(mediaId) {
-    const awardsSection = document.getElementById('awards-section');
-    if (!awardsSection) return;
-
-    const awardInfo = window.awardsData && window.awardsData[mediaId];
-
-    if (awardInfo) {
-        document.getElementById('awards-wins').textContent = awardInfo.wins;
-        document.getElementById('awards-nominations').textContent = awardInfo.nominations;
-        awardsSection.style.display = 'block';
-    } else {
-        awardsSection.style.display = 'none';
     }
 }
 
@@ -250,13 +198,10 @@ function updateStreamingUI(providers) {
     if (!container) return;
     container.innerHTML = '';
     
-    // Standardisation : parfois TMDB renvoie raw, parfois notre cache a déjà traité
     let list = [];
     if (providers.length > 0 && providers[0].provider_name) {
-        // Format Brut TMDB
         list = providers.map(p => ({ name: p.provider_name, logoUrl: IMG_BASE_PROFILE + p.logo_path }));
     } else {
-        // Format Cache data.js
         list = providers;
     }
 
@@ -274,26 +219,15 @@ function updateCastUI(cast) {
     const castContainer = document.getElementById('full-cast-container');
     const castSection = document.getElementById('cast-section');
 
-    // Try to find elements using alternate IDs if not found (for serie.html compatibility if not fixed yet)
-    // But better to fix HTML. Assuming HTML is correct or being fixed.
-    // Wait, plan step 3 is fixing HTML. So I will rely on IDs being 'cast-section' and 'full-cast-container'.
-    // Wait, looking at serie.html content I read:
-    // <div class="flex items-center justify-between"><h2 ...>Full Cast</h2>...</div>
-    // <div id="full-cast-container" ...>
-    // It does NOT have an ID on the parent div like 'cast-section'.
-    // film.html HAS id="cast-section".
-    // I should handle this gracefully.
-
     let container = castContainer;
     let section = castSection;
 
-    // Fallback for serie.html structure if id is missing on parent
     if (!section && container) {
-        section = container.parentElement.parentElement; // Assuming structure
+        section = container.parentElement.parentElement;
     }
 
     if (currentCastData && currentCastData.length > 0) {
-        if(section) section.style.display = 'block'; // Or remove hidden class
+        if(section) section.style.display = 'block';
         renderCastList();
     } else if(section) {
         section.style.display = 'none';
@@ -312,7 +246,6 @@ function renderCastList() {
     const displayList = currentCastData.slice(0, limit);
 
     displayList.forEach(member => {
-    // On vérifie si on a un ID, sinon on met un lien vide '#'
     const link = member.id ? `person.html?id=${member.id}` : '#';
     
     castContainer.innerHTML += `
@@ -323,9 +256,8 @@ function renderCastList() {
                 <p class="text-xs text-gray-400">${member.character}</p>
             </div>
         </a>`;
-});
+    });
 
-    // Toggle button visibility/text
     if (seeAllLink) {
         if (currentCastData.length <= 4) {
             seeAllLink.style.display = 'none';
@@ -367,13 +299,10 @@ function updateSeasonsUI(seasons, seriesId) {
     const container = document.getElementById('seasons-episodes-container');
     if (!container) return;
 
-    container.innerHTML = ''; // Vide le contenu précédent
+    container.innerHTML = '';
 
     seasons.forEach(season => {
-        // Ignore "Season 0" or specials which often have episode_count: 0
-        if (season.season_number === 0 || season.episode_count === 0) {
-            return;
-        }
+        if (season.season_number === 0 || season.episode_count === 0) return;
 
         const seasonCardHTML = `
             <div class="season-card rounded-lg bg-gray-800" data-season-number="${season.season_number}">
@@ -381,29 +310,24 @@ function updateSeasonsUI(seasons, seriesId) {
                     <h3 class="font-semibold text-white">${season.name}</h3>
                     <span class="text-xs text-gray-400">${season.episode_count} Episodes</span>
                 </div>
-        <div class="episodes-container">
-                    <!-- Les épisodes seront chargés ici -->
-                </div>
+        <div class="episodes-container"></div>
             </div>
         `;
         container.innerHTML += seasonCardHTML;
     });
 
-    // Ajoute les écouteurs d'événements pour le clic
     document.querySelectorAll('.season-card .cursor-pointer').forEach(header => {
         header.addEventListener('click', async () => {
             const card = header.closest('.season-card');
             const episodesContainer = card.querySelector('.episodes-container');
             const seasonNumber = card.dataset.seasonNumber;
 
-            // Toggle l'affichage
             const cardIsOpen = card.classList.contains('open');
 
             if (cardIsOpen) {
                 card.classList.remove('open');
             } else {
                 card.classList.add('open');
-                // Fetch and render episodes if not already loaded
                 if (!episodesContainer.dataset.loaded) {
                     episodesContainer.innerHTML = '<div class="p-3 border-t border-gray-700"><p class="text-gray-400">Loading episodes...</p></div>';
                     try {
@@ -442,12 +366,9 @@ function updateSeasonsUI(seasons, seriesId) {
     });
 }
 
-
-// Utilitaire pour transformer les données brutes TMDB en format "data.js"
 function formatTMDBData(data, type) {
     const isMovie = type === 'movie';
     
-    // Director / Creator
     let dir = { name: 'Unknown', imageUrl: 'https://placehold.co/64x64' };
     if(isMovie) {
         const d = data.credits?.crew?.find(c => c.job === 'Director');
@@ -456,7 +377,6 @@ function formatTMDBData(data, type) {
         dir = { name: data.created_by[0].name, imageUrl: data.created_by[0].profile_path ? IMG_BASE_PROFILE + data.created_by[0].profile_path : dir.imageUrl };
     }
 
-    // Cast
     const cast = data.credits?.cast?.map(c => ({
         id: c.id,
         name: c.name,
@@ -464,14 +384,12 @@ function formatTMDBData(data, type) {
         imageUrl: c.profile_path ? IMG_BASE_PROFILE + c.profile_path : 'https://placehold.co/64x64'
     })) || [];
 
-    // Similar
     const similar = data.similar?.results?.map(s => ({
         id: s.id,
         title: s.title,
         posterUrl: s.poster_path ? IMG_BASE_POSTER + s.poster_path : 'https://placehold.co/200x300'
     })) || [];
 
-    // Streaming IE
     const streaming = data['watch/providers']?.results?.IE?.flatrate?.map(p => ({
         name: p.provider_name,
         logoUrl: IMG_BASE_PROFILE + p.logo_path
@@ -484,14 +402,11 @@ function formatTMDBData(data, type) {
             if (isMovie) {
                 return data.release_date?.split('-')[0] || 'N/A';
             }
-            // TV Show Logic
             const firstAirDate = data.first_air_date;
             const lastAirDate = data.last_air_date;
             const status = data.status;
             const startYear = firstAirDate?.split('-')[0] || '';
-
             if (!startYear) return 'N/A';
-
             if (status === 'Ended') {
                 const endYear = lastAirDate?.split('-')[0] || '';
                 if (endYear && startYear !== endYear) {
@@ -499,14 +414,13 @@ function formatTMDBData(data, type) {
                 }
                 return startYear;
             }
-
-            return `${startYear} - `; // For ongoing series
+            return `${startYear} - `;
         })(),
-        genres: data.genres || [], // Array of objects {id, name}
+        genres: data.genres || [],
         duration: isMovie ? `${Math.floor(data.runtime/60)}h ${data.runtime%60}m` : '',
         seasons: !isMovie ? data.number_of_seasons : null,
-        imdb: data.vote_average?.toFixed(1) || 'N/A', // Fallback TMDB
-        rottenTomatoes: 'TMDB', // Indication
+        imdb: data.vote_average?.toFixed(1) || 'N/A',
+        rottenTomatoes: 'TMDB',
         synopsis: data.overview,
         posterUrl: data.poster_path ? IMG_BASE_POSTER + data.poster_path : '',
         bannerUrl: data.backdrop_path ? IMG_BASE_BANNER + data.backdrop_path : '',
@@ -523,15 +437,33 @@ const awardIconSVG = `
         <path d="M7.163 15.023a.75.75 0 01.623.834 3.5 3.5 0 006.428 0 .75.75 0 011.39.55 5 5 0 01-9.208 0 .75.75 0 01.768-.834z"></path>
     </svg>`;
 
+// CORRECTION : Fonction unique et intelligente pour gérer l'affichage des Awards
 function updateAwardsUI(data) {
     const awardsSection = document.getElementById('awards-section');
     if (!awardsSection) return;
 
+    let wins = 0;
+    let nominations = 0;
+    let awardName = '';
+
+    // 1. Priorité au fichier externe (js/awards.js) car il est plus complet
+    // Note: window.awardsData est défini dans js/awards.js
+    const externalAwardInfo = window.awardsData && window.awardsData[data.id];
+
+    if (externalAwardInfo) {
+        wins = externalAwardInfo.wins;
+        nominations = externalAwardInfo.nominations;
+        // On respecte le type défini dans awards.js
+        awardName = externalAwardInfo.type === 'movie' ? 'Oscar' : 'Emmy';
+    } else {
+        // 2. Fallback sur les données locales du film (data.js)
+        const isMovie = data.type === 'movie' || (data.title && !data.name); 
+        awardName = isMovie ? 'Oscar' : 'Emmy';
+        wins = isMovie ? (data.oscarWins || 0) : (data.emmyWins || 0);
+        nominations = isMovie ? (data.oscarNominations || 0) : (data.emmyNominations || 0);
+    }
+
     let awardsHTML = '';
-    const isMovie = data.type === 'movie';
-    const awardName = isMovie ? 'Oscar' : 'Emmy';
-    const wins = isMovie ? data.oscarWins : data.emmyWins;
-    const nominations = isMovie ? data.oscarNominations : data.emmyNominations;
 
     if (wins > 0) {
         awardsHTML += `
@@ -551,6 +483,7 @@ function updateAwardsUI(data) {
 
     if (awardsHTML) {
         awardsSection.innerHTML = awardsHTML;
+        // On affiche en flex pour aligner les items verticalement (flex-col dans le HTML)
         awardsSection.style.display = 'flex';
     } else {
         awardsSection.style.display = 'none';
