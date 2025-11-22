@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<html class="dark" lang="en"><head>
+<html class="dark" lang="en">
+<head>
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <link crossorigin="" href="https://fonts.gstatic.com/" rel="preconnect"/>
@@ -34,71 +35,85 @@
     body {
       min-height: max(884px, 100dvh);
     }
+    [x-cloak] { display: none !important; }
   </style>
-  </head>
+</head>
 <body class="bg-background-dark font-display text-gray-200">
-<div class="flex h-screen flex-col" x-data="{ activeTab: 'tout' }">
-<header class="absolute top-0 left-0 right-0 z-10 flex items-center justify-between p-4">
-<button class="rounded-full bg-black/50 p-2 text-white" onclick="history.back()">
-<svg class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-<path d="M15 19l-7-7 7-7" stroke-linecap="round" stroke-linejoin="round"></path>
-</svg>
-</button>
-<button class="rounded-full bg-black/50 p-2 text-white">
-<svg class="h-6 w-6" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-<path d="M5 4a2 2 0 012-2h6a2 2 0 012 2v12l-5-3-5 3V4z"></path>
-</svg>
-</button>
-</header>
-<main class="flex-1 overflow-y-auto">
-<div class="flex flex-col items-center p-4 pt-16">
-<div class="relative">
-<img alt="Millie Bobby Brown" class="h-40 w-40 rounded-full object-cover shadow-lg" id="person-image" src=""/>
-</div>
-<h1 class="mt-4 text-3xl font-bold text-white" id="person-name"></h1>
-<div class="relative max-w-md text-center text-sm text-gray-400">
-    <p class="mt-4" id="person-bio"></p>
-    <button id="read-more-btn" class="text-primary font-semibold mt-2" style="display: none;">Read More</button>
-</div>
-</div>
-<div class="px-4 pb-8">
-<div class="mt-6">
-<div class="mb-4 flex items-center justify-between">
-<div class="flex items-center space-x-2 rounded-full bg-black/30 p-1">
-<button :class="{'bg-primary text-white': activeTab === 'tout', 'text-gray-400': activeTab !== 'tout'}" @click="activeTab = 'tout'" class="rounded-full py-2 px-4 text-center text-sm font-semibold transition-colors duration-300">
+<div class="flex h-screen flex-col" x-data="personProfile">
+  <header class="absolute top-0 left-0 right-0 z-10 flex items-center justify-between p-4">
+    <button class="rounded-full bg-black/50 p-2 text-white" onclick="history.back()">
+      <svg class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M15 19l-7-7 7-7" stroke-linecap="round" stroke-linejoin="round"></path>
+      </svg>
+    </button>
+    <button class="rounded-full bg-black/50 p-2 text-white">
+      <svg class="h-6 w-6" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+        <path d="M5 4a2 2 0 012-2h6a2 2 0 012 2v12l-5-3-5 3V4z"></path>
+      </svg>
+    </button>
+  </header>
+
+  <main class="flex-1 overflow-y-auto">
+    <div class="flex flex-col items-center p-4 pt-16">
+      <div class="relative">
+        <img :alt="person.name" class="h-40 w-40 rounded-full object-cover shadow-lg" :src="getProfileUrl(person.profile_path)"/>
+      </div>
+      <h1 class="mt-4 text-3xl font-bold text-white" x-text="person.name"></h1>
+      <div class="relative max-w-md text-center text-sm text-gray-400">
+          <p class="mt-4" x-text="bioText"></p>
+          <button x-show="showReadMore" @click="toggleBio()" class="text-primary font-semibold mt-2" x-text="isBioExpanded ? 'Read Less' : 'Read More'"></button>
+      </div>
+    </div>
+
+    <div class="px-4 pb-8">
+      <div class="mt-6">
+        <div class="mb-4 flex items-center justify-between">
+          <div class="flex items-center space-x-2 rounded-full bg-black/30 p-1">
+            <button :class="{'bg-primary text-white': activeTab === 'tout', 'text-gray-400': activeTab !== 'tout'}" @click="activeTab = 'tout'" class="rounded-full py-2 px-4 text-center text-sm font-semibold transition-colors duration-300">
                 Tout
-              </button>
-<button :class="{'bg-primary text-white': activeTab === 'films', 'text-gray-400': activeTab !== 'films'}" @click="activeTab = 'films'" class="rounded-full py-2 px-4 text-center text-sm font-semibold transition-colors duration-300">
+            </button>
+            <button :class="{'bg-primary text-white': activeTab === 'movie', 'text-gray-400': activeTab !== 'movie'}" @click="activeTab = 'movie'" class="rounded-full py-2 px-4 text-center text-sm font-semibold transition-colors duration-300">
                 Films
-              </button>
-<button :class="{'bg-primary text-white': activeTab === 'tv', 'text-gray-400': activeTab !== 'tv'}" @click="activeTab = 'tv'" class="rounded-full py-2 px-4 text-center text-sm font-semibold transition-colors duration-300">
+            </button>
+            <button :class="{'bg-primary text-white': activeTab === 'tv', 'text-gray-400': activeTab !== 'tv'}" @click="activeTab = 'tv'" class="rounded-full py-2 px-4 text-center text-sm font-semibold transition-colors duration-300">
                 TV
-              </button>
-</div>
-<div class="flex items-center space-x-2">
-<button class="flex items-center space-x-1 rounded-full bg-black/30 p-2 text-xs text-gray-400 hover:text-white">
-<span class="material-symbols-outlined text-base">swap_vert</span>
-<span>Trier</span>
-</button>
-<button class="flex items-center space-x-1 rounded-full bg-black/30 p-2 text-xs text-gray-400 hover:text-white">
-<span class="material-symbols-outlined text-base">filter_list</span>
-<span>Filtrer</span>
-</button>
-</div>
-</div>
-<div x-cloak="" x-show="activeTab === 'tout' || activeTab === 'films'">
-<div class="mt-4 space-y-4" id="films-container">
-</div>
-</div>
-<div x-cloak="" x-show="activeTab === 'tout' || activeTab === 'tv'">
-<div class="mt-4 space-y-4" id="series-container">
-</div>
-</div>
-</div>
-</div>
-</main>
+            </button>
+          </div>
+          <div class="flex items-center space-x-2">
+            <button @click="toggleSort()" class="flex items-center space-x-1 rounded-full bg-black/30 p-2 text-xs text-gray-400 hover:text-white transition-colors">
+              <span class="material-symbols-outlined text-base">swap_vert</span>
+              <span x-text="`Trier: ${sortLabel}`"></span>
+            </button>
+            <button class="flex items-center space-x-1 rounded-full bg-black/30 p-2 text-xs text-gray-600 cursor-not-allowed" disabled>
+              <span class="material-symbols-outlined text-base">filter_list</span>
+              <span>Filtrer</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="mt-4 space-y-4" x-cloak>
+            <template x-for="media in filteredCredits" :key="media.id + '-' + media.type">
+                <a :href="media.type === 'movie' ? `film.html?id=${media.id}` : `serie.html?id=${media.id}`" class="flex items-center gap-4 transition-all hover:bg-white/5 p-2 rounded-lg">
+                    <img :alt="media.title + ' poster'" class="h-24 w-16 rounded-lg object-cover" :src="getImageUrl(media.poster_path)"/>
+                    <div class="flex-1">
+                        <p class="font-semibold text-white" x-text="media.title"></p>
+                        <p class="text-sm text-gray-400" x-text="formatYear(media.date)"></p>
+                    </div>
+                    <span class="material-symbols-outlined text-gray-500">
+                      chevron_right
+                    </span>
+                </a>
+            </template>
+            <div x-show="filteredCredits.length === 0 && !isLoading" class="text-center text-gray-500 py-8">
+                No media found.
+            </div>
+        </div>
+      </div>
+    </div>
+  </main>
 </div>
 <script defer="" src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 <script src="config.js"></script>
 <script src="person.js"></script>
-</body></html>
+</body>
+</html>
