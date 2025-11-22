@@ -41,35 +41,45 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function createMediaCard(media, cardType = 'platform') {
-        const cardWidth = cardType === 'popular' ? 'w-48' : 'w-36';
-        const posterRadius = cardType === 'popular' ? 'rounded-lg' : 'rounded';
+   function createMediaCard(media, cardType = 'platform') {
+    const cardWidth = cardType === 'popular' ? 'w-48' : 'w-36';
+    const posterRadius = cardType === 'popular' ? 'rounded-lg' : 'rounded';
 
-        // More robust media type detection. '/discover' endpoints don't have 'media_type'.
-        // We can reliably check for the presence of a 'title' (movie) vs 'name' (tv).
-        const isMovie = media.media_type === 'movie' || media.hasOwnProperty('title');
-        const title = isMovie ? media.title : media.name;
-        const id = media.id;
-        const posterPath = media.poster_path;
+    // Détection du type (Film vs Série)
+    const isMovie = media.media_type === 'movie' || media.hasOwnProperty('title');
+    const title = isMovie ? media.title : media.name;
+    const id = media.id;
+    const posterPath = media.poster_path;
 
-        if (!posterPath) return ''; // Skip items without a poster image
+    if (!posterPath) return ''; 
 
-        const link = isMovie ? `film.html?id=${id}` : `serie.html?id=${id}`;
-        const posterUrl = IMG_BASE_POSTER + posterPath;
+    const link = isMovie ? `film.html?id=${id}` : `serie.html?id=${id}`;
+    const posterUrl = IMG_BASE_POSTER + posterPath;
 
-        return `
-            <a href="${link}" class="flex-shrink-0 ${cardWidth} snap-start">
-                <div class="w-full bg-center bg-no-repeat aspect-[2/3] bg-cover ${posterRadius}" style='background-image: url("${posterUrl}");'></div>
-                <p class="mt-2 text-sm font-medium text-gray-800 dark:text-gray-200 truncate">${title}</p>
-                <div class="flex items-center gap-2 mt-1 text-xs text-gray-500 dark:text-gray-400">
-                    <div class="flex items-center gap-1">
-                        <svg class="w-4 h-4 text-yellow-400" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path></svg>
-                        <span>${media.vote_average ? media.vote_average.toFixed(1) : 'N/A'}</span>
-                    </div>
+    // --- MODIFICATION ICI ---
+    // Création de la pastille TV si ce n'est pas un film
+    // Style: Jaune, texte noir, gras, petite taille, en haut à gauche
+    const badgeHTML = !isMovie 
+        ? `<span class="absolute top-2 left-2 z-10 bg-yellow-400 text-black text-[10px] font-bold px-1.5 py-0.5 rounded-sm shadow-md uppercase tracking-wide">TV</span>`
+        : '';
+
+    return `
+        <a href="${link}" class="flex-shrink-0 ${cardWidth} snap-start group">
+            <div class="relative w-full bg-center bg-no-repeat aspect-[2/3] bg-cover ${posterRadius} overflow-hidden" style='background-image: url("${posterUrl}");'>
+                ${badgeHTML}
+                <div class="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-200"></div>
+            </div>
+            
+            <p class="mt-2 text-sm font-medium text-gray-800 dark:text-gray-200 truncate group-hover:text-primary transition-colors">${title}</p>
+            <div class="flex items-center gap-2 mt-1 text-xs text-gray-500 dark:text-gray-400">
+                <div class="flex items-center gap-1">
+                    <svg class="w-4 h-4 text-yellow-400" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path></svg>
+                    <span>${media.vote_average ? media.vote_average.toFixed(1) : 'N/A'}</span>
                 </div>
-            </a>
-        `;
-    }
+            </div>
+        </a>
+    `;
+}
 
     function renderContent(container, content, cardType = 'platform') {
         container.innerHTML = content.map(media => createMediaCard(media, cardType)).join('');
