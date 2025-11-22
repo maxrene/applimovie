@@ -17,20 +17,30 @@ document.addEventListener('alpine:init', () => {
         isLoading: true,
 
         async init() {
-            const urlParams = new URLSearchParams(window.location.search);
-            const personId = urlParams.get('id');
+            try {
+                const urlParams = new URLSearchParams(window.location.search);
+                const personId = urlParams.get('id');
 
-            if (!personId) {
-                console.error("Person ID is missing from the URL");
+                if (!personId) {
+                    console.error("Person ID is missing from the URL");
+                    this.isLoading = false;
+                    return;
+                }
+
+                await this.fetchPersonDetails(personId);
+            } catch (error) {
+                console.error("Initialization error:", error);
+                this.isLoading = false;
+            }
+        },
+
+        async fetchPersonDetails(personId) {
+            if (typeof TMDB_API_KEY === 'undefined') {
+                console.error("TMDB_API_KEY is not defined. Check config.js.");
                 this.isLoading = false;
                 return;
             }
 
-            await this.fetchPersonDetails(personId);
-        },
-
-        async fetchPersonDetails(personId) {
-            // TMDB_API_KEY is expected to be defined in config.js
             const url = `${BASE_URL}/person/${personId}?api_key=${TMDB_API_KEY}&language=en-US&append_to_response=movie_credits,tv_credits`;
 
             try {
@@ -61,9 +71,6 @@ document.addEventListener('alpine:init', () => {
             const processedSeries = this.normalizeMedia(series, 'tv');
 
             // Combine all unique credits
-            // We need to deduplicate across the entire set if needed, but usually movie and tv IDs are distinct namespaces in TMDB (but wait, an ID is an integer).
-            // A movie ID 123 is different from TV ID 123. So we just dedup within types.
-
             this.credits = [...processedFilms, ...processedSeries];
         },
 
@@ -71,13 +78,15 @@ document.addEventListener('alpine:init', () => {
             const uniqueMap = new Map();
 
             list.forEach(item => {
-                if (!uniqueMap.has(item.id)) {
-                    uniqueMap.set(item.id, {
-                        id: item.id,
-                        title: type === 'movie' ? item.title : item.name,
+                // Use strict type checking and fallbacks
+                const id = item.id;
+                if (id && !uniqueMap.has(id)) {
+                    uniqueMap.set(id, {
+                        id: id,
+                        title: type === 'movie' ? (item.title || item.original_title) : (item.name || item.original_name),
                         poster_path: item.poster_path,
                         date: type === 'movie' ? item.release_date : item.first_air_date,
-                        popularity: item.popularity,
+                        popularity: item.popularity || 0,
                         type: type
                     });
                 }
@@ -124,7 +133,7 @@ document.addEventListener('alpine:init', () => {
                     // Sort by date descending
                     const dateA = new Date(a.date || '0000-01-01');
                     const dateB = new Date(b.date || '0000-01-01');
-                    return dateB - dateA;
+                    return dateB - dateA; // Recent first
                 }
             });
         },
