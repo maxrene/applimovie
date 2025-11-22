@@ -83,6 +83,7 @@ async function fetchUpdates(id, type) {
 
         // Format and Update Cast
         const cast = creditsData.cast?.map(c => ({
+            id: c.id,
             name: c.name,
             character: c.character,
             imageUrl: c.profile_path ? IMG_BASE_PROFILE + c.profile_path : 'https://placehold.co/64x64'
