@@ -37,7 +37,7 @@
   </style>
   </head>
 <body class="bg-background-dark font-display text-gray-200">
-<div class="flex h-screen flex-col" x-data="{ activeTab: 'films' }">
+<div class="flex h-screen flex-col" x-data="{ activeTab: 'tout' }">
 <header class="absolute top-0 left-0 right-0 z-10 flex items-center justify-between p-4">
 <button class="rounded-full bg-black/50 p-2 text-white" onclick="history.back()">
 <svg class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -63,19 +63,34 @@
 </div>
 <div class="px-4 pb-8">
 <div class="mt-6">
-<div class="mb-4 flex items-center justify-center space-x-2 rounded-full bg-black/30 p-1">
-<button :class="{'bg-primary text-white': activeTab === 'films', 'text-gray-400': activeTab !== 'films'}" @click="activeTab = 'films'" class="w-full rounded-full py-2 px-4 text-center text-sm font-semibold transition-colors duration-300">
-              Films
-            </button>
-<button :class="{'bg-primary text-white': activeTab === 'series', 'text-gray-400': activeTab !== 'series'}" @click="activeTab = 'series'" class="w-full rounded-full py-2 px-4 text-center text-sm font-semibold transition-colors duration-300">
-              Series
-            </button>
+<div class="mb-4 flex items-center justify-between">
+<div class="flex items-center space-x-2 rounded-full bg-black/30 p-1">
+<button :class="{'bg-primary text-white': activeTab === 'tout', 'text-gray-400': activeTab !== 'tout'}" @click="activeTab = 'tout'" class="rounded-full py-2 px-4 text-center text-sm font-semibold transition-colors duration-300">
+                Tout
+              </button>
+<button :class="{'bg-primary text-white': activeTab === 'films', 'text-gray-400': activeTab !== 'films'}" @click="activeTab = 'films'" class="rounded-full py-2 px-4 text-center text-sm font-semibold transition-colors duration-300">
+                Films
+              </button>
+<button :class="{'bg-primary text-white': activeTab === 'tv', 'text-gray-400': activeTab !== 'tv'}" @click="activeTab = 'tv'" class="rounded-full py-2 px-4 text-center text-sm font-semibold transition-colors duration-300">
+                TV
+              </button>
 </div>
-<div x-cloak="" x-show="activeTab === 'films'">
+<div class="flex items-center space-x-2">
+<button class="flex items-center space-x-1 rounded-full bg-black/30 p-2 text-xs text-gray-400 hover:text-white">
+<span class="material-symbols-outlined text-base">swap_vert</span>
+<span>Trier</span>
+</button>
+<button class="flex items-center space-x-1 rounded-full bg-black/30 p-2 text-xs text-gray-400 hover:text-white">
+<span class="material-symbols-outlined text-base">filter_list</span>
+<span>Filtrer</span>
+</button>
+</div>
+</div>
+<div x-cloak="" x-show="activeTab === 'tout' || activeTab === 'films'">
 <div class="mt-4 space-y-4" id="films-container">
 </div>
 </div>
-<div x-cloak="" x-show="activeTab === 'series'">
+<div x-cloak="" x-show="activeTab === 'tout' || activeTab === 'tv'">
 <div class="mt-4 space-y-4" id="series-container">
 </div>
 </div>
