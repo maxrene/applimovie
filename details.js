@@ -17,6 +17,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (!mediaId) return console.error("Pas d'ID");
 
+    initializeWatchlistButton(mediaId);
+
     const seeAllLink = document.querySelector('#cast-section a') || document.querySelector('a[href="#"][class*="text-primary"]');
     if (seeAllLink) {
         seeAllLink.addEventListener('click', (e) => {
@@ -515,5 +517,55 @@ function updateAwardsUI(data) {
         awardsSection.style.display = 'flex';
     } else {
         awardsSection.style.display = 'none';
+    }
+}
+
+function initializeWatchlistButton(mediaId) {
+    const watchlistButton = document.getElementById('watchlist-button');
+    if (!watchlistButton) return;
+
+    updateWatchlistButton(mediaId);
+
+    watchlistButton.addEventListener('click', () => {
+        toggleWatchlist(mediaId);
+    });
+}
+
+function toggleWatchlist(mediaId) {
+    let watchlist = JSON.parse(localStorage.getItem('watchlist')) || [];
+    const mediaIdNum = parseInt(mediaId, 10);
+    const index = watchlist.findIndex(item => item.id === mediaIdNum);
+
+    if (index > -1) {
+        watchlist.splice(index, 1);
+    } else {
+        watchlist.push({ id: mediaIdNum, added_at: new Date().toISOString() });
+    }
+
+    localStorage.setItem('watchlist', JSON.stringify(watchlist));
+    updateWatchlistButton(mediaId);
+}
+
+function updateWatchlistButton(mediaId) {
+    const watchlistButton = document.getElementById('watchlist-button');
+    if (!watchlistButton) return;
+
+    let watchlist = JSON.parse(localStorage.getItem('watchlist')) || [];
+    const mediaIdNum = parseInt(mediaId, 10);
+    const isInWatchlist = watchlist.some(item => item.id === mediaIdNum);
+
+    const icon = watchlistButton.querySelector('.material-symbols-outlined');
+    const text = watchlistButton.querySelector('span:last-child');
+
+    if (isInWatchlist) {
+        watchlistButton.classList.remove('bg-gray-700');
+        watchlistButton.classList.add('bg-primary');
+        icon.textContent = 'check';
+        text.textContent = 'On Watchlist';
+    } else {
+        watchlistButton.classList.remove('bg-primary');
+        watchlistButton.classList.add('bg-gray-700');
+        icon.textContent = 'add';
+        text.textContent = 'Watchlist';
     }
 }

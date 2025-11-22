@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html class="dark" lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <link crossorigin="" href="https://fonts.gstatic.com/" rel="preconnect"/>
+    <link as="style" href="https://fonts.googleapis.com/css2?display=swap&amp;family=Noto+Sans%3Awght%40400%3B500%3B700%3B900&amp;family=Spline+Sans%3Awght%40400%3B500%3B700" onload="this.rel='stylesheet'" rel="stylesheet"/>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+    <script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: { "primary": "#ea2a33", "background-light": "#f8f6f6", "background-dark": "#211111" },
+                    fontFamily: { "display": ["Spline Sans"] },
+                    borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" },
+                },
+            },
+        }
+    </script>
+    <title>My List</title>
+    <style>
+        body { min-height: max(884px, 100dvh) }
+        .custom-select {
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+            background-image: url('data:image/svg+xml;utf8,<svg fill="white" height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5z"></path></svg>');
+            background-repeat: no-repeat;
+            background-position: right 0.5rem center;
+            background-size: 1.5em 1.5em;
+            padding-right: 2.5rem;
+        }
+        [x-cloak] { display: none !important; }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark font-display text-gray-800 dark:text-gray-200" x-data="myListPage">
+<div class="flex h-screen flex-col">
+    <header class="flex-shrink-0">
+        <div class="flex items-center p-4">
+            <a href="index.html" class="p-2">
+                <svg class="text-gray-800 dark:text-gray-200" fill="currentColor" height="24" viewBox="0 0 256 256" width="24" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M224,128a8,8,0,0,1-8,8H59.31l58.35,58.34a8,8,0,0,1-11.32,11.32l-72-72a8,8,0,0,1,0-11.32l72-72a8,8,0,0,1,11.32,11.32L59.31,120H216A8,8,0,0,1,224,128Z"></path>
+                </svg>
+            </a>
+            <h1 class="flex-1 text-center text-xl font-bold text-gray-900 dark:text-white pr-10">My List</h1>
+        </div>
+        <div class="border-b border-gray-200/20 dark:border-gray-700/50">
+            <nav aria-label="Tabs" class="flex px-4">
+                <a href="#" @click.prevent="activeTab = 'movie'" :class="{'border-primary text-primary': activeTab === 'movie', 'border-transparent text-gray-500 dark:text-gray-400 hover:border-gray-300 hover:text-gray-700': activeTab !== 'movie'}" class="border-b-2 flex-1 whitespace-nowrap py-4 px-1 text-center text-sm font-semibold">Movies</a>
+                <a href="#" @click.prevent="activeTab = 'tv'" :class="{'border-primary text-primary': activeTab === 'tv', 'border-transparent text-gray-500 dark:text-gray-400 hover:border-gray-300 hover:text-gray-700': activeTab !== 'tv'}" class="border-b-2 flex-1 whitespace-nowrap py-4 px-1 text-center text-sm font-semibold">TV Shows</a>
+            </nav>
+        </div>
+        <div class="flex flex-col gap-4 p-4 border-b border-gray-200/20 dark:border-gray-700/50">
+            <div class="flex items-center justify-between gap-4">
+                <div id="platform-filter" class="flex items-center -space-x-2">
+                </div>
+                <div class="relative">
+                    <select @change="sortMedia($event.target.value)" class="custom-select rounded-md border border-gray-300 bg-background-light py-2 pl-3 pr-10 text-sm font-medium text-gray-700 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary dark:border-gray-600 dark:bg-background-dark dark:text-gray-300">
+                        <option value="popularity">Popularity</option>
+                        <option value="recently_added">Recently Added</option>
+                    </select>
+                </div>
+            </div>
+            <div class="flex items-center justify-end" x-show="activeTab === 'tv'">
+                <label class="flex cursor-pointer items-center gap-2" for="hide-completed">
+                    <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Hide Completed TV Shows</span>
+                    <div class="relative">
+                        <input class="sr-only peer" id="hide-completed" type="checkbox" x-model="hideCompleted"/>
+                        <div class="w-11 h-6 bg-gray-200 rounded-full dark:bg-gray-700 peer-checked:bg-primary"></div>
+                        <div class="absolute left-1 top-1 h-4 w-4 rounded-full bg-white transition-all peer-checked:translate-x-full"></div>
+                    </div>
+                </label>
+            </div>
+        </div>
+    </header>
+    <main class="flex-1 overflow-y-auto" x-cloak>
+        <div id="media-list" class="divide-y divide-gray-200/20 dark:divide-gray-700/50">
+             <!-- Media items will be injected here by mylist.js -->
+        </div>
+        <div id="empty-state" class="hidden text-center p-8">
+            <p class="text-gray-500 dark:text-gray-400">Your list is empty.</p>
+            <p class="text-gray-500 dark:text-gray-400">Add movies and TV shows to see them here.</p>
+        </div>
+    </main>
+    <footer class="flex-shrink-0 border-t border-gray-200/20 dark:border-gray-700/50 bg-background-light dark:bg-background-dark/80 backdrop-blur-sm">
+        <nav class="flex justify-around py-2">
+            <a class="flex flex-col items-center gap-1 p-2 text-gray-500 dark:text-gray-400" href="index.html">
+                <svg fill="currentColor" height="24" viewBox="0 0 256 256" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M218.83,103.77l-80-75.48a1.14,1.14,0,0,1-.11-.11,16,16,0,0,0-21.53,0l-.11.11,L37.17,103.77A16,16,0,0,0,32,115.55V208a16,16,0,0,0,16,16H96a16,16,0,0,0,16-16V160h32v48a16,16,0,0,0,16,16h48a16,16,0,0,0,16-16V115.55A16,16,0,0,0,218.83,103.77ZM208,208H160V160a16,16,0,0,0-16-16H112a16,16,0,0,0-16,16v48H48V115.55l.11-.1L128,40l79.9,75.43.11.1Z"></path></svg>
+                <span class="text-xs font-medium">Home</span>
+            </a>
+            <a class="flex flex-col items-center gap-1 p-2 text-gray-500 dark:text-gray-400" href="search.html">
+                <svg fill="currentColor" height="24" viewBox="0 0 256 256" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M229.66,218.34l-50.07-50.06a88.11,88.11,0,1,0-11.31,11.31l50.06,50.07a8,8,0,0,0,11.32-11.32ZM40,112a72,72,0,1,1,72,72A72.08,72.08,0,0,1,40,112Z"></path></svg>
+                <span class="text-xs font-medium">Search</span>
+            </a>
+            <a class="flex flex-col items-center gap-1 p-2 text-primary" href="mylist.html">
+                <svg fill="currentColor" height="24" viewBox="0 0 256 256" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M184,32H72A16,16,0,0,0,56,48V224a8,8,0,0,0,12.24,6.78L128,193.43l59.77,37.35A8,8,0,0,0,200,224V48A16,16,0,0,0,184,32Z"></path></svg>
+                <span class="text-xs font-medium">My List</span>
+            </a>
+            <a class="flex flex-col items-center gap-1 p-2 text-gray-500 dark:text-gray-400" href="profile.html">
+                <svg fill="currentColor" height="24" viewBox="0 0 256 256" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M230.92,212c-15.23-26.33-38.7-45.21-66.09-54.16a72,72,0,1,0-73.66,0C63.78,166.78,40.31,185.66,25.08,212a8,8,0,1,0,13.85,8c18.84-32.56,52.14-52,89.07-52s70.23,19.44,89.07,52a8,8,0,1,0,13.85-8ZM72,96a56,56,0,1,1,56,56A56.06,56.06,0,0,1,72,96Z"></path></svg>
+                <span class="text-xs font-medium">Profile</span>
+            </a>
+        </nav>
+        <div class="h-safe-bottom"></div>
+    </footer>
+</div>
+
+<script src="config.js"></script>
+<script src="data.js"></script>
+<script src="mylist.js"></script>
+
+</body>
+</html>
