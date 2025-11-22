@@ -166,7 +166,7 @@ window.awardsData = {
   "116362": { "title": "Mr. & Mrs. Smith", "year": "2024", "nominations": 16, "wins": 2, "type": "tv" },
   "196417": { "title": "Palm Royale", "year": "2024", "nominations": 11, "wins": 0, "type": "tv" },
   "136315": { "title": "The Bear", "year": "2022", "nominations": 23, "wins": 11, "type": "tv" },
-  "114472": { "title": "Slow Horses", "year": "2022", "nominations": 15, "wins": 1, "type": "tv" },
+  "95480": { "title": "Slow Horses", "year": "2022", "nominations": 15, "wins": 1, "type": "tv" },
   "76331": { "title": "Succession", "year": "2018", "nominations": 75, "wins": 19, "type": "tv" },
   "100088": { "title": "The Last of Us", "year": "2023", "nominations": 24, "wins": 8, "type": "tv" },
   "122226": { "title": "Hacks", "year": "2021", "nominations": 48, "wins": 9, "type": "tv" },
