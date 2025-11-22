@@ -83,7 +83,6 @@ async function fetchUpdates(id, type) {
 
         // Format and Update Cast
         const cast = creditsData.cast?.map(c => ({
-            id: c.id,
             name: c.name,
             character: c.character,
             imageUrl: c.profile_path ? IMG_BASE_PROFILE + c.profile_path : 'https://placehold.co/64x64'
@@ -93,14 +92,6 @@ async function fetchUpdates(id, type) {
 
         // Fetch Similar Movies (only for movies)
         if (type === 'movie') {
-            const director = creditsData.crew?.find(c => c.job === 'Director');
-            if (director) {
-                updatePersonUI({
-                    id: director.id,
-                    name: director.name,
-                    imageUrl: director.profile_path ? IMG_BASE_PROFILE + director.profile_path : 'https://placehold.co/64x64'
-                }, 'movie');
-            }
             const similarUrl = `${BASE_URL}/${type}/${id}/similar?api_key=${TMDB_API_KEY}`;
             const similarRes = await fetch(similarUrl);
             const similarData = await similarRes.json();
@@ -123,7 +114,6 @@ async function fetchUpdates(id, type) {
             if (seriesDetailsData.created_by && seriesDetailsData.created_by.length > 0) {
                 const c = seriesDetailsData.created_by[0];
                 creator = {
-                    id: c.id,
                     name: c.name,
                     imageUrl: c.profile_path ? IMG_BASE_PROFILE + c.profile_path : 'https://placehold.co/64x64'
                 };
@@ -132,7 +122,6 @@ async function fetchUpdates(id, type) {
                 const director = seriesDetailsData.credits?.crew?.find(c => c.job === 'Director');
                 if (director) {
                     creator = {
-                        id: director.id,
                         name: director.name,
                         imageUrl: director.profile_path ? IMG_BASE_PROFILE + director.profile_path : 'https://placehold.co/64x64'
                     };
@@ -303,13 +292,13 @@ function renderCastList() {
 
     displayList.forEach(member => {
         castContainer.innerHTML += `
-            <a href="person.html?id=${member.id}" class="flex items-center gap-3">
+            <div class="flex items-center gap-3">
                 <img class="h-14 w-14 rounded-full object-cover flex-shrink-0" src="${member.imageUrl}" onerror="this.src='https://placehold.co/64x64'"/>
                 <div>
                     <p class="font-semibold text-white text-sm">${member.name}</p>
                     <p class="text-xs text-gray-400">${member.character}</p>
                 </div>
-            </a>`;
+            </div>`;
     });
 
     // Toggle button visibility/text
@@ -338,17 +327,8 @@ function updatePersonUI(person, type) {
     }
 
     section.style.display = 'block';
-
-    const directorImage = document.getElementById('director-image');
-    if (directorImage) {
-        directorImage.parentElement.href = `person.html?id=${person.id}`;
-        directorImage.src = person.imageUrl;
-    }
-
-    const directorName = document.getElementById('director-name');
-    if (directorName) {
-        directorName.innerHTML = `<a href="person.html?id=${person.id}">${person.name}</a>`;
-    }
+    document.getElementById('director-image').src = person.imageUrl;
+    document.getElementById('director-name').textContent = person.name;
 
     const roleTitle = document.getElementById('director-title');
     const roleText = document.getElementById('director-role');
@@ -447,14 +427,13 @@ function formatTMDBData(data, type) {
     let dir = { name: 'Unknown', imageUrl: 'https://placehold.co/64x64' };
     if(isMovie) {
         const d = data.credits?.crew?.find(c => c.job === 'Director');
-        if(d) dir = { id: d.id, name: d.name, imageUrl: d.profile_path ? IMG_BASE_PROFILE + d.profile_path : dir.imageUrl };
+        if(d) dir = { name: d.name, imageUrl: d.profile_path ? IMG_BASE_PROFILE + d.profile_path : dir.imageUrl };
     } else if(data.created_by?.length > 0) {
-        dir = { id: data.created_by[0].id, name: data.created_by[0].name, imageUrl: data.created_by[0].profile_path ? IMG_BASE_PROFILE + data.created_by[0].profile_path : dir.imageUrl };
+        dir = { name: data.created_by[0].name, imageUrl: data.created_by[0].profile_path ? IMG_BASE_PROFILE + data.created_by[0].profile_path : dir.imageUrl };
     }
 
     // Cast
     const cast = data.credits?.cast?.map(c => ({
-        id: c.id,
         name: c.name,
         character: c.character,
         imageUrl: c.profile_path ? IMG_BASE_PROFILE + c.profile_path : 'https://placehold.co/64x64'
