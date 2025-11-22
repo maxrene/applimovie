@@ -4,6 +4,7 @@ document.addEventListener('alpine:init', () => {
         watchlist: [],
         activeTab: 'tv', // 'movie' or 'tv'
         hideCompleted: false,
+        hideWatched: false,
         sortOrder: 'popularity',
         selectedPlatform: null,
         platforms: [],
@@ -13,6 +14,7 @@ document.addEventListener('alpine:init', () => {
             this.extractPlatforms();
             this.$watch('activeTab', () => this.renderMedia());
             this.$watch('hideCompleted', () => this.renderMedia());
+            this.$watch('hideWatched', () => this.renderMedia());
             this.$watch('selectedPlatform', () => this.renderMedia());
             this.renderMedia();
             this.renderPlatformFilters();
@@ -65,11 +67,16 @@ document.addEventListener('alpine:init', () => {
 
         get filteredMedia() {
             const type = this.activeTab === 'tv' ? 'serie' : 'movie';
+            const watchedMovies = JSON.parse(localStorage.getItem('watchedMovies')) || [];
+            const watchedSeries = JSON.parse(localStorage.getItem('watchedSeries')) || [];
 
             let filtered = this.watchlist
                 .map(item => {
                     const media = mediaData.find(m => m.id === item.id);
-                    return media ? { ...media, added_at: item.added_at } : null;
+                    if (!media) return null;
+                    const isWatched = (media.type === 'movie' && watchedMovies.includes(media.id)) ||
+                                    (media.type === 'serie' && watchedSeries.includes(media.id));
+                    return { ...media, added_at: item.added_at, isWatched };
                 })
                 .filter(item => item && item.type === type);
 
@@ -80,10 +87,11 @@ document.addEventListener('alpine:init', () => {
             }
 
             if (this.activeTab === 'tv' && this.hideCompleted) {
-                filtered = filtered.filter(item => {
-                    // Simulating completion status (e.g., even ID is completed)
-                    return item.id % 2 !== 0;
-                });
+                filtered = filtered.filter(item => !item.isWatched);
+            }
+
+            if (this.activeTab === 'movie' && this.hideWatched) {
+                filtered = filtered.filter(item => !item.isWatched);
             }
 
             return filtered;
@@ -126,43 +134,26 @@ document.addEventListener('alpine:init', () => {
             const link = isTV ? `serie.html?id=${item.id}` : `film.html?id=${item.id}`;
             const yearAndGenre = `${item.year} • ${item.genres[0]}`;
 
-            let progressHTML = '';
-            if (isTV) {
-                // Simulating progress data
-                const season = Math.floor(Math.random() * 3) + 1;
-                const totalEpisodes = 10;
-                const watchedEpisodes = Math.floor(Math.random() * totalEpisodes) + 1;
-                const progressPercentage = (watchedEpisodes / totalEpisodes) * 100;
-                const isCompleted = item.id % 2 === 0;
-
-                if (isCompleted) {
-                    progressHTML = `
-                        <div class="absolute inset-0 flex items-center justify-center rounded-lg bg-black/60">
-                            <div class="text-center">
-                                <div class="inline-flex h-8 w-8 items-center justify-center rounded-full bg-green-500 text-white">
-                                    <svg fill="none" height="20" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="3" viewBox="0 0 24 24" width="20" xmlns="http://www.w3.org/2000/svg">
-                                        <polyline points="20 6 9 17 4 12"></polyline>
-                                    </svg>
-                                </div>
-                                <p class="mt-1 text-xs font-semibold text-white">All Caught Up!</p>
+            let watchedIconHTML = '';
+            if (item.isWatched) {
+                watchedIconHTML = `
+                    <div class="absolute inset-0 flex items-center justify-center rounded-lg bg-black/60">
+                        <div class="text-center">
+                            <div class="inline-flex h-8 w-8 items-center justify-center rounded-full bg-green-500 text-white">
+                                <svg fill="none" height="20" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="3" viewBox="0 0 24 24" width="20" xmlns="http://www.w3.org/2000/svg">
+                                    <polyline points="20 6 9 17 4 12"></polyline>
+                                </svg>
                             </div>
-                        </div>`;
-                } else {
-                    progressHTML = `
-                        <div class="absolute bottom-1 left-1 right-1 rounded bg-black/50 p-1 backdrop-blur-sm">
-                            <div class="h-1 w-full rounded-full bg-gray-500/50">
-                                <div class="h-1 rounded-full bg-primary" style="width: ${progressPercentage}%"></div>
-                            </div>
-                            <p class="mt-1 text-center text-[10px] font-semibold text-white">Season ${season} - ${watchedEpisodes}/${totalEpisodes} episodes</p>
-                        </div>`;
-                }
+                            <p class="mt-1 text-xs font-semibold text-white">Watched</p>
+                        </div>
+                    </div>`;
             }
 
             return `
                 <a href="${link}" class="flex items-center gap-4 p-4">
                     <div class="relative h-24 w-40 flex-shrink-0">
                         <div class="h-full w-full rounded-lg bg-cover bg-center" style="background-image: url('${item.posterUrl}');"></div>
-                        ${progressHTML}
+                        ${watchedIconHTML}
                     </div>
                     <div class="flex-1">
                         <p class="text-xs text-gray-500 dark:text-gray-400">${isTV ? 'TV Show' : 'Movie'}</p>
