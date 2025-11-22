@@ -14,6 +14,8 @@ const mediaData = [
     "duration": "2h 46m",
     "imdb": "8.4",
     "rottenTomatoes": "93",
+    "oscarWins": 1,
+    "oscarNominations": 7,
     "synopsis": "Follow the mythic journey of Paul Atreides as he unites with Chani and the Fremen while on a warpath of revenge against the conspirators who destroyed his family. Facing a choice between the love of his life and the fate of the known universe, he endeavors to prevent a terrible future only he can foresee.",
     "posterUrl": "https://image.tmdb.org/t/p/w500/8b8R8l88Qje9dn9OE8PY05Nxl1X.jpg",
     "bannerUrl": "https://image.tmdb.org/t/p/original/xOMo8BRK7PfcJv9JCnx7s5hj0PX.jpg",
@@ -504,6 +506,8 @@ const mediaData = [
     "id": 1396,
     "type": "serie",
     "title": "Breaking Bad",
+    "emmyWins": 16,
+    "emmyNominations": 58,
     "year": 2008,
     "genres": [
       "Drama",
