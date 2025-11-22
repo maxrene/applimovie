@@ -89,7 +89,7 @@ function populateMediaList(containerId, mediaList, type) {
         const releaseDate = type === 'movie' ? media.release_date : media.first_air_date;
         const year = releaseDate ? new Date(releaseDate).getFullYear() : 'N/A';
         const posterPath = media.poster_path ? `${IMG_BASE_POSTER}${media.poster_path}` : 'https://placehold.co/64x96';
-        const mediaLink = `details.html?id=${media.id}&type=${type}`;
+        const mediaLink = type === 'movie' ? `film.html?id=${media.id}` : `serie.html?id=${media.id}`;
 
         const mediaElement = document.createElement('a');
         mediaElement.href = mediaLink;
