@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>LocalStorage Test</title>
+</head>
+<body>
+    <h1>LocalStorage Test Page</h1>
+    <p>Value from localStorage: <span id="ls-value"></span></p>
+    <script>
+        const value = localStorage.getItem('mykey');
+        document.getElementById('ls-value').textContent = value || 'not set';
+    </script>
+</body>
+</html>
