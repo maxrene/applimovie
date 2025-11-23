@@ -48,7 +48,7 @@ async def main():
 
 
         # --- Test Sorting Component ---
-        await page.goto('http://localhost:8080/mylist.html')
+        await page.goto('http://localhost:8080/watchlist.html')
         await page.wait_for_selector('#media-list')
 
         # Check that platform filters are visible
