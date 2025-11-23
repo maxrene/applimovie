@@ -4,9 +4,10 @@
     <meta charset="utf-8"/>
     <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
     <link crossorigin="" href="https://fonts.gstatic.com/" rel="preconnect"/>
-    <link as="style" href="https://fonts.googleapis.com/css2?display=swap&amp;family=Noto+Sans%3Awght%40400%3B500%3B700%3B900&amp;family=Spline+Sans%3Awght%40400%3B500%3B700" onload="this.rel='stylesheet'" rel="stylesheet"/>
+    <link as="style" href="https://fonts.googleapis.com/css2?display=swap&amp;family=Spline+Sans:wght@400;500;700&amp;display=swap" onload="this.rel='stylesheet'" rel="stylesheet"/>
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
     <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400..700,0..1,0" rel="stylesheet" />
     <script>
         tailwind.config = {
             darkMode: "class",
@@ -20,23 +21,24 @@
         }
     </script>
     <title>Watchlist</title>
-    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet"/>
     <style>
         body { min-height: max(884px, 100dvh) }
         [x-cloak] { display: none !important; }
-        /* Cacher la barre de défilement mais garder la fonction de scroll */
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .material-symbols-outlined.filled { font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
     </style>
 </head>
 <body class="bg-background-light dark:bg-background-dark font-display text-gray-800 dark:text-gray-200" x-data="watchlistPage">
 <div class="flex h-screen flex-col">
    <header class="flex-shrink-0 bg-background-light dark:bg-background-dark z-20 relative">
-    <div class="flex items-center p-4 pb-2">
-        <a href="index.html" class="p-2 -ml-2">
-            <span class="material-symbols-outlined text-gray-800 dark:text-gray-200">arrow_back</span>
+    <div class="flex items-center justify-between p-4 pb-2">
+        <h1 class="text-xl font-bold text-gray-900 dark:text-white pl-2">My List</h1>
+        
+        <a href="profile.html" class="flex items-center gap-3 p-1 rounded-full hover:bg-gray-200 dark:hover:bg-white/10 transition-colors">
+            <img id="header-flag" src="https://flagcdn.com/w40/fr.png" alt="FR" class="w-5 h-auto rounded-sm shadow-sm object-cover">
+            <span class="material-symbols-outlined text-3xl text-gray-600 dark:text-gray-300">account_circle</span>
         </a>
-        <h1 class="flex-1 text-center text-xl font-bold text-gray-900 dark:text-white pr-6">My List</h1>
     </div>
 
     <div class="border-b border-gray-200/20 dark:border-gray-700/50">
@@ -51,7 +53,6 @@
     </div>
 
     <div class="flex items-center gap-3 px-4 py-3 overflow-x-auto no-scrollbar border-b border-gray-200/20 dark:border-gray-700/50">
-        
         <button @click="activePlatformFilters = []"
                 class="flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-colors border h-10"
                 :class="activePlatformFilters.length === 0 
@@ -59,59 +60,40 @@
                         : 'bg-gray-800 border-gray-700 text-gray-400 hover:bg-gray-700'">
             Tout
         </button>
-
         <template x-for="platform in userSelectedPlatforms" :key="platform.id">
             <button @click="togglePlatformFilter(platform.id)" 
                     class="relative flex-shrink-0 w-10 h-10 rounded-lg transition-all duration-200 border-2 overflow-hidden"
                     :class="activePlatformFilters.includes(platform.id) 
                             ? 'border-primary scale-105 shadow-lg shadow-primary/20 grayscale-0' 
-                            : 'border-transparent opacity-60 grayscale hover:grayscale-0 hover:opacity-100'"
-                    :title="platform.name">
-                
-                <img :src="platform.logoUrl" class="w-full h-full object-contain bg-gray-800 p-1">
-                
+                            : 'border-transparent opacity-60 grayscale hover:grayscale-0 hover:opacity-100'">
+                <img :src="platform.logoUrl" class="w-full h-full object-cover bg-black">
                 <div x-show="activePlatformFilters.includes(platform.id)" 
                      class="absolute inset-0 bg-primary/30 flex items-center justify-center">
                      <span class="material-symbols-outlined text-white text-lg drop-shadow-md" style="font-weight: 700;">check</span>
                 </div>
             </button>
         </template>
-
-        <a href="platforms.html" 
-           class="flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-lg bg-gray-800 border border-gray-700 text-gray-400 hover:text-white hover:bg-gray-700 transition-colors ml-auto"
-           title="Gérer mes services">
+        <a href="platforms.html" class="flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-lg bg-gray-800 border border-gray-700 text-gray-400 hover:text-white hover:bg-gray-700 transition-colors ml-auto">
             <span class="material-symbols-outlined text-xl">edit</span>
         </a>
     </div>
 
     <div class="flex items-center justify-between px-4 py-2 gap-2">
-        
         <div class="flex-1 flex justify-center">
             <div class="relative flex w-full max-w-xs items-center bg-gray-200 dark:bg-gray-800 rounded-full p-1 h-10 cursor-pointer">
                 <div class="absolute inset-y-1 w-[calc(50%-4px)] bg-primary rounded-full shadow-md transition-all duration-300 ease-out"
                      :class="watchStatusFilter === 'watched' ? 'translate-x-[100%] left-1' : 'translate-x-0 left-1'">
                 </div>
-                <button @click="watchStatusFilter = 'unwatched'" 
-                        class="relative z-10 flex-1 text-xs font-bold uppercase tracking-wide transition-colors duration-200 text-center h-full flex items-center justify-center"
-                        :class="watchStatusFilter === 'unwatched' ? 'text-white' : 'text-gray-500 dark:text-gray-400'">
-                    Watchlist
-                </button>
-                <button @click="watchStatusFilter = 'watched'" 
-                        class="relative z-10 flex-1 text-xs font-bold uppercase tracking-wide transition-colors duration-200 text-center h-full flex items-center justify-center"
-                        :class="watchStatusFilter === 'watched' ? 'text-white' : 'text-gray-500 dark:text-gray-400'">
-                    Vu
-                </button>
+                <button @click="watchStatusFilter = 'unwatched'" class="relative z-10 flex-1 text-xs font-bold uppercase tracking-wide transition-colors duration-200 text-center h-full flex items-center justify-center" :class="watchStatusFilter === 'unwatched' ? 'text-white' : 'text-gray-500 dark:text-gray-400'">Watchlist</button>
+                <button @click="watchStatusFilter = 'watched'" class="relative z-10 flex-1 text-xs font-bold uppercase tracking-wide transition-colors duration-200 text-center h-full flex items-center justify-center" :class="watchStatusFilter === 'watched' ? 'text-white' : 'text-gray-500 dark:text-gray-400'">Vu</button>
             </div>
         </div>
-
         <div class="flex items-center gap-1">
             <div class="relative" x-data="{ open: false }">
                 <button @click="open = !open" class="p-2 text-gray-500 dark:text-gray-400 hover:text-primary transition-colors rounded-full hover:bg-gray-100 dark:hover:bg-white/5">
                     <span class="material-symbols-outlined">sort</span>
                 </button>
-                <div x-show="open" @click.away="open = false" 
-                     class="absolute right-0 top-full mt-2 w-40 bg-gray-800 rounded-xl shadow-xl z-50 border border-gray-700 py-2" 
-                     x-transition.origin.top.right x-cloak>
+                <div x-show="open" @click.away="open = false" class="absolute right-0 top-full mt-2 w-40 bg-gray-800 rounded-xl shadow-xl z-50 border border-gray-700 py-2" x-transition x-cloak>
                     <a href="#" @click.prevent="setSort('popularity'); open = false" class="block px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white">Popularité</a>
                     <a href="#" @click.prevent="setSort('release_date'); open = false" class="block px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white">Date de sortie</a>
                     <a href="#" @click.prevent="setSort('recently_added'); open = false" class="block px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white">Date d'ajout</a>
@@ -121,39 +103,35 @@
     </div>
 </header>
     <main class="flex-1 overflow-y-auto" x-cloak>
-        <div id="media-list" class="divide-y divide-gray-200/20 dark:divide-gray-700/50">
-             </div>
+        <div id="media-list" class="divide-y divide-gray-200/20 dark:divide-gray-700/50"></div>
         <div id="empty-state" class="hidden text-center p-8">
             <p class="text-gray-500 dark:text-gray-400">Your list is empty.</p>
-            <p class="text-gray-500 dark:text-gray-400">Add movies and TV shows to see them here.</p>
         </div>
     </main>
-    <footer class="flex-shrink-0 border-t border-gray-200/20 dark:border-gray-700/50 bg-background-light dark:bg-background-dark/80 backdrop-blur-sm">
-        <nav class="flex justify-around py-2">
-            <a class="flex flex-col items-center gap-1 p-2 text-gray-500 dark:text-gray-400" href="index.html">
-                <svg fill="currentColor" height="24" viewBox="0 0 256 256" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M218.83,103.77l-80-75.48a1.14,1.14,0,0,1-.11-.11,16,16,0,0,0-21.53,0l-.11.11,L37.17,103.77A16,16,0,0,0,32,115.55V208a16,16,0,0,0,16,16H96a16,16,0,0,0,16-16V160h32v48a16,16,0,0,0,16,16h48a16,16,0,0,0,16-16V115.55A16,16,0,0,0,218.83,103.77ZM208,208H160V160a16,16,0,0,0-16-16H112a16,16,0,0,0-16,16v48H48V115.55l.11-.1L128,40l79.9,75.43.11.1Z"></path></svg>
-                <span class="text-xs font-medium">Home</span>
+    
+    <footer class="sticky bottom-0 bg-background-light/90 dark:bg-background-dark/90 backdrop-blur-sm border-t border-gray-200 dark:border-gray-800">
+        <nav class="flex justify-around items-center h-16">
+            <a class="flex flex-col items-center justify-center gap-1 text-gray-500 dark:text-gray-400 hover:text-primary dark:hover:text-primary transition-colors" href="index.html">
+                <span class="material-symbols-outlined">home</span>
+                <span class="text-[10px] font-medium">Home</span>
             </a>
-            <a class="flex flex-col items-center gap-1 p-2 text-gray-500 dark:text-gray-400" href="search.html">
-                <svg fill="currentColor" height="24" viewBox="0 0 256 256" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M229.66,218.34l-50.07-50.06a88.11,88.11,0,1,0-11.31,11.31l50.06,50.07a8,8,0,0,0,11.32-11.32ZM40,112a72,72,0,1,1,72,72A72.08,72.08,0,0,1,40,112Z"></path></svg>
-                <span class="text-xs font-medium">Search</span>
+            <a class="flex flex-col items-center justify-center gap-1 text-gray-500 dark:text-gray-400 hover:text-primary dark:hover:text-primary transition-colors" href="#">
+                <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1, 'wght' 700;">local_fire_department</span>
+                <span class="text-[10px] font-medium">Popular</span>
             </a>
-            <a class="flex flex-col items-center gap-1 p-2 text-primary" href="watchlist.html">
-                <svg fill="currentColor" height="24" viewBox="0 0 256 256" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M184,32H72A16,16,0,0,0,56,48V224a8,8,0,0,0,12.24,6.78L128,193.43l59.77,37.35A8,8,0,0,0,200,224V48A16,16,0,0,0,184,32Z"></path></svg>
-                <span class="text-xs font-medium">Watchlist</span>
+            <a class="flex flex-col items-center justify-center gap-1 text-gray-500 dark:text-gray-400 hover:text-primary dark:hover:text-primary transition-colors" href="search.html">
+                <span class="material-symbols-outlined">search</span>
+                <span class="text-[10px] font-medium">Search</span>
             </a>
-            <a class="flex flex-col items-center gap-1 p-2 text-gray-500 dark:text-gray-400" href="profile.html">
-                <svg fill="currentColor" height="24" viewBox="0 0 256 256" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M230.92,212c-15.23-26.33-38.7-45.21-66.09-54.16a72,72,0,1,0-73.66,0C63.78,166.78,40.31,185.66,25.08,212a8,8,0,1,0,13.85,8c18.84-32.56,52.14-52,89.07-52s70.23,19.44,89.07,52a8,8,0,1,0,13.85-8ZM72,96a56,56,0,1,1,56,56A56.06,56.06,0,0,1,72,96Z"></path></svg>
-                <span class="text-xs font-medium">Profile</span>
+            <a class="flex flex-col items-center justify-center gap-1 text-primary" href="watchlist.html">
+                <span class="material-symbols-outlined filled">bookmark</span>
+                <span class="text-[10px] font-bold">My List</span>
             </a>
         </nav>
-        <div class="h-safe-bottom"></div>
     </footer>
 </div>
-
 <script src="config.js"></script>
 <script src="data.js"></script>
 <script src="watchlist.js"></script>
-
 </body>
 </html>
