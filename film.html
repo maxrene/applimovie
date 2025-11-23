@@ -24,12 +24,7 @@
     </script>
     <title>Movie Details</title>
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet"/>
-    <style>
-        body { min-height: max(884px, 100dvh); background-color: #121212; }
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-        .material-symbols-outlined.filled { font-variation-settings: 'FILL' 1; }
-    </style>
+    <style> body { min-height: max(884px, 100dvh); background-color: #121212; } </style>
 </head>
 <body class="bg-background-dark font-display text-gray-200">
 <div>
@@ -38,45 +33,42 @@
             <svg class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7" stroke-linecap="round" stroke-linejoin="round"></path></svg>
         </button>
     </header>
-
-    <main class="flex-1 overflow-y-auto">
-        <div class="relative h-64">
+    <main>
+        <div class="relative h-96">
             <div class="absolute inset-0 h-full w-full">
-                <img id="media-banner" alt="Movie banner" class="h-full w-full object-cover" src=""/>
-                <div class="absolute inset-0 bg-black/40"></div>
-            </div>
-        </div>
-
-        <div class="p-4 relative z-10">
-            <div class="relative -mt-28 mb-4">
-                <div class="flex items-end gap-4">
-                    <img id="media-poster" alt="Poster" class="h-40 w-28 rounded-lg object-cover shadow-lg border border-white/10 bg-gray-800" src=""/>
-                    <div class="flex-1 pb-1">
-                        <h1 id="media-title" class="text-2xl font-bold text-white leading-tight drop-shadow-md"></h1>
+                <img id="media-banner" alt="Movie still" class="h-full w-full object-cover" src=""/>
+                <div class="absolute inset-0 bg-gradient-to-t from-[#121212] via-black/20 to-transparent"></div>
+                <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <div class="rounded-full bg-white/20 p-4 text-white backdrop-blur-sm border border-white/30">
+                        <svg class="h-10 w-10" fill="currentColor" viewBox="0 0 20 20"><path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z"></path></svg>
                     </div>
                 </div>
             </div>
+        </div>
+        <div class="p-4 -mt-12 relative z-10">
 
-            <div class="flex items-center gap-2 text-sm text-gray-300 font-medium mb-3">
+            <h1 id="media-title" class="text-3xl font-bold text-white leading-tight mb-2"></h1>
+
+            <div class="flex items-center space-x-3 text-sm text-gray-400 mb-6">
                 <span id="media-year"></span>
-                <span class="text-gray-500">•</span>
+                <span class="h-1 w-1 rounded-full bg-gray-500"></span>
                 <span id="media-duration"></span>
-
-                <span class="text-gray-500">•</span>
-                <div class="flex items-center gap-1 text-yellow-500">
-                    <span class="material-symbols-outlined text-sm filled">star</span>
-                    <span id="media-rating" class="text-gray-200 font-bold"></span>
-                </div>
+                <span class="h-1 w-1 rounded-full bg-gray-500"></span>
+                <div id="media-genres" class="flex items-center gap-2"></div>
             </div>
 
-            <div id="media-genres" class="flex flex-wrap items-center gap-2 mb-6"></div>
-            <div id="awards-section" style="display: none;"></div>
-
             <div class="flex items-center gap-3 mb-8">
-                <button id="watchlist-button" class="w-full flex items-center justify-center gap-2 rounded-xl bg-white text-black py-3 font-bold transition-transform active:scale-95">
+                <button id="watchlist-button" class="flex-1 flex items-center justify-center gap-2 rounded-xl bg-white text-black py-3 font-bold transition-transform active:scale-95">
                     <span class="material-symbols-outlined filled">add</span>
                     <span>Ma Liste</span>
                 </button>
+                <div class="flex flex-col items-center justify-center bg-gray-800/50 rounded-xl px-4 py-2 border border-gray-700">
+                    <div class="flex items-center gap-1">
+                        <span class="material-symbols-outlined text-yellow-500 text-sm filled">star</span>
+                        <span id="media-imdb" class="text-lg font-bold text-white"></span>
+                    </div>
+                    <span class="text-[10px] text-gray-400">IMDb</span>
+                </div>
             </div>
 
             <div class="mb-8" id="streaming-section" style="display: none;">
@@ -109,6 +101,8 @@
                 <div id="full-cast-container" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4"></div>
             </div>
             
+            <div id="awards-section" style="display: none;"></div>
+
             <div class="mb-8" id="similar-movies-section">
                 <h3 class="text-lg font-bold text-white mb-3">Similaires</h3>
                 <div id="similar-movies-container" class="flex gap-3 overflow-x-auto pb-4 no-scrollbar"></div>
