@@ -388,8 +388,7 @@ document.addEventListener('alpine:init', () => {
                 : '';
 
             const totalSeasons = item.apiDetails.number_of_seasons;
-            const startYear = item.year.split(' - ')[0];
-
+            const startYear = String(item.year).split(' - ')[0];
             return `
                 <div class="relative overflow-hidden p-4">
                     <div class="flex gap-4">
