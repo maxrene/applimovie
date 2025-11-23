@@ -8,41 +8,34 @@ async def main():
         browser = await p.chromium.launch()
         page = await browser.new_page()
 
-        # Local storage setup for watchlist
-        watchlist = [
-            {"id": 1396, "added_at": "2024-01-01T12:00:00Z"},  # Breaking Bad
-        ]
+        # Setup: Add Breaking Bad to watchlist and mark first 3 episodes as watched
+        watchlist = [{"id": 1396, "added_at": "2024-01-01T12:00:00Z"}]
+        watched_episodes = {"1396": [62085, 62086, 62087]} # S01E01, S01E02, S01E03
+
+        # Go to the page FIRST, then set up local storage
         await page.goto("http://localhost:8080/watchlist.html")
         await page.evaluate(f"localStorage.setItem('watchlist', '{json.dumps(watchlist)}')")
-
-        # Local storage for watched episodes
-        watched_episodes = {
-            "1396": [62085, 62086, 62087] # S01E01, S01E02, S01E03
-        }
         await page.evaluate(f"localStorage.setItem('watchedEpisodes', '{json.dumps(watched_episodes)}')")
 
-        await page.goto("http://localhost:8080/watchlist.html")
+        # Reload the page for localStorage changes to take effect
+        await page.reload()
 
-        # Wait for dynamic content to load
-        await page.wait_for_selector('.flex-1 h3')
+        # Wait for the initial render of the in-progress item
+        await page.wait_for_selector('h3:has-text("S01 E04")')
+        print("Initial state verified: Next episode is S01 E04.")
 
-        await asyncio.sleep(2) # Extra wait for async rendering
+        # Find and click the "Mark episode as watched" button
+        mark_watched_button = page.locator('button[aria-label="Mark episode as watched"]')
+        await mark_watched_button.click()
+        print("Clicked 'Mark as Watched' for S01 E04.")
 
-        # Verification checks
-        next_episode_text = await page.text_content('.text-\\[10px\\]')
-        if "Next: S01E04" not in next_episode_text:
-            print(f"Verification failed: 'Next Episode' text is incorrect. Found: {next_episode_text}")
-            await browser.close()
-            return
+        # Wait for the component to re-render with the next episode
+        await page.wait_for_selector('h3:has-text("S01 E05")')
+        print("Verification successful: UI updated to show S01 E05 as the next episode.")
 
-        logo = await page.query_selector('img[alt="Netflix"]')
-        if not logo:
-             print("Verification failed: Platform logo not found.")
-             await browser.close()
-             return
-
-        print("Verification successful!")
         await page.screenshot(path="verification/new_features_verification.png")
+        print("Screenshot taken.")
+
         await browser.close()
 
 asyncio.run(main())
