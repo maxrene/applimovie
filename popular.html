@@ -60,7 +60,10 @@
 
             <div class="flex items-center gap-1 flex-shrink-0">
                 <div class="relative" x-data="{ open: false }">
-                    <button @click="open = !open" class="p-2 text-gray-500 dark:text-gray-400 hover:text-primary transition-colors rounded-full hover:bg-gray-100 dark:hover:bg-white/5"><span class="material-symbols-outlined">sort</span></button>
+                    <button @click="open = !open" class="flex items-center gap-0.5 p-2 text-gray-500 dark:text-gray-400 hover:text-primary transition-colors rounded-full hover:bg-gray-100 dark:hover:bg-white/5">
+                         <span class="material-symbols-outlined">sort</span>
+                         <span class="material-symbols-outlined text-lg">expand_more</span>
+                    </button>
                     <div x-show="open" @click.away="open = false" class="absolute right-0 top-full mt-2 w-48 bg-gray-800 rounded-xl shadow-xl z-50 border border-gray-700 py-2" x-transition x-cloak>
                         <a href="#" @click.prevent="setSort('popularity.desc'); open = false" class="block px-4 py-3 text-sm text-gray-300 hover:bg-gray-700 hover:text-white border-b border-gray-700/50">Popularité</a>
                         <a href="#" @click.prevent="setSort('vote_average.desc'); open = false" class="block px-4 py-3 text-sm text-gray-300 hover:bg-gray-700 hover:text-white border-b border-gray-700/50">Mieux notés</a>
