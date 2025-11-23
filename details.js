@@ -1,11 +1,11 @@
-// details.js - Version Hybride (Cache Local + Mise à jour dynamique + Logos HD)
+// details.js - Version Complète et Corrigée
 
 const BASE_URL = 'https://api.themoviedb.org/3';
 const IMG_BASE_POSTER = 'https://image.tmdb.org/t/p/w500';
 const IMG_BASE_BANNER = 'https://image.tmdb.org/t/p/original';
 const IMG_BASE_PROFILE = 'https://image.tmdb.org/t/p/w185';
 
-// VRAIS LOGOS (Intégrés directement ici pour la cohérence)
+// LOGOS PERSONNALISÉS HD
 const CUSTOM_PLATFORMS = {
     8: { name: 'Netflix', url: 'https://images.ctfassets.net/4cd45et68cgf/Rx83JoRDMkYNlMC9MKzcB/2b14d5a59fc3937afd3f03191e19502d/Netflix-Symbol.png?w=700&h=456' },
     119: { name: 'Prime Video', url: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/ca/Amazon_Prime_Video_logo_%282024%29.svg/1024px-Amazon_Prime_Video_logo_%282024%29.svg.png' },
@@ -18,17 +18,16 @@ const CUSTOM_PLATFORMS = {
     39: { name: 'Now', url: 'https://logo.clearbit.com/nowtv.com' }
 };
 
+// VARIABLES GLOBALES
 let currentCastData = [];
 let isCastExpanded = false;
-
-// Charger les préférences utilisateur
 const userRegion = localStorage.getItem('userRegion') || 'FR';
 const myPlatformIds = JSON.parse(localStorage.getItem('selectedPlatforms')) || [];
 
+// INIT
 document.addEventListener('DOMContentLoaded', async () => {
     const urlParams = new URLSearchParams(window.location.search);
     const mediaId = urlParams.get('id');
-    
     const isMovie = window.location.pathname.includes('film.html');
     const type = isMovie ? 'movie' : 'tv';
 
@@ -54,6 +53,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 });
 
+// FONCTIONS FETCH
 async function fetchFullFromTMDB(id, type) {
     try {
         const url = `${BASE_URL}/${type}/${id}?api_key=${TMDB_API_KEY}&append_to_response=credits,watch/providers,similar,external_ids`;
@@ -134,7 +134,8 @@ async function fetchUpdates(id, type) {
             const firstAirDate = seriesDetailsData.first_air_date;
             const startYear = firstAirDate?.split('-')[0] || '';
             if(startYear) {
-                document.getElementById('media-year').textContent = startYear;
+                const yearEl = document.getElementById('media-year');
+                if(yearEl) yearEl.textContent = startYear;
             }
 
             if (seriesDetailsData.seasons) {
@@ -147,14 +148,18 @@ async function fetchUpdates(id, type) {
     }
 }
 
+// FONCTIONS UI
 function updateUI(data, type, isLocal) {
-    document.getElementById('media-banner').src = data.bannerUrl;
-    document.getElementById('media-poster').src = data.posterUrl;
+    const banner = document.getElementById('media-banner');
+    if(banner) banner.src = data.bannerUrl;
+    
+    const poster = document.getElementById('media-poster');
+    if(poster) poster.src = data.posterUrl; // Peut être utilisé pour le flou d'arrière plan si on veut
+
     document.getElementById('media-title').textContent = data.title;
     document.getElementById('media-year').textContent = data.year;
     document.getElementById('media-synopsis').textContent = data.synopsis;
 
-    // Clean IMDB/RT if needed
     const imdbEl = document.getElementById('media-imdb');
     if(imdbEl) imdbEl.textContent = data.imdb;
     
@@ -164,17 +169,21 @@ function updateUI(data, type, isLocal) {
     }
 
     if (type === 'movie') {
-        document.getElementById('media-duration').textContent = data.duration;
+        const dur = document.getElementById('media-duration');
+        if(dur) dur.textContent = data.duration;
     } else {
-        document.getElementById('media-seasons').textContent = typeof data.seasons === 'number' ? `${data.seasons} Saisons` : data.seasons;
+        const sea = document.getElementById('media-seasons');
+        if(sea) sea.textContent = typeof data.seasons === 'number' ? `${data.seasons} Saisons` : data.seasons;
     }
 
     const genresContainer = document.getElementById('media-genres');
-    genresContainer.innerHTML = '';
-    const genreList = data.genres.map(g => typeof g === 'string' ? g : g.name); 
-    genreList.slice(0, 3).forEach((g, i) => {
-        genresContainer.innerHTML += `<span class="bg-gray-800 text-xs px-2 py-1 rounded text-gray-300 border border-gray-700">${g}</span>`;
-    });
+    if(genresContainer) {
+        genresContainer.innerHTML = '';
+        const genreList = data.genres.map(g => typeof g === 'string' ? g : g.name); 
+        genreList.slice(0, 3).forEach((g, i) => {
+            genresContainer.innerHTML += `<span class="bg-white/10 text-xs px-2 py-1 rounded text-gray-300 border border-white/10 backdrop-blur-sm">${g}</span>`;
+        });
+    }
 
     if (data.cast && data.cast.length > 0) updateCastUI(data.cast);
     updatePersonUI(data.director, type);
@@ -194,9 +203,11 @@ function updateSimilarMoviesUI(similarMovies) {
         simContainer.innerHTML = '';
         similarMovies.slice(0,6).forEach(sim => {
             simContainer.innerHTML += `
-                <div class="w-28 flex-shrink-0 cursor-pointer" onclick="window.location.href='film.html?id=${sim.id}'">
-                    <img class="w-full rounded-lg bg-gray-800 object-cover aspect-[2/3]" src="${sim.posterUrl}"/>
-                    <p class="mt-1 truncate text-xs font-semibold text-white">${sim.title}</p>
+                <div class="w-28 flex-shrink-0 cursor-pointer group" onclick="window.location.href='film.html?id=${sim.id}'">
+                    <div class="relative aspect-[2/3] rounded-lg overflow-hidden">
+                        <img class="w-full h-full object-cover transition-transform group-hover:scale-105" src="${sim.posterUrl}"/>
+                    </div>
+                    <p class="mt-1 truncate text-xs font-medium text-white/80 group-hover:text-white">${sim.title}</p>
                 </div>`;
         });
     } else if(simSection) {
@@ -204,7 +215,6 @@ function updateSimilarMoviesUI(similarMovies) {
     }
 }
 
-// --- MISE À JOUR ET DÉDOUBLONNAGE DES LOGOS ---
 function updateStreamingUI(allProvidersData) {
     const container = document.getElementById('available-on-container');
     if (!container) return;
@@ -227,7 +237,7 @@ function updateStreamingUI(allProvidersData) {
         }
     }
 
-    // Dédoublonnage avec Set
+    // Dédoublonnage
     const uniqueProviders = [];
     const seen = new Set();
     for(const p of providers) {
@@ -239,20 +249,19 @@ function updateStreamingUI(allProvidersData) {
 
     if (uniqueProviders.length > 0) {
         uniqueProviders.forEach(p => {
-            // On utilise le logo custom s'il existe, sinon celui de TMDB
             let logoUrl = p.logo_path ? IMG_BASE_PROFILE + p.logo_path : 'https://placehold.co/64x64';
-            let cssClass = "object-cover"; // Par défaut
+            let cssClass = "object-cover"; 
 
             if (CUSTOM_PLATFORMS[p.provider_id]) {
                 logoUrl = CUSTOM_PLATFORMS[p.provider_id].url;
-                cssClass = "object-contain bg-black p-0.5"; // Pour les logos custom, souvent transparents
+                cssClass = "object-contain bg-black p-1";
             }
 
             container.innerHTML += `
                 <img src="${logoUrl}" 
                      alt="${p.provider_name}" 
                      title="${p.provider_name}" 
-                     class="h-10 w-10 rounded-lg shadow-md border border-gray-700 ${cssClass}"/>
+                     class="h-10 w-10 rounded-lg border border-white/10 ${cssClass}"/>
             `;
         });
     } else {
@@ -278,16 +287,16 @@ function renderCastList() {
     if (!castContainer) return;
 
     castContainer.innerHTML = '';
-    const displayList = currentCastData.slice(0, 10); // Top 10
+    const displayList = currentCastData.slice(0, 10);
 
     displayList.forEach(member => {
     const link = member.id ? `person.html?id=${member.id}` : '#';
     
     castContainer.innerHTML += `
         <a href="${link}" class="flex flex-col items-center gap-2 w-20 flex-shrink-0 group">
-            <img class="h-20 w-20 rounded-full object-cover border-2 border-transparent group-hover:border-primary transition-colors" src="${member.imageUrl}" onerror="this.src='https://placehold.co/64x64'"/>
+            <img class="h-20 w-20 rounded-full object-cover border-2 border-transparent group-hover:border-primary transition-colors bg-gray-800" src="${member.imageUrl}" onerror="this.src='https://placehold.co/64x64'"/>
             <div class="text-center">
-                <p class="font-semibold text-white text-xs truncate w-full">${member.name}</p>
+                <p class="font-medium text-white text-xs truncate w-full group-hover:text-primary">${member.name}</p>
                 <p class="text-[10px] text-gray-400 truncate w-full">${member.character}</p>
             </div>
         </a>`;
@@ -295,8 +304,7 @@ function renderCastList() {
 }
 
 function toggleCastExpansion(linkElement) {
-    // (Simplifié pour mobile : on affiche juste le top 10 scrollable horizontalement)
-    window.location.href = "#"; // Placeholder pour future page cast complet
+    window.location.href = "#"; 
 }
 
 function updatePersonUI(person, type) {
@@ -330,18 +338,18 @@ function updateSeasonsUI(seasons, seriesId, totalEpisodes) {
         if (season.season_number === 0) return;
 
         const seasonCardHTML = `
-            <div class="season-card rounded-xl bg-gray-800 border border-gray-700 overflow-hidden" data-season-number="${season.season_number}">
-                <div class="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-700/50 transition-colors">
+            <div class="season-card rounded-xl bg-gray-800/50 border border-white/5 overflow-hidden" data-season-number="${season.season_number}">
+                <div class="flex items-center justify-between p-4 cursor-pointer hover:bg-white/5 transition-colors">
                     <div class="flex items-center gap-3">
-                        <div class="bg-gray-700 h-8 w-8 rounded-full flex items-center justify-center text-sm font-bold text-white">${season.season_number}</div>
+                        <div class="bg-gray-700 h-8 w-8 rounded-lg flex items-center justify-center text-sm font-bold text-white">${season.season_number}</div>
                         <div>
                             <h3 class="font-bold text-white text-sm">${season.name}</h3>
                             <span class="text-xs text-gray-400">${season.episode_count} Épisodes</span>
                         </div>
                     </div>
-                    <span class="material-symbols-outlined text-gray-400">expand_more</span>
+                    <span class="material-symbols-outlined text-gray-400 transition-transform duration-300">expand_more</span>
                 </div>
-                <div class="episodes-container bg-black/20"></div>
+                <div class="episodes-container bg-black/20 border-t border-white/5"></div>
             </div>
         `;
         container.innerHTML += seasonCardHTML;
@@ -381,13 +389,13 @@ function updateSeasonsUI(seasons, seriesId, totalEpisodes) {
                             const episodesListHTML = episodes.map(episode => {
                                 const isChecked = seriesWatchedEpisodes.includes(episode.id);
                                 return `
-                                    <div class="flex items-center gap-3 p-3 border-t border-gray-800 hover:bg-white/5 transition-colors">
+                                    <div class="flex items-center gap-3 p-3 border-t border-white/5 hover:bg-white/5 transition-colors">
                                         <span class="text-xs font-mono text-gray-500 w-6 text-center">${episode.episode_number}</span>
                                         <div class="flex-1 min-w-0">
                                             <p class="text-sm font-medium text-white truncate">${episode.name}</p>
                                             <p class="text-[10px] text-gray-500">${episode.runtime ? episode.runtime + 'm' : ''}</p>
                                         </div>
-                                        <input type="checkbox" data-episode-id="${episode.id}" class="h-5 w-5 rounded border-gray-600 text-primary focus:ring-offset-0 focus:ring-0 bg-gray-700" ${isChecked ? 'checked' : ''}>
+                                        <input type="checkbox" data-episode-id="${episode.id}" class="h-5 w-5 rounded border-gray-600 text-primary focus:ring-offset-0 focus:ring-0 bg-gray-700/50" ${isChecked ? 'checked' : ''}>
                                     </div>`;
                             }).join('');
 
@@ -423,7 +431,6 @@ function toggleEpisodeWatchedStatus(seriesId, episodeId, totalEpisodes) {
         watchedEpisodes[seriesId].push(episodeId);
     }
 
-    // Auto-add to watchlist logic
     let watchlist = JSON.parse(localStorage.getItem('watchlist')) || [];
     if (!watchlist.some(item => item.id === seriesIdNum)) {
         watchlist.push({ id: seriesIdNum, added_at: new Date().toISOString() });
@@ -432,7 +439,6 @@ function toggleEpisodeWatchedStatus(seriesId, episodeId, totalEpisodes) {
 
     localStorage.setItem('watchedEpisodes', JSON.stringify(watchedEpisodes));
 
-    // Check full series watched
     const watchedCount = watchedEpisodes[seriesId].length;
     let watchedList = JSON.parse(localStorage.getItem('watchedSeries')) || [];
     
@@ -453,7 +459,6 @@ function toggleEpisodeWatchedStatus(seriesId, episodeId, totalEpisodes) {
 
 function formatTMDBData(data, type) {
     const isMovie = type === 'movie';
-    
     let dir = { name: 'Unknown', imageUrl: 'https://placehold.co/64x64' };
     if(isMovie) {
         const d = data.credits?.crew?.find(c => c.job === 'Director');
@@ -493,21 +498,58 @@ function formatTMDBData(data, type) {
     };
 }
 
-// (Fonctions awardIconSVG, updateAwardsUI, initializeWatchlistButton, toggleWatchlist, showConfirmationModal, updateWatchlistButton inchangées mais nécessaires, elles sont incluses dans le fichier complet précédent)
-// Pour la concision ici, assurez-vous d'avoir copié tout le fichier précédent si vous ne l'avez pas fait, ou demandez-moi de tout remettre si besoin. 
-// Note: Les fonctions awards et watchlist sont cruciales.
-// Voici les fonctions manquantes pour que le fichier soit 100% complet et autonome :
-
+// FONCTIONS AWARDS & WATCHLIST (Réintégrées ici pour éviter le crash)
 const awardIconSVG = `<svg class="h-5 w-5 text-amber-400" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path></svg>`;
 
-function updateAwardsUI(data) { /* ... (Code identique au précédent turn) ... */ }
+function updateAwardsUI(data) {
+    const awardsSection = document.getElementById('awards-section');
+    if (!awardsSection) return;
+
+    let wins = 0;
+    let nominations = 0;
+    let awardName = '';
+
+    const externalAwardInfo = window.awardsData && window.awardsData[data.id];
+
+    if (externalAwardInfo) {
+        wins = externalAwardInfo.wins;
+        nominations = externalAwardInfo.nominations;
+        awardName = externalAwardInfo.type === 'movie' ? 'Oscar' : 'Emmy';
+    } else {
+        const isMovie = data.type === 'movie' || (data.title && !data.name); 
+        awardName = isMovie ? 'Oscar' : 'Emmy';
+        wins = isMovie ? (data.oscarWins || 0) : (data.emmyWins || 0);
+        nominations = isMovie ? (data.oscarNominations || 0) : (data.emmyNominations || 0);
+    }
+
+    let awardsHTML = '';
+    if (wins > 0) {
+        awardsHTML += `<div class="flex items-center gap-2 text-sm">${awardIconSVG}<span class="font-medium text-gray-300">${wins} ${awardName} win${wins > 1 ? 's' : ''}</span></div>`;
+    }
+    if (nominations > 0) {
+        awardsHTML += `<div class="flex items-center gap-2 text-sm">${awardIconSVG}<span class="font-medium text-gray-300">${nominations} ${awardName} nomination${nominations > 1 ? 's' : ''}</span></div>`;
+    }
+
+    if (awardsHTML) {
+        awardsSection.innerHTML = awardsHTML;
+        awardsSection.style.display = 'flex';
+        awardsSection.className = "mt-4 flex flex-col gap-2 border-t border-gray-800 pt-4";
+    } else {
+        awardsSection.style.display = 'none';
+    }
+}
+
 function initializeWatchlistButton(mediaId) {
     const btn = document.getElementById('watchlist-button');
     if(btn) {
         updateWatchlistButton(mediaId);
-        btn.addEventListener('click', () => toggleWatchlist(mediaId));
+        // Clone pour retirer les anciens listeners
+        const newBtn = btn.cloneNode(true);
+        btn.parentNode.replaceChild(newBtn, btn);
+        newBtn.addEventListener('click', () => toggleWatchlist(mediaId));
     }
 }
+
 async function toggleWatchlist(mediaId) {
     const mediaIdNum = parseInt(mediaId, 10);
     const isMovie = window.location.pathname.includes('film.html');
@@ -525,8 +567,7 @@ async function toggleWatchlist(mediaId) {
         updateWatchlistButton(mediaId);
     } else if (isInWatchlist) {
         if (!isMovie) {
-            // Logic series complete check... (simplifié ici, voir fonction complète plus haut si besoin précis)
-             showConfirmationModal(mediaId, 99); // Fake total for now
+             showConfirmationModal(mediaId, 99); 
              return;
         }
         watchedList.push(mediaIdNum);
@@ -538,16 +579,23 @@ async function toggleWatchlist(mediaId) {
         updateWatchlistButton(mediaId);
     }
 }
+
 function showConfirmationModal(seriesId, total) {
     const modal = document.getElementById('confirmation-modal');
     modal.style.display = 'flex';
     document.getElementById('modal-cancel-button').onclick = () => modal.style.display = 'none';
     document.getElementById('modal-confirm-button').onclick = () => {
-        // Mark all watched logic
+        const seriesIdNum = parseInt(seriesId, 10);
+        let watchedList = JSON.parse(localStorage.getItem('watchedSeries')) || [];
+        if (!watchedList.includes(seriesIdNum)) {
+            watchedList.push(seriesIdNum);
+            localStorage.setItem('watchedSeries', JSON.stringify(watchedList));
+        }
         modal.style.display = 'none';
         updateWatchlistButton(seriesId);
     };
 }
+
 function updateWatchlistButton(mediaId) {
     const btn = document.getElementById('watchlist-button');
     if(!btn) return;
@@ -562,17 +610,21 @@ function updateWatchlistButton(mediaId) {
     const icon = btn.querySelector('.material-symbols-outlined');
     const text = btn.querySelector('span:last-child');
     
-    btn.className = "flex-1 flex items-center justify-center gap-2 rounded-xl py-3 font-bold transition-transform active:scale-95 text-white";
+    btn.className = "flex-1 flex items-center justify-center gap-2 rounded-xl py-3 font-bold transition-transform active:scale-95 text-black";
+    
     if(isWatched) {
-        btn.classList.add('bg-green-600');
+        btn.classList.remove('bg-white', 'text-black');
+        btn.classList.add('bg-green-500', 'text-white');
         icon.textContent = 'check_circle';
         text.textContent = 'Vu';
     } else if(isInWatchlist) {
-        btn.classList.add('bg-primary');
+        btn.classList.remove('bg-white', 'text-black');
+        btn.classList.add('bg-primary', 'text-white');
         icon.textContent = 'check';
         text.textContent = 'Dans ma liste';
     } else {
-        btn.classList.add('bg-gray-700');
+        btn.classList.remove('bg-green-500', 'bg-primary', 'text-white');
+        btn.classList.add('bg-white', 'text-black');
         icon.textContent = 'add';
         text.textContent = 'Ma Liste';
     }
