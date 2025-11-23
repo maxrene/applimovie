@@ -4,6 +4,13 @@ const BASE_URL = 'https://api.themoviedb.org/3';
 const IMG_BASE_POSTER = 'https://image.tmdb.org/t/p/w500';
 
 document.addEventListener('DOMContentLoaded', () => {
+    // --- NOUVEAU CODE POUR LE DRAPEAU ---
+    const userRegion = localStorage.getItem('userRegion') || 'FR';
+    const flagImg = document.getElementById('header-flag');
+    if (flagImg) {
+        flagImg.src = `https://flagcdn.com/w40/${userRegion.toLowerCase()}.png`;
+        flagImg.alt = userRegion;
+    }
     // Containers
     const popularContainer = document.getElementById('popular-container');
     const netflixContainer = document.getElementById('netflix-container');
