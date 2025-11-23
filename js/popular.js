@@ -6,22 +6,29 @@ document.addEventListener('alpine:init', () => {
         isLoadingMore: false,
         showServiceBar: false,
         
+        // Bottom Sheets
+        showSortSheet: false,
+        showFilterSheet: false,
+
         currentPage: 1,
         totalPages: 1,
 
         // Filtres
-        activePlatformFilters: [], // IDs de MES plateformes qui sont ACTIVES
+        activePlatformFilters: [],
         userSelectedPlatforms: [],
         myPlatformIds: [],
         userRegion: localStorage.getItem('userRegion') || 'FR',
+
+        // Sorting & Filtering State
         sortOrder: 'popularity.desc',
         
-        // Label pour le tri affiché
-        get sortLabel() {
-            if (this.sortOrder === 'popularity.desc') return 'Popularité';
-            if (this.sortOrder === 'vote_average.desc') return 'Mieux notés';
-            return 'Récents';
-        },
+        // Filter Data
+        genres: [],
+        filterGenres: [], // Selected genre IDs
+        filterYearMin: 1950,
+        filterYearMax: new Date().getFullYear(),
+        filterRating: 0,
+        isThisYearSelected: false,
 
         tmdbProviderMap: {
             'netflix': 8, 'prime': 119, 'disney': 337, 'apple': 350,
@@ -40,7 +47,23 @@ document.addEventListener('alpine:init', () => {
             { id: 'now', logoUrl: 'https://logo.clearbit.com/nowtv.com' }
         ],
 
-        init() {
+        get sortLabel() {
+            if (this.sortOrder === 'popularity.desc') return 'Popularité';
+            if (this.sortOrder === 'vote_average.desc') return 'Mieux notés';
+            if (this.sortOrder === 'primary_release_date.desc') return 'Récents';
+            return 'Tri';
+        },
+
+        get activeFiltersCount() {
+            let count = 0;
+            if (this.filterGenres.length > 0) count++;
+            if (this.filterRating > 0) count++;
+            if (this.filterYearMin > 1950 || this.filterYearMax < new Date().getFullYear()) count++;
+            if (this.isThisYearSelected) count++;
+            return count;
+        },
+
+        async init() {
             const flagImg = document.getElementById('header-flag');
             if (flagImg) flagImg.src = `https://flagcdn.com/w40/${this.userRegion.toLowerCase()}.png`;
 
@@ -51,16 +74,32 @@ document.addEventListener('alpine:init', () => {
                 this.myPlatformIds.includes(p.id)
             );
 
-            // PAR DÉFAUT : TOUTES MES PLATEFORMES SONT ACTIVES (Incluses)
             this.activePlatformFilters = [...this.myPlatformIds];
+
+            await this.fetchGenres();
 
             this.$watch('activePlatformFilters', () => this.resetAndFetch());
             
             this.resetAndFetch();
         },
 
+        async fetchGenres() {
+            const type = this.activeTab === 'movie' ? 'movie' : 'tv';
+            try {
+                const res = await fetch(`https://api.themoviedb.org/3/genre/${type}/list?api_key=${TMDB_API_KEY}&language=fr-FR`);
+                const data = await res.json();
+                if (data.genres) {
+                    this.genres = data.genres;
+                }
+            } catch (e) {
+                console.error("Genre fetch failed", e);
+            }
+        },
+
         switchTab(tab) {
             this.activeTab = tab;
+            this.filterGenres = []; // Reset genres when switching tabs as IDs differ
+            this.fetchGenres();
             this.resetAndFetch();
         },
 
@@ -70,14 +109,47 @@ document.addEventListener('alpine:init', () => {
         },
 
         togglePlatformFilter(platformId) {
-            // Logique "Inverse" : 
-            // Si présent -> Je le retire (Désélectionné / Grisé)
-            // Si absent -> Je l'ajoute (Sélectionné / Coloré)
             if (this.activePlatformFilters.includes(platformId)) {
                 this.activePlatformFilters = this.activePlatformFilters.filter(id => id !== platformId);
             } else {
                 this.activePlatformFilters.push(platformId);
             }
+        },
+
+        toggleGenre(genreId) {
+            if (this.filterGenres.includes(genreId)) {
+                this.filterGenres = this.filterGenres.filter(id => id !== genreId);
+            } else {
+                this.filterGenres.push(genreId);
+            }
+        },
+
+        toggleThisYear() {
+            this.isThisYearSelected = !this.isThisYearSelected;
+            const currentYear = new Date().getFullYear();
+            if (this.isThisYearSelected) {
+                this.filterYearMin = currentYear;
+                this.filterYearMax = currentYear;
+            } else {
+                // Reset to default range
+                this.filterYearMin = 1950;
+                this.filterYearMax = currentYear;
+            }
+        },
+
+        resetFilters() {
+            this.filterGenres = [];
+            this.filterRating = 0;
+            this.filterYearMin = 1950;
+            this.filterYearMax = new Date().getFullYear();
+            this.isThisYearSelected = false;
+            this.showFilterSheet = false;
+            this.resetAndFetch();
+        },
+
+        applyFilters() {
+            this.showFilterSheet = false;
+            this.resetAndFetch();
         },
 
         resetAndFetch() {
@@ -103,7 +175,6 @@ document.addEventListener('alpine:init', () => {
             if (page === 1) this.isLoading = true;
             else this.isLoadingMore = true;
 
-            // Conversion des filtres ACTIFS en IDs TMDB
             const providerIds = this.activePlatformFilters
                 .map(id => this.tmdbProviderMap[id])
                 .filter(id => id !== undefined)
@@ -112,18 +183,32 @@ document.addEventListener('alpine:init', () => {
             const endpoint = this.activeTab === 'movie' ? '/discover/movie' : '/discover/tv';
             let url = `https://api.themoviedb.org/3${endpoint}?api_key=${TMDB_API_KEY}&language=fr-FR&page=${page}`;
             
+            // Basic Params
             url += `&sort_by=${this.sortOrder}`;
             url += `&watch_region=${this.userRegion}`;
             
-            // Si j'ai des filtres actifs, je filtre. Sinon, je montre tout (ou rien, selon le choix UX).
-            // Ici : Si aucune plateforme active, on montre tout le catalogue (TMDB default).
-            // Si on veut montrer "Rien" quand tout est désélectionné, il faut mettre un if.
+            // Platform Filters
             if (providerIds.length > 0) {
                 url += `&with_watch_providers=${providerIds}`;
-            } else if (this.myPlatformIds.length > 0) {
-                // Si l'user a des plateformes mais a tout décoché -> On ne devrait rien voir ?
-                // Ou on considère que tout décoché = tout voir ?
-                // Restons sur la logique TMDB: pas de filtre = tout.
+            }
+
+            // Advanced Filters
+            if (this.filterGenres.length > 0) {
+                url += `&with_genres=${this.filterGenres.join(',')}`;
+            }
+
+            if (this.filterRating > 0) {
+                url += `&vote_average.gte=${this.filterRating}`;
+            }
+
+            const dateField = this.activeTab === 'movie' ? 'primary_release_date' : 'first_air_date';
+
+            // Year Range
+            // Only apply if it differs from default range
+            const currentYear = new Date().getFullYear();
+            if (this.filterYearMin > 1950 || this.filterYearMax < currentYear) {
+                url += `&${dateField}.gte=${this.filterYearMin}-01-01`;
+                url += `&${dateField}.lte=${this.filterYearMax}-12-31`;
             }
 
             try {
@@ -142,7 +227,6 @@ document.addEventListener('alpine:init', () => {
                         media_type: this.activeTab
                     }));
 
-                    // Filtrage des doublons pour le chargement infini
                     if (page === 1) {
                         this.items = newItems;
                     } else {

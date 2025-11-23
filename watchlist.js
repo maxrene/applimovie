@@ -5,9 +5,18 @@ document.addEventListener('alpine:init', () => {
         activeTab: 'movie',
         sortOrder: 'popularity',
         
-        // INITIALISÉ PLUS TARD AVEC TOUT
+        // Bottom Sheets
+        showSortSheet: false,
+        showFilterSheet: false,
+
+        // Filter State
         activePlatformFilters: [], 
-        
+        filterGenres: [], // Array of genre IDs
+        filterYearMin: 1950,
+        filterYearMax: new Date().getFullYear(),
+        filterRating: 0,
+        isThisYearSelected: false,
+
         watchStatusFilter: 'unwatched',
         showServiceBar: false,
         userRegion: localStorage.getItem('userRegion') || 'FR',
@@ -26,6 +35,44 @@ document.addEventListener('alpine:init', () => {
             { id: 'now', logoUrl: 'https://logo.clearbit.com/nowtv.com' }
         ],
 
+        get sortLabel() {
+            if (this.sortOrder === 'popularity') return 'Popularité';
+            if (this.sortOrder === 'release_date') return 'Date de sortie';
+            if (this.sortOrder === 'recently_added') return 'Date d\'ajout';
+            return 'Tri';
+        },
+
+        get activeFiltersCount() {
+            let count = 0;
+            if (this.filterGenres.length > 0) count++;
+            if (this.filterRating > 0) count++;
+            if (this.filterYearMin > 1950 || this.filterYearMax < new Date().getFullYear()) count++;
+            if (this.isThisYearSelected) count++;
+            return count;
+        },
+
+        // Dynamically get all genres available in the current enriched watchlist
+        get availableGenres() {
+            const genres = new Map();
+            const type = this.activeTab === 'movie' ? 'movie' : 'serie';
+
+            this.enrichedWatchlist.forEach(item => {
+                let itemType = item.type;
+                if (!itemType && item.title) itemType = 'movie';
+                if (!itemType && item.name) itemType = 'serie';
+                if (itemType === 'tv') itemType = 'serie';
+
+                if (itemType === type && item.apiDetails && item.apiDetails.genres) {
+                    item.apiDetails.genres.forEach(g => {
+                        if (!genres.has(g.id)) {
+                            genres.set(g.id, g);
+                        }
+                    });
+                }
+            });
+            return Array.from(genres.values()).sort((a, b) => a.name.localeCompare(b.name));
+        },
+
         async init() {
             this.loadWatchlist();
             const flagImg = document.getElementById('header-flag');
@@ -43,7 +90,7 @@ document.addEventListener('alpine:init', () => {
 
             await this.fetchAndEnrichWatchlist();
             
-            this.$watch('activeTab', () => this.renderMedia());
+            this.$watch('activeTab', () => { this.filterGenres = []; this.renderMedia(); });
             this.$watch('watchStatusFilter', () => this.renderMedia());
             this.$watch('activePlatformFilters', () => this.renderMedia());
 
@@ -56,6 +103,42 @@ document.addEventListener('alpine:init', () => {
             } else {
                 this.activePlatformFilters.push(platformId);
             }
+        },
+
+        toggleGenre(genreId) {
+            if (this.filterGenres.includes(genreId)) {
+                this.filterGenres = this.filterGenres.filter(id => id !== genreId);
+            } else {
+                this.filterGenres.push(genreId);
+            }
+        },
+
+        toggleThisYear() {
+            this.isThisYearSelected = !this.isThisYearSelected;
+            const currentYear = new Date().getFullYear();
+            if (this.isThisYearSelected) {
+                this.filterYearMin = currentYear;
+                this.filterYearMax = currentYear;
+            } else {
+                // Reset to default range
+                this.filterYearMin = 1950;
+                this.filterYearMax = currentYear;
+            }
+        },
+
+        resetFilters() {
+            this.filterGenres = [];
+            this.filterRating = 0;
+            this.filterYearMin = 1950;
+            this.filterYearMax = new Date().getFullYear();
+            this.isThisYearSelected = false;
+            this.showFilterSheet = false;
+            this.renderMedia();
+        },
+
+        applyFilters() {
+            this.showFilterSheet = false;
+            this.renderMedia();
         },
 
         // ... (loadWatchlist, getInternalPlatformId inchangés) ...
@@ -114,48 +197,51 @@ document.addEventListener('alpine:init', () => {
                 })
                 .filter(item => item && item.type === type);
 
-            // FILTRAGE LOGIQUE :
-            // 1. Si user a tout décoché -> Tout cacher ? Ou tout montrer ? (Hypothèse: tout montrer si vide OU si on veut juste voir la liste)
-            // La demande : "ca affichent aussi les films sur ma wathclist ou vu qui sont pas dispos".
-            // Donc : on ne filtre QUE si on a activé des plateformes ET que l'item n'est sur AUCUNE d'elles.
-            // Mais si la liste est vide, on considère que l'user veut juste voir sa liste.
-            
-            // Si l'user a des filtres actifs
-            if (this.activePlatformFilters.length > 0) {
-                // On veut voir l'item SI :
-                // - Il est dispo sur une des plateformes actives
-                // - OU si on veut voir TOUT (films non dispos inclus) ?
-                // La demande est : "changer la logique pour juste afficher les plateformes que j'ai... mais ca affiche aussi les films pas dispos".
-                // Interprétation : Le filtre ne doit PAS cacher les items. Il sert juste à surligner/filtrer visuellement les dispos ? 
-                // NON, "filtrer sur ma watchlist ceux disponibles".
-                
-                filtered = filtered.filter(item => {
-                    // Est-il sur une de mes plateformes actives ?
-                    const isAvailableOnActive = item.dynamicProviders.some(p => 
-                        this.activePlatformFilters.includes(this.getInternalPlatformId(p.provider_name))
-                    );
-                    // Si dispo, on garde.
-                    if (isAvailableOnActive) return true;
-                    
-                    // Si pas dispo : est-ce qu'on le garde quand même ?
-                    // "ca affichent aussi les films ... qui sont pas dispos".
-                    // Si on garde tout, le filtre ne sert à rien.
-                    // Je pense que l'user veut voir les items "Dispos sur mes services" + "Pas dispos du tout (Cinéma/DVD)".
-                    // Ce qu'il ne veut pas voir c'est "Dispo sur une plateforme que je n'ai PAS".
-                    
-                    // Simplification : Si je coche Netflix, je veux voir ce qui est sur Netflix.
-                    // Si je ne coche rien (tout gris), je vois tout.
-                    // Si je coche tout (tout rouge), je vois tout ce qui est streamable chez moi.
-                    
-                    return isAvailableOnActive;
-                });
-            }
-            // Si activePlatformFilters est vide (tout désélectionné), on montre tout.
-
+            // 1. FILTER: WATCH STATUS
             if (this.watchStatusFilter === 'watched') {
                 filtered = filtered.filter(item => item.isWatched);
             } else if (this.watchStatusFilter === 'unwatched') {
                 filtered = filtered.filter(item => !item.isWatched);
+            }
+
+            // 2. FILTER: PLATFORMS
+            if (this.activePlatformFilters.length > 0) {
+                filtered = filtered.filter(item => {
+                    const isAvailableOnActive = item.dynamicProviders.some(p => 
+                        this.activePlatformFilters.includes(this.getInternalPlatformId(p.provider_name))
+                    );
+                    return isAvailableOnActive;
+                });
+            }
+
+            // 3. FILTER: GENRES
+            if (this.filterGenres.length > 0) {
+                filtered = filtered.filter(item => {
+                    if (!item.apiDetails || !item.apiDetails.genres) return false;
+                    // Check if item has ANY of the selected genres
+                    return item.apiDetails.genres.some(g => this.filterGenres.includes(g.id));
+                });
+            }
+
+            // 4. FILTER: YEAR RANGE
+            // Only apply if it differs from default
+            const currentYear = new Date().getFullYear();
+            if (this.filterYearMin > 1950 || this.filterYearMax < currentYear) {
+                filtered = filtered.filter(item => {
+                    const yearStr = item.year || (item.apiDetails ? (item.apiDetails.release_date || item.apiDetails.first_air_date) : '');
+                    if (!yearStr) return false;
+                    const year = parseInt(yearStr.split('-')[0] || yearStr.split(' ')[0]);
+                    return year >= this.filterYearMin && year <= this.filterYearMax;
+                });
+            }
+
+            // 5. FILTER: RATING
+            if (this.filterRating > 0) {
+                filtered = filtered.filter(item => {
+                    const rating = item.vote_average || (item.apiDetails ? item.apiDetails.vote_average : 0);
+                    // Also handle IMDb from data.js if needed, but consistency suggests TMDB rating
+                    return parseFloat(rating) >= this.filterRating;
+                });
             }
 
             return filtered;
@@ -163,7 +249,6 @@ document.addEventListener('alpine:init', () => {
 
         // ... (setSort, renderMedia, createHTML functions unchanged) ...
         setSort(order) { this.sortOrder = order; this.renderMedia(); },
-        get sortLabel() { if (this.sortOrder === 'popularity') return 'Popularité'; if (this.sortOrder === 'release_date') return 'Date de sortie'; return 'Date d\'ajout'; },
         async renderMedia() { const container = document.getElementById('media-list'); const emptyState = document.getElementById('empty-state'); if (!container) return; let itemsToRender = [...this.filteredMedia]; if (this.sortOrder === 'recently_added') { itemsToRender.sort((a, b) => new Date(b.added_at) - new Date(a.added_at)); } else if (this.sortOrder === 'release_date') { itemsToRender.sort((a, b) => { const yearAStr = String(a.year || ''); const yearBStr = String(b.year || ''); const dateA = new Date(yearAStr.split(' - ')[0]); const dateB = new Date(yearBStr.split(' - ')[0]); return dateB - dateA; }); } else { itemsToRender.sort((a, b) => { const imdbA = a.imdb === 'xx' || !a.imdb ? 0 : parseFloat(a.imdb); const imdbB = b.imdb === 'xx' || !b.imdb ? 0 : parseFloat(b.imdb); return imdbB - imdbA; }); } if (itemsToRender.length === 0) { container.innerHTML = ''; if (emptyState) emptyState.classList.remove('hidden'); return; } if (emptyState) emptyState.classList.add('hidden'); const mediaHTMLPromises = itemsToRender.map(item => this.createMediaItemHTML(item)); const mediaHTML = await Promise.all(mediaHTMLPromises); container.innerHTML = mediaHTML.join(''); },
         async createMediaItemHTML(item) { if (item.type === 'movie') return this.createMovieItemHTML(item); if (item.type === 'serie') return this.createTVItemHTML(item); return ''; },
         createCheckButtonHTML(itemId, isWatched, type, extraAction = '') { const action = type === 'movie' ? `toggleMovieWatched(${itemId})` : `markEpisodeWatched(${itemId}, ${extraAction})`; const bgClass = isWatched ? 'bg-primary border-primary text-white' : 'bg-black/40 border-gray-600 text-gray-500 hover:text-white hover:border-gray-400'; return ` <button @click.prevent.stop="${action}" class="flex h-8 w-8 items-center justify-center rounded-full border transition-all ${bgClass} z-10 shrink-0 ml-2"> <span class="material-symbols-outlined text-[20px]">check</span> </button>`; },
