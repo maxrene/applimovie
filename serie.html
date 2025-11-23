@@ -2,13 +2,9 @@
 <html class="dark" lang="en">
 <head>
     <meta charset="utf-8"/>
-    <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport"/>
-    <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#121212">
-    <link rel="apple-touch-icon" href="icons/icon-192.png">
-
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
     <link crossorigin="" href="https://fonts.gstatic.com/" rel="preconnect"/>
-    <link as="style" href="https://fonts.googleapis.com/css2?display=swap&family=Noto+Sans%3Awght%40400%3B500%3B700%3B900&family=Spline+Sans%3Awght%40400%3B500%3B700" onload="this.rel='stylesheet'" rel="stylesheet"/>
+    <link as="style" href="https://fonts.googleapis.com/css2?display=swap&amp;family=Noto+Sans%3Awght%40400%3B500%3B700%3B900&amp;family=Spline+Sans%3Awght%40400%3B500%3B700" onload="this.rel='stylesheet'" rel="stylesheet"/>
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
     <script>
         tailwind.config = {
@@ -20,133 +16,184 @@
                         "background-light": "#f8f6f6",
                         "background-dark": "#121212",
                     },
-                    fontFamily: { "display": ["Spline Sans"] },
-                    borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" },
+                    fontFamily: {
+                        "display": ["Spline Sans"]
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
                 },
             },
         }
     </script>
     <title>TV Show Details</title>
-    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400..700,0..1,0" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet"/>
     <style>
-        body { min-height: max(884px, 100dvh); background-color: #121212; }
-        .season-card .episodes-container { display: none; }
-        .season-card.open .episodes-container { display: block; }
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-        .material-symbols-outlined.filled { font-variation-settings: 'FILL' 1; }
-        
-        /* Checkbox Custom */
-        input[type="checkbox"] {
-            appearance: none; width: 1.5rem; height: 1.5rem; border-radius: 0.375rem;
-            border: 1px solid #4A5568; background-color: rgba(17, 24, 39, 0.5);
-            cursor: pointer; position: relative;
-        }
-        input[type="checkbox"]:checked { background-color: #ea2a33; border-color: #ea2a33; }
-        input[type="checkbox"]:checked::after {
-            content: ""; position: absolute; top: 50%; left: 50%; width: 0.4rem; height: 0.8rem;
-            border: solid white; border-width: 0 2px 2px 0; transform: translate(-50%, -60%) rotate(45deg);
+        body {
+            min-height: max(884px, 100dvh);
+            background-color: #121212;
         }
     </style>
+    <style>
+    .season-card .episodes-container {
+        display: none;
+    }
+    .season-card.open .episodes-container {
+        display: block;
+    }
+    /* Custom Checkbox Style */
+    input[type="checkbox"] {
+        appearance: none;
+        -webkit-appearance: none;
+        position: relative;
+        width: 1.5rem;
+        height: 1.5rem;
+        border-radius: 0.375rem; /* rounded-md */
+        border: 1px solid #4A5568; /* border-gray-700 */
+        background-color: rgba(17, 24, 39, 0.5); /* bg-gray-900/50 */
+        cursor: pointer;
+        transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out;
+    }
+    input[type="checkbox"]:checked {
+        background-color: #ea2a33; /* bg-primary */
+        border-color: #ea2a33; /* border-primary */
+    }
+    input[type="checkbox"]:checked::after {
+        content: "";
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 0.5rem;
+        height: 1rem;
+        border: solid white;
+        border-width: 0 3px 3px 0;
+        transform: translate(-50%, -60%) rotate(45deg);
+    }
+    input[type="checkbox"]:focus {
+        outline: none;
+        box-shadow: 0 0 0 2px rgba(234, 42, 51, 0.5); /* focus:ring-2 focus:ring-primary/50 */
+    }
+</style>
 </head>
 <body class="bg-background-dark font-display text-gray-200">
-
-<div class="flex flex-col">
-    <header class="absolute top-0 left-0 right-0 z-20 flex items-center justify-between p-4">
-        <button onclick="history.back()" class="rounded-full bg-black/50 p-2 text-white backdrop-blur-sm hover:bg-black/70 transition-colors">
-            <span class="material-symbols-outlined">arrow_back</span>
-        </button>
-    </header>
-
-    <main class="flex-1 overflow-y-auto">
-        <div class="relative h-96">
-            <div class="absolute inset-0 h-full w-full">
-                <img id="media-banner" alt="Show banner" class="h-full w-full object-cover" src=""/>
-                <div class="absolute inset-0 bg-gradient-to-t from-[#121212] via-black/20 to-transparent"></div>
-            </div>
-        </div>
-        
-        <div class="p-4 -mt-12 relative z-10">
-            <h1 id="media-title" class="text-3xl font-bold text-white leading-tight mb-2"></h1>
-            
-            <div class="flex items-center space-x-3 text-sm text-gray-400 mb-6">
-                <span id="media-year"></span>
-                <span class="h-1 w-1 rounded-full bg-gray-500"></span>
-                <span id="media-seasons"></span>
-                <span class="h-1 w-1 rounded-full bg-gray-500"></span>
-                <div id="media-genres" class="flex items-center gap-2"></div>
-            </div>
-
-            <div class="flex items-center gap-3 mb-8">
-                <button id="watchlist-button" class="flex-1 flex items-center justify-center gap-2 rounded-xl bg-white text-black py-3 font-bold transition-transform active:scale-95">
-                    <span class="material-symbols-outlined filled">add</span>
-                    <span>Ma Liste</span>
-                </button>
-                <div class="flex flex-col items-center justify-center bg-gray-800/50 rounded-xl px-4 py-2 border border-gray-700">
-                    <div class="flex items-center gap-1">
-                        <span class="material-symbols-outlined text-yellow-500 text-sm filled">star</span>
-                        <span id="media-imdb" class="text-lg font-bold text-white"></span>
-                    </div>
-                    <span class="text-[10px] text-gray-400">IMDb</span>
-                </div>
-            </div>
-
-            <div class="mb-8">
-                <h3 class="text-xs font-bold text-gray-500 mb-3 uppercase tracking-wide">Disponible sur</h3>
-                <div id="available-on-container" class="flex items-center gap-3 min-h-[40px]"></div>
-            </div>
-
-            <div class="mb-8">
-                <h3 class="text-lg font-bold text-white mb-2">Synopsis</h3>
-                <p id="media-synopsis" class="text-gray-400 leading-relaxed text-sm"></p>
-            </div>
-
-            <div class="mb-8" id="director-section">
-                <h3 class="text-sm text-gray-500 mb-2" id="director-title">Créateur</h3>
-                <div class="flex items-center gap-3">
-                    <img id="director-image" class="h-10 w-10 rounded-full object-cover bg-gray-700">
-                    <div>
-                        <p id="director-name" class="font-semibold text-white"></p>
-                        <p id="director-role" class="text-xs text-gray-400">Creator</p>
-                    </div>
-                </div>
-            </div>
-
-            <div class="mb-8" id="cast-section">
-                <div class="flex items-center justify-between mb-3">
-                    <h3 class="text-lg font-bold text-white">Casting</h3>
-                </div>
-                <div id="full-cast-container" class="flex gap-4 overflow-x-auto pb-4 no-scrollbar"></div>
-            </div>
-            
-            <div id="awards-section" style="display: none;"></div>
-
-            <div class="mb-12">
-                <div class="flex items-center justify-between mb-4">
-                    <h3 class="text-lg font-bold text-white">Saisons</h3>
-                </div>
-                <div id="seasons-episodes-container" class="space-y-3"></div>
-            </div>
-            
-            <div class="h-20"></div>
-        </div>
-    </main>
-
-    <div id="confirmation-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm" style="display: none;">
-        <div class="bg-gray-900 p-6 rounded-2xl max-w-xs w-full text-center border border-gray-800">
-            <h3 class="text-lg font-bold text-white mb-2">Série terminée ?</h3>
-            <p class="text-gray-400 text-sm mb-6">Marquer tous les épisodes restants comme vus ?</p>
-            <div class="flex gap-3">
-                <button id="modal-cancel-button" class="flex-1 py-2.5 rounded-lg bg-gray-800 text-white font-medium">Non</button>
-                <button id="modal-confirm-button" class="flex-1 py-2.5 rounded-lg bg-primary text-white font-medium">Oui</button>
-            </div>
+<div id="confirmation-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" style="display: none;">
+    <div class="w-full max-w-sm rounded-xl bg-gray-800 p-6 text-center shadow-lg">
+        <h3 class="text-lg font-bold text-white">Mark All as Watched?</h3>
+        <p class="mt-2 text-sm text-gray-400">You haven't marked all episodes as watched. Do you want to mark the entire series as watched?</p>
+        <div class="mt-6 flex justify-center gap-4">
+            <button id="modal-cancel-button" class="flex-1 rounded-lg bg-gray-700 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-600">Back</button>
+            <button id="modal-confirm-button" class="flex-1 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-red-700">Yes, mark all</button>
         </div>
     </div>
-
+</div>
+<div class="flex flex-col">
+    <header class="absolute top-0 left-0 right-0 z-20 flex items-center justify-between p-4">
+        <a href="index.html" class="rounded-full bg-black/50 p-2 text-white">
+            <svg class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path d="M15 19l-7-7 7-7" stroke-linecap="round" stroke-linejoin="round"></path>
+            </svg>
+        </a>
+    </header>
+    <main class="flex-1 overflow-y-auto">
+        <div class="relative h-80">
+            <div class="absolute inset-0 h-full w-full">
+                <img id="media-banner" alt="Future Echoes show still" class="h-full w-full object-cover" src=""/>
+                <div class="absolute inset-0 bg-black/40"></div>
+            </div>
+        </div>
+        <div class="p-4">
+            <div class="relative -mt-24">
+                <div class="flex items-end gap-4">
+                    <img id="media-poster" alt="Future Echoes show poster" class="h-40 w-28 rounded-lg object-cover shadow-lg" src=""/>
+                    <div class="flex-1 pb-2">
+                        <h1 id="media-title" class="text-4xl font-bold text-white"></h1>
+                    </div>
+                </div>
+            </div>
+            <div class="mt-4 mb-4 flex items-center space-x-3 text-sm text-gray-400">
+                <span id="media-year"></span>
+                <span class="text-gray-600">-</span>
+                <div id="media-genres" class="flex items-center gap-2 rounded-md border border-gray-600 px-2 py-1">
+                </div>
+                <span class="text-gray-600">-</span>
+                <span id="media-seasons"></span>
+            </div>
+            <div class="mb-6 flex items-center justify-between gap-4">
+                <div class="flex items-center gap-4">
+                    <div class="flex items-center gap-2">
+                        <img alt="IMDb logo" class="h-5" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD5Qobe6SpHH0TWLB5i_PB_IucslxA_QaDBaJNDDCIFHCdiq_LfeRorBVfBlSxn_xkXPeMCarmt3QBjnhsjNm2eDqmD6w0RE033tKevCYFn5MAqQ1Rjt2k58rzFNFxpqKGSEeDRQlbuiN49a_-a_uU9TgTcerHC2-jSohJT8aIqo0OUl6Q-4thg4mHdihjJIJjmAABPtoa3xDg9ZXJH7VrPFE7eePQUycz9RfgKeRwEgIiFnaJkTd0YPi2-Chfb47tsdDGXGJLVaSps"/>
+                        <span id="media-imdb" class="text-base font-bold text-white"></span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <img alt="Rotten Tomatoes logo" class="h-5" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDfFgSrAsGpkahL6N_YxwuYDBW8ijQF5eGQ0YjTboDzFVDRqArV1wQJHlIR2yj7yrEfbrNEY3O4QDVjeMyN8RxULFvz484slBZiB7WmOw6kBZg9Ct4b43oqBPBggRb3wAJBaMIaIsLq9XMX5Qj2Si22R8PfTOjdXpxZEfJP7x5k14_Scko_M5E5xVVOw3Sesg-VmDQaYyGpEQfCjNSv_z1uE8UdVx-8eTBU04_-ajEKhmzaHplgq3tizx2WJ7pv4joMEi7CCiq6BqdQ"/>
+                        <span id="media-rt" class="text-base font-bold text-white"></span>
+                    </div>
+                </div>
+                <button id="watchlist-button" class="flex items-center gap-2 rounded-full bg-gray-700 py-2 px-4 text-sm font-semibold text-white">
+                    <span class="material-symbols-outlined !text-base !font-bold">add</span>
+                    <span>Watchlist</span>
+                </button>
+            </div>
+            <div class="flex items-center gap-4 border-t border-gray-800 pt-4">
+                <span class="text-sm font-medium text-gray-400">Available on:</span>
+                <div id="available-on-container" class="flex items-center gap-3">
+                </div>
+            </div>
+            <div id="awards-section" class="mt-4 flex flex-col gap-2 border-t border-gray-800 pt-4" style="display: none;">
+            </div>
+            <div class="mt-6">
+                <h2 class="text-xl font-bold text-white">Synopsis</h2>
+                <p id="media-synopsis" class="mt-2 text-sm text-gray-400"></p>
+            </div>
+            <div class="mt-6" id="director-section">
+                <h2 id="director-title" class="text-xl font-bold text-white">Creator</h2>
+                <div class="mt-3 flex items-center gap-3">
+                    <img id="director-image" alt="Creator" class="h-16 w-16 rounded-full object-cover" src=""/>
+                    <div>
+                        <p id="director-name" class="font-semibold text-white"></p>
+                        <p id="director-role" class="text-sm text-gray-400">Creator</p>
+                    </div>
+                </div>
+            </div>
+            <!-- Awards Section -->
+            <div class="mt-6" id="awards-section" style="display: none;">
+                 <h2 class="text-xl font-bold text-white">Awards & Nominations</h2>
+                 <div class="mt-3 flex items-center gap-4 text-center">
+                    <div class="flex flex-col">
+                        <span class="text-3xl font-bold text-primary" id="awards-wins"></span>
+                        <span class="text-sm text-gray-400">Wins</span>
+                    </div>
+                    <div class="flex flex-col">
+                        <span class="text-3xl font-bold text-white" id="awards-nominations"></span>
+                        <span class="text-sm text-gray-400">Nominations</span>
+                    </div>
+                 </div>
+            </div>
+            <div class="mt-6" id="cast-section">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-xl font-bold text-white">Full Cast</h2>
+                    <a class="text-sm font-semibold text-primary" href="#">See All</a>
+                </div>
+                <div id="full-cast-container" class="mt-3 grid grid-cols-2 gap-4">
+                </div>
+            </div>
+            <div class="mt-8">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-xl font-bold text-white">Seasons &amp; Episodes</h2>
+                    <a class="text-sm font-semibold text-primary" href="#">See All</a>
+                </div>
+                <div id="seasons-episodes-container" class="mt-3 space-y-3">
+                </div>
+            </div>
+        </div>
+    </main>
 </div>
 <script src="config.js"></script>
 <script src="data.js"></script>
+<script src="js/awards.js"></script>
 <script src="details.js"></script>
-<script>if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js'));}</script>
 </body>
 </html>
