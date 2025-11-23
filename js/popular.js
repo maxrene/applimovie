@@ -1,10 +1,15 @@
 document.addEventListener('alpine:init', () => {
     Alpine.data('popularPage', () => ({
-        activeTab: 'movie', // 'movie' ou 'tv'
+        activeTab: 'movie',
         items: [],
-        isLoading: true,
+        isLoading: true,      // Chargement initial (gros spinner)
+        isLoadingMore: false, // Chargement suite (petit spinner en bas)
         showServiceBar: false,
         
+        // Pagination
+        currentPage: 1,
+        totalPages: 1,
+
         // Filtres
         activePlatformFilters: [],
         userSelectedPlatforms: [],
@@ -12,19 +17,9 @@ document.addEventListener('alpine:init', () => {
         userRegion: localStorage.getItem('userRegion') || 'FR',
         sortOrder: 'popularity.desc',
 
-        // Mapping interne pour convertir nos IDs (netflix) en IDs TMDB (8)
-        // Ces IDs sont spécifiques pour la France/Europe en général, mais peuvent varier légèrement.
-        // 8: Netflix, 119: Prime, 337: Disney+, 350: AppleTV+, 392: Canal+, 531: Paramount+
         tmdbProviderMap: {
-            'netflix': 8,
-            'prime': 119,
-            'disney': 337,
-            'apple': 350,
-            'canal': 392, // Canal+ VOD/Series
-            'paramount': 531,
-            'max': 1899,
-            'skygo': 29,
-            'now': 39
+            'netflix': 8, 'prime': 119, 'disney': 337, 'apple': 350,
+            'canal': 392, 'paramount': 531, 'max': 1899, 'skygo': 29, 'now': 39
         },
 
         availablePlatforms: [
@@ -40,35 +35,29 @@ document.addEventListener('alpine:init', () => {
         ],
 
         init() {
-            // Gestion du drapeau
             const flagImg = document.getElementById('header-flag');
-            if (flagImg) {
-                flagImg.src = `https://flagcdn.com/w40/${this.userRegion.toLowerCase()}.png`;
-            }
+            if (flagImg) flagImg.src = `https://flagcdn.com/w40/${this.userRegion.toLowerCase()}.png`;
 
-            // Charger les plateformes de l'utilisateur
             const savedPlatforms = localStorage.getItem('selectedPlatforms');
             this.myPlatformIds = savedPlatforms ? JSON.parse(savedPlatforms) : [];
 
-            // Préparer l'affichage des bulles
             this.userSelectedPlatforms = this.availablePlatforms.filter(p => 
                 this.myPlatformIds.includes(p.id)
             );
 
-            // Watchers pour recharger quand on change un filtre
-            this.$watch('activePlatformFilters', () => this.fetchContent());
+            this.$watch('activePlatformFilters', () => this.resetAndFetch());
             
-            this.fetchContent();
+            this.resetAndFetch();
         },
 
         switchTab(tab) {
             this.activeTab = tab;
-            this.fetchContent();
+            this.resetAndFetch();
         },
 
         setSort(order) {
             this.sortOrder = order;
-            this.fetchContent();
+            this.resetAndFetch();
         },
 
         togglePlatformFilter(platformId) {
@@ -79,33 +68,48 @@ document.addEventListener('alpine:init', () => {
             }
         },
 
-        async fetchContent() {
-            this.isLoading = true;
-            this.items = [];
+        // Réinitialise la liste pour une nouvelle recherche (filtre, tri...)
+        resetAndFetch() {
+            this.currentPage = 1;
+            this.items = []; // Vide la liste
+            this.fetchContent(1);
+        },
 
-            // Construction de la liste des IDs providers pour l'API
-            // Si aucun filtre n'est cliqué dans le tiroir, on utilise TOUTES les plateformes de l'utilisateur (par défaut)
-            // Si des filtres sont cliqués, on utilise seulement ceux-là.
+        // Charge la page suivante (Scroll infini)
+        loadMore() {
+            if (!this.isLoading && !this.isLoadingMore && this.currentPage < this.totalPages) {
+                this.fetchContent(this.currentPage + 1);
+            }
+        },
+
+        // Détection du scroll (appelé depuis le HTML)
+        handleScroll(e) {
+            const el = e.target;
+            // Si on est à 300px du bas, on charge la suite
+            if (el.scrollHeight - el.scrollTop - el.clientHeight < 300) {
+                this.loadMore();
+            }
+        },
+
+        async fetchContent(page) {
+            if (page === 1) this.isLoading = true;
+            else this.isLoadingMore = true;
+
             let targetPlatforms = this.activePlatformFilters.length > 0 
                 ? this.activePlatformFilters 
                 : this.myPlatformIds;
 
-            // Conversion en IDs numériques TMDB (ex: 'netflix' -> 8)
             const providerIds = targetPlatforms
                 .map(id => this.tmdbProviderMap[id])
-                .filter(id => id !== undefined) // Enlever les inconnus
-                .join('|'); // Le pipe '|' signifie OU pour l'API TMDB
+                .filter(id => id !== undefined)
+                .join('|');
 
-            // Construction de l'URL API
-            // On utilise /discover pour pouvoir filtrer par providers
             const endpoint = this.activeTab === 'movie' ? '/discover/movie' : '/discover/tv';
-            let url = `https://api.themoviedb.org/3${endpoint}?api_key=${TMDB_API_KEY}&language=fr-FR&page=1`;
+            let url = `https://api.themoviedb.org/3${endpoint}?api_key=${TMDB_API_KEY}&language=fr-FR&page=${page}`;
             
-            // Paramètres de tri et de région
             url += `&sort_by=${this.sortOrder}`;
             url += `&watch_region=${this.userRegion}`;
             
-            // Ajouter le filtre de providers SEULEMENT si on a des providers à filtrer
             if (providerIds.length > 0) {
                 url += `&with_watch_providers=${providerIds}`;
             }
@@ -115,7 +119,7 @@ document.addEventListener('alpine:init', () => {
                 const data = await res.json();
                 
                 if (data.results) {
-                    this.items = data.results.map(item => ({
+                    const newItems = data.results.map(item => ({
                         id: item.id,
                         title: this.activeTab === 'movie' ? item.title : item.name,
                         poster_path: item.poster_path 
@@ -123,13 +127,26 @@ document.addEventListener('alpine:init', () => {
                             : 'https://placehold.co/300x450?text=No+Image',
                         vote_average: item.vote_average ? item.vote_average.toFixed(1) : 'N/A',
                         year: (item.release_date || item.first_air_date || '').split('-')[0],
-                        media_type: this.activeTab // Force le type pour les liens
+                        media_type: this.activeTab
                     }));
+
+                    if (page === 1) {
+                        this.items = newItems;
+                    } else {
+                        // Ajoute à la suite sans doublons (sécurité)
+                        const existingIds = new Set(this.items.map(i => i.id));
+                        const filteredNew = newItems.filter(i => !existingIds.has(i.id));
+                        this.items = [...this.items, ...filteredNew];
+                    }
+                    
+                    this.currentPage = data.page;
+                    this.totalPages = data.total_pages;
                 }
             } catch (error) {
                 console.error("Erreur lors du chargement :", error);
             } finally {
                 this.isLoading = false;
+                this.isLoadingMore = false;
             }
         }
     }));
