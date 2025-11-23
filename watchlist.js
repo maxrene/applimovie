@@ -1,6 +1,6 @@
 
 document.addEventListener('alpine:init', () => {
-    Alpine.data('myListPage', () => ({
+    Alpine.data('watchlistPage', () => ({
         watchlist: [],
         enrichedWatchlist: [],
         activeTab: 'tv', // 'movie' or 'tv'
@@ -11,14 +11,14 @@ document.addEventListener('alpine:init', () => {
 
         async init() {
             this.loadWatchlist();
-            this.extractPlatforms();
-            await this.fetchSeriesDetails();
+            await this.fetchAndEnrichWatchlist();
+            this.extractPlatforms(); // Keep for UI, but data comes from API
 
             this.$watch('activeTab', () => this.renderMedia());
             this.$watch('watchStatusFilter', () => this.renderMedia());
             this.$watch('selectedPlatform', () => this.renderMedia());
 
-            this.renderMedia();
+            await this.renderMedia();
             this.renderPlatformFilters();
         },
 
@@ -29,36 +29,80 @@ document.addEventListener('alpine:init', () => {
 
         extractPlatforms() {
             const platformSet = new Set();
-            this.watchlist.forEach(item => {
-                const media = mediaData.find(m => m.id === item.id);
-                if (media && media.availableOn) {
-                    media.availableOn.forEach(p => platformSet.add(JSON.stringify(p)));
+            this.enrichedWatchlist.forEach(item => {
+                const providers = item.apiDetails?.providers || item.availableOn;
+                if (providers) {
+                    providers.forEach(p => {
+                        const logoUrl = p.logo_path ? `https://image.tmdb.org/t/p/w500${p.logo_path}` : p.logoUrl;
+                        const name = p.provider_name || p.name;
+                        platformSet.add(JSON.stringify({ name, logoUrl }));
+                    });
                 }
             });
             this.platforms = Array.from(platformSet).map(p => JSON.parse(p));
         },
 
-        async fetchSeriesDetails() {
-            const seriesOnWatchlist = this.watchlist
-                .map(item => mediaData.find(m => m.id === item.id))
-                .filter(item => item && item.type === 'serie');
+        async fetchAndEnrichWatchlist() {
+            const watchlistWithMediaData = this.watchlist.map(item => {
+                const media = mediaData.find(m => m.id === item.id);
+                return { ...media, ...item, apiDetails: null };
+            });
 
-            const promises = seriesOnWatchlist.map(series =>
-                fetch(`https://api.themoviedb.org/3/tv/${series.id}?api_key=${TMDB_API_KEY}`)
-                    .then(res => res.ok ? res.json() : null)
-                    .catch(() => null)
-            );
+            const promises = watchlistWithMediaData.map(item => {
+                if (!item) return Promise.resolve(null);
+                if (item.type === 'serie') {
+                    return this.fetchFullSeriesDetails(item.id);
+                } else if (item.type === 'movie') {
+                    return this.fetchMovieDetails(item.id);
+                }
+                return Promise.resolve(null);
+            });
 
             const results = await Promise.all(promises);
 
-            this.enrichedWatchlist = this.watchlist.map(item => {
-                const media = mediaData.find(m => m.id === item.id);
-                if (media && media.type === 'serie') {
-                    const details = results.find(d => d && d.id === item.id);
-                    return { ...media, ...item, seriesDetails: details };
+            this.enrichedWatchlist = watchlistWithMediaData.map(item => {
+                if (!item) return null;
+                const details = results.find(d => d && d.id === item.id);
+                if (details) {
+                    item.apiDetails = details;
                 }
-                return { ...media, ...item };
-            });
+                return item;
+            }).filter(Boolean);
+        },
+
+        async fetchMovieDetails(movieId) {
+            try {
+                const res = await fetch(`https://api.themoviedb.org/3/movie/${movieId}?api_key=${TMDB_API_KEY}&append_to_response=watch/providers&language=fr-FR`);
+                if (!res.ok) return null;
+                const data = await res.json();
+                data.providers = data['watch/providers']?.results?.FR?.flatrate || [];
+                return data;
+            } catch (e) {
+                return null;
+            }
+        },
+
+        async fetchFullSeriesDetails(seriesId) {
+            try {
+                const seriesRes = await fetch(`https://api.themoviedb.org/3/tv/${seriesId}?api_key=${TMDB_API_KEY}&append_to_response=watch/providers&language=fr-FR`);
+                if (!seriesRes.ok) return null;
+                const seriesData = await seriesRes.json();
+                seriesData.providers = seriesData['watch/providers']?.results?.FR?.flatrate || [];
+
+                const seasonPromises = seriesData.seasons
+                    .filter(s => s.season_number > 0)
+                    .map(season =>
+                        fetch(`https://api.themoviedb.org/3/tv/${seriesId}/season/${season.season_number}?api_key=${TMDB_API_KEY}&language=fr-FR`)
+                        .then(res => res.ok ? res.json() : null)
+                    );
+
+                const seasonsWithEpisodes = await Promise.all(seasonPromises);
+                seriesData.seasons = seasonsWithEpisodes.filter(s => s);
+                return seriesData;
+            } catch (e) {
+                console.error(`Failed to fetch full details for series ${seriesId}:`, e);
+                return null;
+            }
         },
 
         renderPlatformFilters() {
@@ -129,7 +173,7 @@ document.addEventListener('alpine:init', () => {
             return 'Date d\'ajout';
         },
 
-        renderMedia() {
+        async renderMedia() {
             const container = document.getElementById('media-list');
             const emptyState = document.getElementById('empty-state');
             if (!container) return;
@@ -159,13 +203,20 @@ document.addEventListener('alpine:init', () => {
             }
 
             emptyState.style.display = 'none';
-            container.innerHTML = itemsToRender.map(item => this.createMediaItemHTML(item)).join('');
+            const mediaHTMLPromises = itemsToRender.map(item => this.createMediaItemHTML(item));
+            const mediaHTML = await Promise.all(mediaHTMLPromises);
+            container.innerHTML = mediaHTML.join('');
         },
 
-        createMediaItemHTML(item) {
+        async createMediaItemHTML(item) {
             const isTV = item.type === 'serie';
             const link = isTV ? `serie.html?id=${item.id}` : `film.html?id=${item.id}`;
             const yearAndGenre = `${item.year} • ${item.genres[0]}`;
+
+            const providers = item.apiDetails?.providers;
+            const platformLogo = providers && providers.length > 0
+                ? `<img src="https://image.tmdb.org/t/p/w500${providers[0].logo_path}" alt="${providers[0].provider_name}" class="h-4 w-4 rounded-sm">`
+                : '';
 
             let overlayHTML = '';
             if (item.isWatched) {
@@ -180,22 +231,34 @@ document.addEventListener('alpine:init', () => {
                             <p class="mt-1 text-xs font-semibold text-white">Watched</p>
                         </div>
                     </div>`;
-            } else if (isTV && item.seriesDetails) {
+            } else if (isTV && item.apiDetails) {
                 const watchedEpisodes = JSON.parse(localStorage.getItem('watchedEpisodes')) || {};
-                const seriesWatchedEpisodes = watchedEpisodes[item.id] || [];
-                const watchedCount = seriesWatchedEpisodes.length;
-                const totalEpisodes = item.seriesDetails.number_of_episodes;
+                const seriesWatchedEpisodes = new Set(watchedEpisodes[item.id] || []);
+                const watchedCount = seriesWatchedEpisodes.size;
 
-                if (watchedCount > 0 && totalEpisodes > 0) {
-                    const progress = (watchedCount / totalEpisodes) * 100;
-                    const seasonText = item.seriesDetails.last_episode_to_air?.season_number ? `Season ${item.seriesDetails.last_episode_to_air.season_number} -` : '';
-                    overlayHTML = `
-                        <div class="absolute bottom-1 left-1 right-1 rounded bg-black/50 p-1 backdrop-blur-sm">
-                            <div class="h-1 w-full rounded-full bg-gray-500/50">
-                                <div class="h-1 rounded-full bg-primary" style="width: ${progress}%"></div>
-                            </div>
-                            <p class="mt-1 text-center text-[10px] font-semibold text-white">${seasonText} ${watchedCount}/${totalEpisodes} episodes</p>
+                if (watchedCount > 0 && watchedCount < item.apiDetails.number_of_episodes) {
+                    let nextEpisode = null;
+                    const sortedSeasons = item.apiDetails.seasons
+                        .filter(s => s.season_number > 0)
+                        .sort((a, b) => a.season_number - b.season_number);
+
+                    for (const season of sortedSeasons) {
+                        const sortedEpisodes = season.episodes.sort((a, b) => a.episode_number - b.episode_number);
+                        for (const episode of sortedEpisodes) {
+                            if (!seriesWatchedEpisodes.has(episode.id)) {
+                                nextEpisode = episode;
+                                break;
+                            }
+                        }
+                        if (nextEpisode) break;
+                    }
+
+                    if (nextEpisode) {
+                        overlayHTML = `
+                        <div class="absolute bottom-1 left-1 right-1 rounded bg-black/50 p-1 backdrop-blur-sm text-center">
+                           <p class="text-[10px] font-semibold text-white">Next: S${this.formatEpisodeNumber(nextEpisode.season_number)}E${this.formatEpisodeNumber(nextEpisode.episode_number)}</p>
                         </div>`;
+                    }
                 }
             }
 
@@ -206,12 +269,19 @@ document.addEventListener('alpine:init', () => {
                         ${overlayHTML}
                     </div>
                     <div class="flex-1">
-                        <p class="text-xs text-gray-500 dark:text-gray-400">${isTV ? 'TV Show' : 'Movie'}</p>
-                        <h3 class="font-bold text-gray-900 dark:text-white">${item.title}</h3>
+                        <div class="flex items-center gap-2">
+                           ${platformLogo}
+                           <p class="text-xs text-gray-500 dark:text-gray-400">${isTV ? 'TV Show' : 'Movie'}</p>
+                        </div>
+                        <h3 class="font-bold text-gray-900 dark:text-white mt-1">${item.title}</h3>
                         <p class="text-sm text-gray-500 dark:text-gray-400">${yearAndGenre}</p>
                     </div>
                 </a>
             `;
+        },
+
+        formatEpisodeNumber(num) {
+            return String(num).padStart(2, '0');
         }
     }));
 });
