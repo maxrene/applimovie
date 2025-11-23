@@ -37,8 +37,8 @@ document.addEventListener('alpine:init', () => {
                 this.myPlatformIds.includes(p.id)
             );
 
-            // TOUT COCHÉ PAR DÉFAUT
-            this.activePlatformFilters = [...this.myPlatformIds];
+            // TOUT COCHÉ PAR DÉFAUT (activePlatformFilters vide = TOUT)
+            this.activePlatformFilters = [];
 
             await this.fetchAndEnrichWatchlist();
             
@@ -49,7 +49,16 @@ document.addEventListener('alpine:init', () => {
             await this.renderMedia();
         },
 
+        get isAllSelected() {
+            return this.activePlatformFilters.length === 0;
+        },
+
         togglePlatformFilter(platformId) {
+            if (platformId === 'all') {
+                this.activePlatformFilters = [];
+                return;
+            }
+
             if (this.activePlatformFilters.includes(platformId)) {
                 this.activePlatformFilters = this.activePlatformFilters.filter(id => id !== platformId);
             } else {
@@ -170,8 +179,15 @@ document.addEventListener('alpine:init', () => {
                 })
                 .filter(item => item && item.type === type);
 
-            // Important: We do NOT filter by platforms here.
-            // Platform selection is only for UI (icon visibility).
+            // Filter by selected platforms if any are selected (otherwise "All" shows everything)
+            if (this.activePlatformFilters.length > 0) {
+                filtered = filtered.filter(item => {
+                    if (!item.dynamicProviders || item.dynamicProviders.length === 0) return false;
+                    return item.dynamicProviders.some(p =>
+                        this.activePlatformFilters.includes(this.getInternalPlatformId(p.provider_name))
+                    );
+                });
+            }
 
             if (this.watchStatusFilter === 'watched') {
                 filtered = filtered.filter(item => item.isWatched);
@@ -204,7 +220,9 @@ document.addEventListener('alpine:init', () => {
         createCheckButtonHTML(itemId, isWatched, type, extraAction = '') { const action = type === 'movie' ? `toggleMovieWatched(${itemId})` : `markEpisodeWatched(${itemId}, ${extraAction})`; const bgClass = isWatched ? 'bg-primary border-primary text-white' : 'bg-black/40 border-gray-600 text-gray-500 hover:text-white hover:border-gray-400'; return ` <button @click.prevent.stop="${action}" class="flex h-8 w-8 items-center justify-center rounded-full border transition-all ${bgClass} z-10 shrink-0 ml-2"> <span class="material-symbols-outlined text-[20px]">check</span> </button>`; },
         createPlatformIconsHTML(providers) {
             if (!providers || providers.length === 0) return '';
-            const myProviders = providers.filter(p => this.activePlatformFilters.includes(this.getInternalPlatformId(p.provider_name)));
+            // Show all icons available on user's platforms, regardless of the active filter
+            // (The filter hides the card, but the card should show all valid icons)
+            const myProviders = providers.filter(p => this.myPlatformIds.includes(this.getInternalPlatformId(p.provider_name)));
             if (myProviders.length === 0) return '';
 
             const renderedPlatforms = new Set();
