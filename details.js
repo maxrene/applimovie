@@ -8,6 +8,10 @@ const IMG_BASE_PROFILE = 'https://image.tmdb.org/t/p/w185';
 let currentCastData = [];
 let isCastExpanded = false;
 
+// Charger les préférences utilisateur
+const userRegion = localStorage.getItem('userRegion') || 'FR';
+const myPlatformIds = JSON.parse(localStorage.getItem('selectedPlatforms')) || [];
+
 document.addEventListener('DOMContentLoaded', async () => {
     const urlParams = new URLSearchParams(window.location.search);
     const mediaId = urlParams.get('id');
@@ -49,6 +53,11 @@ async function fetchFullFromTMDB(id, type) {
         const formattedData = formatTMDBData(data, type);
         updateUI(formattedData, type, false);
 
+        // Mettre à jour le streaming avec les données complètes (sans filtrage précoce)
+        if(data['watch/providers']?.results) {
+            updateStreamingUI(data['watch/providers'].results);
+        }
+
         if (type === 'tv' && data.seasons) {
             updateSeasonsUI(data.seasons, id, data.number_of_episodes);
         }
@@ -59,10 +68,12 @@ async function fetchFullFromTMDB(id, type) {
 
 async function fetchUpdates(id, type) {
     try {
+        // Récupérer les providers SANS filtrer directement
         const streamingUrl = `${BASE_URL}/${type}/${id}/watch/providers?api_key=${TMDB_API_KEY}`;
         const streamingRes = await fetch(streamingUrl);
         const streamingData = await streamingRes.json();
-        updateStreamingUI(streamingData.results?.FR?.flatrate || []);
+        // Passer tout l'objet results à la fonction d'update pour appliquer la logique Région + Canal
+        updateStreamingUI(streamingData.results || {});
 
         const creditsUrl = `${BASE_URL}/${type}/${id}/credits?api_key=${TMDB_API_KEY}`;
         const creditsRes = await fetch(creditsUrl);
@@ -163,12 +174,11 @@ function updateUI(data, type, isLocal) {
         genresContainer.innerHTML += `<span class="font-medium">${g}</span>${i < genreList.length - 1 ? '<span class="h-3 w-px bg-gray-600 mx-2"></span>' : ''}`;
     });
 
-    if (data.availableOn) updateStreamingUI(data.availableOn);
+    // Si les données sont locales, updateStreamingUI pourrait recevoir une liste déjà filtrée ou non
+    // Pour simplifier, fetchUpdates s'occupera de rafraichir ça proprement
     if (data.cast && data.cast.length > 0) updateCastUI(data.cast);
     
     updatePersonUI(data.director, type);
-
-    // CORRECTION : Appel unique et unifié pour les Awards
     updateAwardsUI(data);
 
     if (type === 'movie' && data.similarMovies) {
@@ -195,51 +205,66 @@ function updateSimilarMoviesUI(similarMovies) {
     }
 }
 
-function updateStreamingUI(providers) {
+// --- LOGIQUE DE STREAMING MISE À JOUR ---
+function updateStreamingUI(allProvidersData) {
     const container = document.getElementById('available-on-container');
     if (!container) return;
     container.innerHTML = '';
 
-    let list = [];
-    if (providers.length > 0 && providers[0].provider_name) {
-        list = providers.map(p => ({ name: p.provider_name, logoUrl: IMG_BASE_PROFILE + p.logo_path }));
+    // Si on a reçu un tableau directement (cas legacy), on assume que c'est pour la France
+    // Sinon c'est l'objet complet { FR: {...}, IE: {...} }
+    let providers = [];
+    if (Array.isArray(allProvidersData)) {
+        providers = allProvidersData; // Fallback
     } else {
-        list = providers;
+        // 1. Récupérer providers pour le pays choisi
+        if (allProvidersData[userRegion] && allProvidersData[userRegion].flatrate) {
+            providers = [...allProvidersData[userRegion].flatrate];
+        }
+        // 2. Exception Canal+
+        if (userRegion !== 'FR' && myPlatformIds.includes('canal')) {
+            if (allProvidersData['FR'] && allProvidersData['FR'].flatrate) {
+                const canal = allProvidersData['FR'].flatrate.find(p => p.provider_id === 392 || p.provider_name.includes('Canal'));
+                if (canal && !providers.some(p => p.provider_id === canal.provider_id)) {
+                    providers.push(canal);
+                }
+            }
+        }
     }
 
-    const saved = localStorage.getItem('selectedPlatforms');
-    const selectedPlatforms = saved ? JSON.parse(saved) : [];
+    // Mapping rapide pour filtrer selon "Mes Plateformes"
+    // Fonction utilitaire interne pour matcher les IDs
+    const getInternalId = (name) => {
+        const lower = name.toLowerCase();
+        if (lower.includes('netflix')) return 'netflix';
+        if (lower.includes('amazon') || lower.includes('prime')) return 'prime';
+        if (lower.includes('disney')) return 'disney';
+        if (lower.includes('apple')) return 'apple';
+        if (lower.includes('canal')) return 'canal';
+        if (lower.includes('paramount')) return 'paramount';
+        if (lower.includes('max') || lower.includes('hbo')) return 'max';
+        if (lower.includes('sky')) return 'skygo';
+        if (lower.includes('now')) return 'now';
+        return 'other';
+    };
 
-    let displayList = list;
-    if (selectedPlatforms.length > 0) {
-        const platformNameMap = {
-            'Netflix': 'netflix',
-            'Prime Video': 'prime',
-            'Amazon Prime Video': 'prime',
-            'Max': 'max',
-            'Disney+': 'disney',
-            'Hulu': 'hulu',
-            'Apple TV+': 'apple',
-            'Paramount+': 'paramount',
-            'Peacock': 'peacock',
-            'Canal+': 'canal'
-        };
-
-        displayList = list.filter(provider => {
-            const platformId = platformNameMap[provider.name];
-            return platformId && selectedPlatforms.includes(platformId);
-        });
+    // Filtrer pour n'afficher que les plateformes sélectionnées par l'utilisateur
+    // Si l'utilisateur n'a rien configuré, on affiche tout par défaut (optionnel)
+    let displayList = providers;
+    if (myPlatformIds.length > 0) {
+        displayList = providers.filter(p => myPlatformIds.includes(getInternalId(p.provider_name)));
     }
 
     if (displayList.length > 0) {
         displayList.forEach(p => {
-            container.innerHTML += `<img src="${p.logoUrl}" alt="${p.name}" title="${p.name}" class="h-6 w-6 rounded-md"/>`;
+            const logo = p.logo_path ? IMG_BASE_PROFILE + p.logo_path : 'https://placehold.co/64x64';
+            container.innerHTML += `<img src="${logo}" alt="${p.provider_name}" title="${p.provider_name}" class="h-6 w-6 rounded-md"/>`;
         });
     } else {
-        if(list.length > 0 && selectedPlatforms.length > 0) {
-             container.innerHTML = '<span class="text-gray-500 text-xs">Not available on your selected platforms in FR</span>';
+        if(providers.length > 0 && myPlatformIds.length > 0) {
+             container.innerHTML = '<span class="text-gray-500 text-xs">Non dispo sur vos plateformes</span>';
         } else {
-            container.innerHTML = '<span class="text-gray-500 text-xs">Not available in FR</span>';
+            container.innerHTML = '<span class="text-gray-500 text-xs">Indisponible</span>';
         }
     }
 }
@@ -423,7 +448,6 @@ function toggleEpisodeWatchedStatus(seriesId, episodeId, totalEpisodes) {
         watchedEpisodes[seriesId].push(episodeId);
     }
 
-    // Automatically add to watchlist if it's the first watched episode
     let watchlist = JSON.parse(localStorage.getItem('watchlist')) || [];
     if (!watchlist.some(item => item.id === seriesIdNum)) {
         watchlist.push({ id: seriesIdNum, added_at: new Date().toISOString() });
@@ -474,11 +498,6 @@ function formatTMDBData(data, type) {
         posterUrl: s.poster_path ? IMG_BASE_POSTER + s.poster_path : 'https://placehold.co/200x300'
     })) || [];
 
-    const streaming = data['watch/providers']?.results?.IE?.flatrate?.map(p => ({
-        name: p.provider_name,
-        logoUrl: IMG_BASE_PROFILE + p.logo_path
-    })) || [];
-
     return {
         id: data.id,
         title: isMovie ? data.title : data.name,
@@ -510,8 +529,7 @@ function formatTMDBData(data, type) {
         bannerUrl: data.backdrop_path ? IMG_BASE_BANNER + data.backdrop_path : '',
         director: dir,
         cast: cast,
-        similarMovies: similar,
-        availableOn: streaming
+        similarMovies: similar
     };
 }
 
@@ -521,7 +539,6 @@ const awardIconSVG = `
         <path d="M7.163 15.023a.75.75 0 01.623.834 3.5 3.5 0 006.428 0 .75.75 0 011.39.55 5 5 0 01-9.208 0 .75.75 0 01.768-.834z"></path>
     </svg>`;
 
-// CORRECTION : Fonction unique et intelligente pour gérer l'affichage des Awards
 function updateAwardsUI(data) {
     const awardsSection = document.getElementById('awards-section');
     if (!awardsSection) return;
@@ -530,17 +547,13 @@ function updateAwardsUI(data) {
     let nominations = 0;
     let awardName = '';
 
-    // 1. Priorité au fichier externe (js/awards.js) car il est plus complet
-    // Note: window.awardsData est défini dans js/awards.js
     const externalAwardInfo = window.awardsData && window.awardsData[data.id];
 
     if (externalAwardInfo) {
         wins = externalAwardInfo.wins;
         nominations = externalAwardInfo.nominations;
-        // On respecte le type défini dans awards.js
         awardName = externalAwardInfo.type === 'movie' ? 'Oscar' : 'Emmy';
     } else {
-        // 2. Fallback sur les données locales du film (data.js)
         const isMovie = data.type === 'movie' || (data.title && !data.name); 
         awardName = isMovie ? 'Oscar' : 'Emmy';
         wins = isMovie ? (data.oscarWins || 0) : (data.emmyWins || 0);
@@ -567,7 +580,6 @@ function updateAwardsUI(data) {
 
     if (awardsHTML) {
         awardsSection.innerHTML = awardsHTML;
-        // On affiche en flex pour aligner les items verticalement (flex-col dans le HTML)
         awardsSection.style.display = 'flex';
     } else {
         awardsSection.style.display = 'none';
@@ -597,14 +609,12 @@ async function toggleWatchlist(mediaId) {
     const isWatched = watchedList.includes(mediaIdNum);
 
     if (isWatched) {
-        // State 3 (Watched) -> State 1 (Not on list)
         watchlist = watchlist.filter(item => item.id !== mediaIdNum);
         watchedList = watchedList.filter(id => id !== mediaIdNum);
         localStorage.setItem('watchlist', JSON.stringify(watchlist));
         localStorage.setItem(watchedListKey, JSON.stringify(watchedList));
         updateWatchlistButton(mediaId);
     } else if (isInWatchlist) {
-        // State 2 (On Watchlist) -> State 3 (Watched)
         if (!isMovie) {
             const seriesDetailsUrl = `${BASE_URL}/tv/${mediaId}?api_key=${TMDB_API_KEY}`;
             const seriesDetailsRes = await fetch(seriesDetailsUrl);
@@ -623,7 +633,6 @@ async function toggleWatchlist(mediaId) {
         localStorage.setItem(watchedListKey, JSON.stringify(watchedList));
         updateWatchlistButton(mediaId);
     } else {
-        // State 1 (Not on list) -> State 2 (On Watchlist)
         watchlist.push({ id: mediaIdNum, added_at: new Date().toISOString() });
         localStorage.setItem('watchlist', JSON.stringify(watchlist));
         updateWatchlistButton(mediaId);
@@ -693,21 +702,17 @@ function updateWatchlistButton(mediaId) {
     const icon = watchlistButton.querySelector('.material-symbols-outlined');
     const text = watchlistButton.querySelector('span:last-child');
 
-    // Reset classes
     watchlistButton.classList.remove('bg-gray-700', 'bg-primary', 'bg-green-600');
 
     if (isWatched) {
-        // State 3: Watched
         watchlistButton.classList.add('bg-green-600');
         icon.textContent = 'visibility';
         text.textContent = 'Watched';
     } else if (isInWatchlist) {
-        // State 2: On Watchlist
         watchlistButton.classList.add('bg-primary');
         icon.textContent = 'check';
         text.textContent = 'On Watchlist';
     } else {
-        // State 1: Not on list
         watchlistButton.classList.add('bg-gray-700');
         icon.textContent = 'add';
         text.textContent = 'Watchlist';
