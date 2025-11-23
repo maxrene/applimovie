@@ -5,24 +5,49 @@ document.addEventListener('alpine:init', () => {
         activeTab: 'tv', // 'movie' ou 'tv'
         sortOrder: 'popularity',
         
-        // NOUVEAU : Tableau pour gérer plusieurs filtres en même temps
+        // Tableau pour gérer plusieurs filtres en même temps
         activePlatformFilters: [], 
         
         watchStatusFilter: 'unwatched', // 'watched' ou 'unwatched'
         
         // État et préférences utilisateur
         userRegion: localStorage.getItem('userRegion') || 'FR',
-        myPlatformIds: [], // IDs des plateformes cochées dans le profil
-        userSelectedPlatforms: [], // Objets complets des plateformes de l'utilisateur (pour l'affichage)
+        myPlatformIds: [], 
+        userSelectedPlatforms: [], // Pour l'affichage
 
-        // Liste des plateformes avec les VRAIS logos (via Clearbit pour l'instant)
+        // LISTE DES PLATEFORMES AVEC VOS URLS PERSONNALISÉES
         availablePlatforms: [
-            { id: 'netflix', name: 'Netflix', logoUrl: 'https://logo.clearbit.com/netflix.com' },
-            { id: 'prime', name: 'Prime Video', logoUrl: 'https://logo.clearbit.com/primevideo.com' },
-            { id: 'disney', name: 'Disney+', logoUrl: 'https://logo.clearbit.com/disneyplus.com' },
-            { id: 'apple', name: 'Apple TV+', logoUrl: 'https://logo.clearbit.com/tv.apple.com' },
-            { id: 'canal', name: 'Canal+', logoUrl: 'https://logo.clearbit.com/canalplus.com' },
-            { id: 'paramount', name: 'Paramount+', logoUrl: 'https://logo.clearbit.com/paramountplus.com' },
+            { 
+                id: 'netflix', 
+                name: 'Netflix', 
+                logoUrl: 'https://images.ctfassets.net/4cd45et68cgf/Rx83JoRDMkYNlMC9MKzcB/2b14d5a59fc3937afd3f03191e19502d/Netflix-Symbol.png?w=700&h=456' 
+            },
+            { 
+                id: 'prime', 
+                name: 'Prime Video', 
+                logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/ca/Amazon_Prime_Video_logo_%282024%29.svg/1024px-Amazon_Prime_Video_logo_%282024%29.svg.png' 
+            },
+            { 
+                id: 'disney', 
+                name: 'Disney+', 
+                logoUrl: 'https://platform.theverge.com/wp-content/uploads/sites/2/chorus/uploads/chorus_asset/file/25357066/Disney__Logo_March_2024.png?quality=90&strip=all&crop=0,0,100,100' 
+            },
+            { 
+                id: 'apple', 
+                name: 'Apple TV+', 
+                logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/ad/AppleTVLogo.svg/768px-AppleTVLogo.svg.png' 
+            },
+            { 
+                id: 'canal', 
+                name: 'Canal+', 
+                logoUrl: 'https://static1.purepeople.com/articles/0/46/23/10/@/6655765-logo-de-la-chaine-canal-1200x0-2.png' 
+            },
+            { 
+                id: 'paramount', 
+                name: 'Paramount+', 
+                logoUrl: 'https://images.seeklogo.com/logo-png/39/1/paramount-logo-png_seeklogo-397501.png' 
+            },
+            // Pour ceux-ci, on garde les logos automatiques car pas d'URL fournie
             { id: 'max', name: 'Max', logoUrl: 'https://logo.clearbit.com/max.com' },
             { id: 'skygo', name: 'Sky Go', logoUrl: 'https://logo.clearbit.com/sky.com' },
             { id: 'now', name: 'Now', logoUrl: 'https://logo.clearbit.com/nowtv.com' }
@@ -45,7 +70,7 @@ document.addEventListener('alpine:init', () => {
             // Surveillance des variables pour rafraîchir l'affichage
             this.$watch('activeTab', () => this.renderMedia());
             this.$watch('watchStatusFilter', () => this.renderMedia());
-            this.$watch('activePlatformFilters', () => this.renderMedia()); // Rafraîchir quand on clique sur un logo
+            this.$watch('activePlatformFilters', () => this.renderMedia());
 
             await this.renderMedia();
         },
@@ -80,7 +105,6 @@ document.addEventListener('alpine:init', () => {
             return 'other';
         },
 
-        // LOGIQUE DE DISPONIBILITÉ (Pays + Canal)
         getProvidersForItem(item) {
             if (!item.apiDetails || !item.apiDetails['watch/providers']) return [];
             
@@ -200,15 +224,12 @@ document.addEventListener('alpine:init', () => {
                     const isWatched = (normalizedType === 'movie' && watchedMovies.includes(item.id)) ||
                                     (normalizedType === 'serie' && watchedSeries.includes(item.id));
                     
-                    // Calcul des providers
                     const dynamicProviders = this.getProvidersForItem(item);
 
                     return { ...item, type: normalizedType, isWatched, dynamicProviders };
                 })
                 .filter(item => item && item.type === type);
 
-            // --- NOUVEAU FILTRE MULTIPLE ---
-            // Si on a des filtres actifs, on garde les items dispos sur AU MOINS UNE des plateformes sélectionnées
             if (this.activePlatformFilters.length > 0) {
                 filtered = filtered.filter(item =>
                     item.dynamicProviders.some(p => 
@@ -217,7 +238,6 @@ document.addEventListener('alpine:init', () => {
                 );
             }
 
-            // Filtre Vu / Pas Vu
             if (this.watchStatusFilter === 'watched') {
                 filtered = filtered.filter(item => item.isWatched);
             } else if (this.watchStatusFilter === 'unwatched') {
@@ -294,14 +314,15 @@ document.addEventListener('alpine:init', () => {
             </button>`;
         },
 
-        // Générateur d'icônes plateformes
         createPlatformIconsHTML(providers) {
             if (!providers || providers.length === 0) return '';
             const myProviders = providers.filter(p => this.myPlatformIds.includes(this.getInternalPlatformId(p.provider_name)));
             if (myProviders.length === 0) return '';
             return myProviders.map(p => {
-                const logo = p.logo_path ? `https://image.tmdb.org/t/p/original${p.logo_path}` : p.logoUrl;
-                return `<img src="${logo}" alt="${p.provider_name}" class="h-4 w-4 rounded-sm" title="${p.provider_name}">`;
+                const platformObj = this.availablePlatforms.find(ap => ap.id === this.getInternalPlatformId(p.provider_name));
+                // Utiliser le logo personnalisé s'il existe, sinon l'URL TMDB
+                const logo = platformObj ? platformObj.logoUrl : (p.logo_path ? `https://image.tmdb.org/t/p/original${p.logo_path}` : p.logoUrl);
+                return `<img src="${logo}" alt="${p.provider_name}" class="h-4 w-4 rounded-sm object-contain bg-gray-800" title="${p.provider_name}">`;
             }).join('');
         },
 
