@@ -58,11 +58,9 @@ document.addEventListener('alpine:init', () => {
             }
         },
 
-        // ... (loadWatchlist, getInternalPlatformId inchangés) ...
         loadWatchlist() { const savedList = localStorage.getItem('watchlist'); this.watchlist = savedList ? JSON.parse(savedList) : []; },
         getInternalPlatformId(tmdbName) { const lower = tmdbName.toLowerCase(); if (lower.includes('netflix')) return 'netflix'; if (lower.includes('amazon') || lower.includes('prime')) return 'prime'; if (lower.includes('disney')) return 'disney'; if (lower.includes('apple')) return 'apple'; if (lower.includes('canal')) return 'canal'; if (lower.includes('paramount')) return 'paramount'; if (lower.includes('max') || lower.includes('hbo')) return 'max'; if (lower.includes('sky')) return 'skygo'; if (lower.includes('now')) return 'now'; return 'other'; },
 
-        // CORRECTION DOUBLONS & LOGIQUE
         getProvidersForItem(item) {
             if (!item.apiDetails || !item.apiDetails['watch/providers']) return [];
             const providersData = item.apiDetails['watch/providers'].results;
@@ -90,7 +88,6 @@ document.addEventListener('alpine:init', () => {
             return unique;
         },
 
-        // ... (fetch functions unchanged) ...
         async fetchAndEnrichWatchlist() { const watchlistWithMediaData = this.watchlist.map(item => { const media = mediaData.find(m => m.id === item.id); return { ...media, ...item, apiDetails: null }; }); const promises = watchlistWithMediaData.map(item => { if (!item) return Promise.resolve(null); if (item.type === 'serie' || item.type === 'tv') { return this.fetchFullSeriesDetails(item.id); } else if (item.type === 'movie') { return this.fetchMovieDetails(item.id); } return Promise.resolve(null); }); const results = await Promise.all(promises); this.enrichedWatchlist = watchlistWithMediaData.map(item => { if (!item) return null; const details = results.find(d => d && d.id === item.id); if (details) { item.apiDetails = details; } return item; }).filter(Boolean); },
         getCachedData(key) { const cached = localStorage.getItem(key); if (!cached) return null; const { timestamp, data } = JSON.parse(cached); const isExpired = (new Date().getTime() - timestamp) > 24 * 60 * 60 * 1000; return isExpired ? null : data; },
         setCachedData(key, data) { const item = { timestamp: new Date().getTime(), data: data }; localStorage.setItem(key, JSON.stringify(item)); },
@@ -114,43 +111,8 @@ document.addEventListener('alpine:init', () => {
                 })
                 .filter(item => item && item.type === type);
 
-            // FILTRAGE LOGIQUE :
-            // 1. Si user a tout décoché -> Tout cacher ? Ou tout montrer ? (Hypothèse: tout montrer si vide OU si on veut juste voir la liste)
-            // La demande : "ca affichent aussi les films sur ma wathclist ou vu qui sont pas dispos".
-            // Donc : on ne filtre QUE si on a activé des plateformes ET que l'item n'est sur AUCUNE d'elles.
-            // Mais si la liste est vide, on considère que l'user veut juste voir sa liste.
-            
-            // Si l'user a des filtres actifs
-            if (this.activePlatformFilters.length > 0) {
-                // On veut voir l'item SI :
-                // - Il est dispo sur une des plateformes actives
-                // - OU si on veut voir TOUT (films non dispos inclus) ?
-                // La demande est : "changer la logique pour juste afficher les plateformes que j'ai... mais ca affiche aussi les films pas dispos".
-                // Interprétation : Le filtre ne doit PAS cacher les items. Il sert juste à surligner/filtrer visuellement les dispos ? 
-                // NON, "filtrer sur ma watchlist ceux disponibles".
-                
-                filtered = filtered.filter(item => {
-                    // Est-il sur une de mes plateformes actives ?
-                    const isAvailableOnActive = item.dynamicProviders.some(p => 
-                        this.activePlatformFilters.includes(this.getInternalPlatformId(p.provider_name))
-                    );
-                    // Si dispo, on garde.
-                    if (isAvailableOnActive) return true;
-                    
-                    // Si pas dispo : est-ce qu'on le garde quand même ?
-                    // "ca affichent aussi les films ... qui sont pas dispos".
-                    // Si on garde tout, le filtre ne sert à rien.
-                    // Je pense que l'user veut voir les items "Dispos sur mes services" + "Pas dispos du tout (Cinéma/DVD)".
-                    // Ce qu'il ne veut pas voir c'est "Dispo sur une plateforme que je n'ai PAS".
-                    
-                    // Simplification : Si je coche Netflix, je veux voir ce qui est sur Netflix.
-                    // Si je ne coche rien (tout gris), je vois tout.
-                    // Si je coche tout (tout rouge), je vois tout ce qui est streamable chez moi.
-                    
-                    return isAvailableOnActive;
-                });
-            }
-            // Si activePlatformFilters est vide (tout désélectionné), on montre tout.
+            // Modification: On ne filtre PLUS les items. On montre tout.
+            // Les filtres servent uniquement à afficher/masquer les icones sur les cartes.
 
             if (this.watchStatusFilter === 'watched') {
                 filtered = filtered.filter(item => item.isWatched);
@@ -161,13 +123,12 @@ document.addEventListener('alpine:init', () => {
             return filtered;
         },
 
-        // ... (setSort, renderMedia, createHTML functions unchanged) ...
         setSort(order) { this.sortOrder = order; this.renderMedia(); },
         get sortLabel() { if (this.sortOrder === 'popularity') return 'Popularité'; if (this.sortOrder === 'release_date') return 'Date de sortie'; return 'Date d\'ajout'; },
         async renderMedia() { const container = document.getElementById('media-list'); const emptyState = document.getElementById('empty-state'); if (!container) return; let itemsToRender = [...this.filteredMedia]; if (this.sortOrder === 'recently_added') { itemsToRender.sort((a, b) => new Date(b.added_at) - new Date(a.added_at)); } else if (this.sortOrder === 'release_date') { itemsToRender.sort((a, b) => { const yearAStr = String(a.year || ''); const yearBStr = String(b.year || ''); const dateA = new Date(yearAStr.split(' - ')[0]); const dateB = new Date(yearBStr.split(' - ')[0]); return dateB - dateA; }); } else { itemsToRender.sort((a, b) => { const imdbA = a.imdb === 'xx' || !a.imdb ? 0 : parseFloat(a.imdb); const imdbB = b.imdb === 'xx' || !b.imdb ? 0 : parseFloat(b.imdb); return imdbB - imdbA; }); } if (itemsToRender.length === 0) { container.innerHTML = ''; if (emptyState) emptyState.classList.remove('hidden'); return; } if (emptyState) emptyState.classList.add('hidden'); const mediaHTMLPromises = itemsToRender.map(item => this.createMediaItemHTML(item)); const mediaHTML = await Promise.all(mediaHTMLPromises); container.innerHTML = mediaHTML.join(''); },
         async createMediaItemHTML(item) { if (item.type === 'movie') return this.createMovieItemHTML(item); if (item.type === 'serie') return this.createTVItemHTML(item); return ''; },
         createCheckButtonHTML(itemId, isWatched, type, extraAction = '') { const action = type === 'movie' ? `toggleMovieWatched(${itemId})` : `markEpisodeWatched(${itemId}, ${extraAction})`; const bgClass = isWatched ? 'bg-primary border-primary text-white' : 'bg-black/40 border-gray-600 text-gray-500 hover:text-white hover:border-gray-400'; return ` <button @click.prevent.stop="${action}" class="flex h-8 w-8 items-center justify-center rounded-full border transition-all ${bgClass} z-10 shrink-0 ml-2"> <span class="material-symbols-outlined text-[20px]">check</span> </button>`; },
-        createPlatformIconsHTML(providers) { if (!providers || providers.length === 0) return ''; const myProviders = providers.filter(p => this.myPlatformIds.includes(this.getInternalPlatformId(p.provider_name))); if (myProviders.length === 0) return ''; return myProviders.map(p => { const platformObj = this.availablePlatforms.find(ap => ap.id === this.getInternalPlatformId(p.provider_name)); const logo = platformObj ? platformObj.logoUrl : (p.logo_path ? `https://image.tmdb.org/t/p/original${p.logo_path}` : p.logoUrl); return `<img src="${logo}" alt="${p.provider_name}" class="h-4 w-4 rounded-sm object-cover bg-gray-800" title="${p.provider_name}">`; }).join(''); },
+        createPlatformIconsHTML(providers) { if (!providers || providers.length === 0) return ''; const myProviders = providers.filter(p => this.activePlatformFilters.includes(this.getInternalPlatformId(p.provider_name))); if (myProviders.length === 0) return ''; return myProviders.map(p => { const platformObj = this.availablePlatforms.find(ap => ap.id === this.getInternalPlatformId(p.provider_name)); const logo = platformObj ? platformObj.logoUrl : (p.logo_path ? `https://image.tmdb.org/t/p/original${p.logo_path}` : p.logoUrl); return `<img src="${logo}" alt="${p.provider_name}" class="h-4 w-4 rounded-sm object-cover bg-gray-800" title="${p.provider_name}">`; }).join(''); },
         formatDuration(runtime) { if (!runtime) return ''; const h = Math.floor(runtime / 60); const m = runtime % 60; return `${h}h ${m}m`; },
         createMovieItemHTML(item) { const link = `film.html?id=${item.id}`; const durationStr = item.duration || (item.apiDetails?.runtime ? this.formatDuration(item.apiDetails.runtime) : 'N/A'); const genresStr = item.genres && item.genres.length > 0 ? item.genres[0] : 'Genre'; const metaLine = `${item.year} • ${genresStr} • ${durationStr}`; const platformsHTML = this.createPlatformIconsHTML(item.dynamicProviders); const availableLine = platformsHTML ? `<div class="mt-5 flex items-center gap-2 text-xs text-gray-400"> <span>Available on:</span> <div class="flex items-center gap-1">${platformsHTML}</div> </div>` : ''; const checkButton = this.createCheckButtonHTML(item.id, item.isWatched, 'movie'); return ` <div class="relative flex items-start gap-4 p-4 hover:bg-white/5 transition-colors rounded-lg"> <a href="${link}" class="w-24 flex-shrink-0 group"> <div class="relative w-full aspect-[2/3] rounded-lg overflow-hidden"> <img src="${item.posterUrl}" alt="${item.title}" class="w-full h-full object-cover group-hover:scale-105 transition-transform"> ${item.isWatched ? '<div class="absolute inset-0 bg-black/40 flex items-center justify-center"><span class="material-symbols-outlined text-white">visibility</span></div>' : ''} </div> </a> <div class="flex-1 min-w-0"> <div class="flex justify-between items-start"> <a href="${link}" class="block pr-2"> <h3 class="font-bold text-lg text-white truncate leading-tight">${item.title}</h3> </a> ${checkButton} </div> <p class="text-sm text-gray-400 mt-1">${metaLine}</p> ${availableLine} </div> </div>`; },
         createTVItemHTML(item) { const watchedEpisodes = JSON.parse(localStorage.getItem('watchedEpisodes')) || {}; const seriesWatchedEpisodes = new Set(watchedEpisodes[item.id] || []); const watchedCount = seriesWatchedEpisodes.size; if (item.isWatched || (item.apiDetails && watchedCount > 0 && watchedCount === item.apiDetails.number_of_episodes)) { const checkButton = this.createCheckButtonHTML(item.id, true, 'serie', 'all'); return ` <div class="relative flex items-center gap-4 p-4 hover:bg-white/5 transition-colors rounded-lg"> <a href="serie.html?id=${item.id}" class="w-24 flex-shrink-0"> <div class="relative w-full aspect-[2/3] rounded-lg overflow-hidden"> <img src="${item.posterUrl}" class="w-full h-full object-cover"> <div class="absolute inset-0 flex items-center justify-center bg-black/60"> <span class="material-symbols-outlined text-white">visibility</span> </div> </div> </a> <div class="flex-1 min-w-0"> <div class="flex justify-between items-start"> <h3 class="font-bold text-lg text-white truncate">${item.title}</h3> ${checkButton} </div> <p class="text-sm text-gray-400">${String(item.year).split(' - ')[0]} • ${item.genres[0]}</p> <p class="text-xs text-green-500 mt-2 font-medium">Série terminée</p> </div> </div>`; } if (watchedCount > 0 && item.apiDetails) { return this.createInProgressTVItemHTML(item, seriesWatchedEpisodes); } return this.createUnwatchedTVItemHTML(item); },
