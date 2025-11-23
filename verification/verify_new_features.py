@@ -21,8 +21,9 @@ async def main():
         await page.reload()
 
         # Wait for the initial render of the in-progress item
-        await page.wait_for_selector('h3:has-text("S01 E04")')
-        print("Initial state verified: Next episode is S01 E04.")
+        await page.wait_for_selector('h3:has-text("Breaking Bad")')
+        await page.wait_for_selector('p:has-text("S01 E04")')
+        print("Initial state verified: Next episode is S01 E04 for Breaking Bad.")
 
         # Find and click the "Mark episode as watched" button
         mark_watched_button = page.locator('button[aria-label="Mark episode as watched"]')
@@ -30,7 +31,7 @@ async def main():
         print("Clicked 'Mark as Watched' for S01 E04.")
 
         # Wait for the component to re-render with the next episode
-        await page.wait_for_selector('h3:has-text("S01 E05")')
+        await page.wait_for_selector('p:has-text("S01 E05")')
         print("Verification successful: UI updated to show S01 E05 as the next episode.")
 
         await page.screenshot(path="verification/new_features_verification.png")

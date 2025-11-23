@@ -383,19 +383,30 @@ document.addEventListener('alpine:init', () => {
             const remainingInSeason = currentSeasonForProgress.episodes.length - seasonWatchedCount;
             const totalProgress = (seriesWatchedEpisodes.size / item.apiDetails.number_of_episodes) * 100;
 
+            const providers = item.apiDetails?.providers;
+            const platformHTML = providers && providers.length > 0
+                ? `<div class="flex items-center gap-2 mt-2">
+                       ${providers.slice(0, 3).map(p => `<img src="https://image.tmdb.org/t/p/w500${p.logo_path}" alt="${p.provider_name}" class="h-5 w-5 rounded-sm">`).join('')}
+                   </div>`
+                : '';
+
+
             return `
                 <div class="p-4">
                     <div class="flex items-start gap-4">
-                        <a href="serie.html?id=${item.id}" class="w-24 flex-shrink-0">
-                            <img class="w-full rounded-lg" src="${item.posterUrl}" alt="${item.title}">
-                            <p class="text-xs text-center text-gray-400 mt-1">${remainingInSeason} restants dans la Saison</p>
-                        </a>
+                        <div class="w-24 flex-shrink-0 relative">
+                            <a href="serie.html?id=${item.id}">
+                                <img class="w-full rounded-lg" src="${item.posterUrl}" alt="${item.title}">
+                            </a>
+                            <p class="absolute bottom-1 right-1 left-auto text-xs font-semibold text-white bg-black/50 px-1.5 py-0.5 rounded-sm backdrop-blur-sm">${remainingInSeason} restants</p>
+                        </div>
                         <div class="flex-1">
                              <a href="serie.html?id=${item.id}">
-                                <h3 class="text-lg font-bold text-white">S${this.formatEpisodeNumber(nextEpisode.season_number)} E${this.formatEpisodeNumber(nextEpisode.episode_number)}</h3>
-                                <p class="text-sm text-gray-300">${item.title}</p>
+                                <h3 class="text-lg font-bold text-white">${item.title}</h3>
+                                <p class="text-sm text-gray-300">S${this.formatEpisodeNumber(nextEpisode.season_number)} E${this.formatEpisodeNumber(nextEpisode.episode_number)}</p>
                                 <p class="text-xs text-gray-400 mt-1">${nextEpisode.name}</p>
                             </a>
+                            ${platformHTML}
                         </div>
                         <button aria-label="Mark episode as watched" @click="markEpisodeWatched(${item.id}, ${nextEpisode.id})" class="h-8 w-8 rounded-full border-2 border-gray-500 text-gray-500 flex items-center justify-center flex-shrink-0 hover:border-green-500 hover:text-green-500 transition-colors">
                             <svg fill="currentColor" height="20" viewBox="0 0 20 20" width="20"><path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"></path></svg>
