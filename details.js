@@ -50,7 +50,7 @@ async function fetchFullFromTMDB(id, type) {
         updateUI(formattedData, type, false);
 
         if (type === 'tv' && data.seasons) {
-            updateSeasonsUI(data.seasons, id);
+            updateSeasonsUI(data.seasons, id, data.number_of_episodes);
         }
     } catch (e) {
         console.error(e);
@@ -131,7 +131,7 @@ async function fetchUpdates(id, type) {
             }
 
             if (seriesDetailsData.seasons) {
-                updateSeasonsUI(seriesDetailsData.seasons, id);
+                updateSeasonsUI(seriesDetailsData.seasons, id, seriesDetailsData.number_of_episodes);
             }
         }
 
@@ -325,7 +325,7 @@ function updatePersonUI(person, type) {
     if (roleText) roleText.textContent = role;
 }
 
-function updateSeasonsUI(seasons, seriesId) {
+function updateSeasonsUI(seasons, seriesId, totalEpisodes) {
     const container = document.getElementById('seasons-episodes-container');
     if (!container) return;
 
@@ -370,19 +370,31 @@ function updateSeasonsUI(seasons, seriesId) {
                         if (!episodes || episodes.length === 0) {
                             episodesContainer.innerHTML = '<div class="p-3 border-t border-gray-700"><p class="text-gray-400">No episode information available.</p></div>';
                         } else {
+                            const watchedEpisodes = JSON.parse(localStorage.getItem('watchedEpisodes')) || {};
+                            const seriesWatchedEpisodes = watchedEpisodes[seriesId] || [];
+
                             const episodesListHTML = episodes.map(episode => {
-                                 const runtime = episode.runtime ? `${episode.runtime}m` : '';
-                                 return `
-                                    <div class="flex items-center gap-4">
-                                        <span class="text-sm font-medium text-gray-400">${episode.episode_number}</span>
+                                const runtime = episode.runtime ? `${episode.runtime}m` : '';
+                                const isChecked = seriesWatchedEpisodes.includes(episode.id);
+                                return `
+                                    <div class="flex items-center gap-4 p-2 rounded-lg hover:bg-white/10">
+                                        <span class="text-sm font-medium text-gray-400 w-6 text-center">${episode.episode_number}</span>
                                         <div class="flex-1">
                                             <p class="font-semibold text-white">${episode.name}</p>
                                             <p class="text-xs text-gray-500">${runtime}</p>
                                         </div>
+                                        <input type="checkbox" data-episode-id="${episode.id}" class="h-6 w-6 rounded-md bg-gray-900/50 border-gray-700 text-primary focus:ring-primary focus:ring-2 cursor-pointer" ${isChecked ? 'checked' : ''}>
                                     </div>`;
                             }).join('');
 
-                            episodesContainer.innerHTML = `<div class="border-t border-gray-700 px-3 py-4 space-y-4">${episodesListHTML}</div>`;
+                            episodesContainer.innerHTML = `<div class="border-t border-gray-700 px-3 py-4 space-y-2">${episodesListHTML}</div>`;
+
+                            episodesContainer.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+                                checkbox.addEventListener('change', () => {
+                                    const episodeId = parseInt(checkbox.dataset.episodeId, 10);
+                                    toggleEpisodeWatchedStatus(seriesId, episodeId, totalEpisodes);
+                                });
+                            });
                         }
 
                         episodesContainer.dataset.loaded = 'true';
@@ -394,6 +406,47 @@ function updateSeasonsUI(seasons, seriesId) {
             }
         });
     });
+}
+
+function toggleEpisodeWatchedStatus(seriesId, episodeId, totalEpisodes) {
+    let watchedEpisodes = JSON.parse(localStorage.getItem('watchedEpisodes')) || {};
+    if (!watchedEpisodes[seriesId]) {
+        watchedEpisodes[seriesId] = [];
+    }
+
+    const seriesIdNum = parseInt(seriesId, 10);
+    const episodeIndex = watchedEpisodes[seriesId].indexOf(episodeId);
+
+    if (episodeIndex > -1) {
+        watchedEpisodes[seriesId].splice(episodeIndex, 1);
+    } else {
+        watchedEpisodes[seriesId].push(episodeId);
+    }
+
+    localStorage.setItem('watchedEpisodes', JSON.stringify(watchedEpisodes));
+
+    const watchedCount = watchedEpisodes[seriesId].length;
+    if (totalEpisodes && watchedCount === totalEpisodes) {
+        let watchedList = JSON.parse(localStorage.getItem('watchedSeries')) || [];
+        if (!watchedList.includes(seriesIdNum)) {
+            watchedList.push(seriesIdNum);
+            localStorage.setItem('watchedSeries', JSON.stringify(watchedList));
+
+            let watchlist = JSON.parse(localStorage.getItem('watchlist')) || [];
+            if (!watchlist.some(item => item.id === seriesIdNum)) {
+                 watchlist.push({ id: seriesIdNum, added_at: new Date().toISOString() });
+                 localStorage.setItem('watchlist', JSON.stringify(watchlist));
+            }
+            updateWatchlistButton(seriesId);
+        }
+    } else {
+        let watchedList = JSON.parse(localStorage.getItem('watchedSeries')) || [];
+        if (watchedList.includes(seriesIdNum)) {
+            watchedList = watchedList.filter(id => id !== seriesIdNum);
+            localStorage.setItem('watchedSeries', JSON.stringify(watchedList));
+            updateWatchlistButton(seriesId);
+        }
+    }
 }
 
 function formatTMDBData(data, type) {
@@ -531,7 +584,7 @@ function initializeWatchlistButton(mediaId) {
     });
 }
 
-function toggleWatchlist(mediaId) {
+async function toggleWatchlist(mediaId) {
     const mediaIdNum = parseInt(mediaId, 10);
     const isMovie = window.location.pathname.includes('film.html');
     const watchedListKey = isMovie ? 'watchedMovies' : 'watchedSeries';
@@ -544,22 +597,82 @@ function toggleWatchlist(mediaId) {
 
     if (isWatched) {
         // State 3 (Watched) -> State 1 (Not on list)
-        // Remove from both lists
         watchlist = watchlist.filter(item => item.id !== mediaIdNum);
         watchedList = watchedList.filter(id => id !== mediaIdNum);
+        localStorage.setItem('watchlist', JSON.stringify(watchlist));
+        localStorage.setItem(watchedListKey, JSON.stringify(watchedList));
+        updateWatchlistButton(mediaId);
     } else if (isInWatchlist) {
         // State 2 (On Watchlist) -> State 3 (Watched)
-        // Add to watched list
+        if (!isMovie) {
+            const seriesDetailsUrl = `${BASE_URL}/tv/${mediaId}?api_key=${TMDB_API_KEY}`;
+            const seriesDetailsRes = await fetch(seriesDetailsUrl);
+            const seriesDetailsData = await seriesDetailsRes.json();
+            const totalEpisodes = seriesDetailsData.number_of_episodes;
+
+            const watchedEpisodes = JSON.parse(localStorage.getItem('watchedEpisodes')) || {};
+            const seriesWatchedEpisodes = watchedEpisodes[mediaId] || [];
+
+            if (seriesWatchedEpisodes.length < totalEpisodes) {
+                showConfirmationModal(mediaId, totalEpisodes);
+                return;
+            }
+        }
         watchedList.push(mediaIdNum);
+        localStorage.setItem(watchedListKey, JSON.stringify(watchedList));
+        updateWatchlistButton(mediaId);
     } else {
         // State 1 (Not on list) -> State 2 (On Watchlist)
-        // Add to watchlist
         watchlist.push({ id: mediaIdNum, added_at: new Date().toISOString() });
+        localStorage.setItem('watchlist', JSON.stringify(watchlist));
+        updateWatchlistButton(mediaId);
     }
+}
 
-    localStorage.setItem('watchlist', JSON.stringify(watchlist));
-    localStorage.setItem(watchedListKey, JSON.stringify(watchedList));
-    updateWatchlistButton(mediaId);
+function showConfirmationModal(seriesId, totalEpisodes) {
+    const modal = document.getElementById('confirmation-modal');
+    modal.style.display = 'flex';
+
+    document.getElementById('modal-cancel-button').onclick = () => {
+        modal.style.display = 'none';
+    };
+
+    document.getElementById('modal-confirm-button').onclick = async () => {
+        const seriesIdNum = parseInt(seriesId, 10);
+        let watchedList = JSON.parse(localStorage.getItem('watchedSeries')) || [];
+        if (!watchedList.includes(seriesIdNum)) {
+            watchedList.push(seriesIdNum);
+            localStorage.setItem('watchedSeries', JSON.stringify(watchedList));
+        }
+
+        const url = `${BASE_URL}/tv/${seriesId}?api_key=${TMDB_API_KEY}`;
+        const res = await fetch(url);
+        const seriesData = await res.json();
+
+        const seasonPromises = seriesData.seasons
+            .filter(season => season.season_number !== 0)
+            .map(season =>
+                fetch(`${BASE_URL}/tv/${seriesId}/season/${season.season_number}?api_key=${TMDB_API_KEY}`)
+                    .then(res => res.json())
+            );
+
+        const seasonsData = await Promise.all(seasonPromises);
+
+        const allEpisodeIds = seasonsData.flatMap(seasonData =>
+            seasonData.episodes ? seasonData.episodes.map(e => e.id) : []
+        );
+
+        let watchedEpisodes = JSON.parse(localStorage.getItem('watchedEpisodes')) || {};
+        watchedEpisodes[seriesId] = allEpisodeIds;
+        localStorage.setItem('watchedEpisodes', JSON.stringify(watchedEpisodes));
+
+        document.querySelectorAll('.episodes-container input[type="checkbox"]').forEach(checkbox => {
+            checkbox.checked = true;
+        });
+
+        updateWatchlistButton(seriesId);
+        modal.style.display = 'none';
+    };
 }
 
 function updateWatchlistButton(mediaId) {

@@ -2,18 +2,22 @@
 document.addEventListener('alpine:init', () => {
     Alpine.data('myListPage', () => ({
         watchlist: [],
+        enrichedWatchlist: [],
         activeTab: 'tv', // 'movie' or 'tv'
         sortOrder: 'popularity',
         selectedPlatform: null,
         platforms: [],
         watchStatusFilter: 'all', // 'all', 'watched', 'unwatched'
 
-        init() {
+        async init() {
             this.loadWatchlist();
             this.extractPlatforms();
+            await this.fetchSeriesDetails();
+
             this.$watch('activeTab', () => this.renderMedia());
             this.$watch('watchStatusFilter', () => this.renderMedia());
             this.$watch('selectedPlatform', () => this.renderMedia());
+
             this.renderMedia();
             this.renderPlatformFilters();
         },
@@ -32,6 +36,29 @@ document.addEventListener('alpine:init', () => {
                 }
             });
             this.platforms = Array.from(platformSet).map(p => JSON.parse(p));
+        },
+
+        async fetchSeriesDetails() {
+            const seriesOnWatchlist = this.watchlist
+                .map(item => mediaData.find(m => m.id === item.id))
+                .filter(item => item && item.type === 'serie');
+
+            const promises = seriesOnWatchlist.map(series =>
+                fetch(`https://api.themoviedb.org/3/tv/${series.id}?api_key=${TMDB_API_KEY}`)
+                    .then(res => res.ok ? res.json() : null)
+                    .catch(() => null)
+            );
+
+            const results = await Promise.all(promises);
+
+            this.enrichedWatchlist = this.watchlist.map(item => {
+                const media = mediaData.find(m => m.id === item.id);
+                if (media && media.type === 'serie') {
+                    const details = results.find(d => d && d.id === item.id);
+                    return { ...media, ...item, seriesDetails: details };
+                }
+                return { ...media, ...item };
+            });
         },
 
         renderPlatformFilters() {
@@ -68,13 +95,11 @@ document.addEventListener('alpine:init', () => {
             const watchedMovies = JSON.parse(localStorage.getItem('watchedMovies')) || [];
             const watchedSeries = JSON.parse(localStorage.getItem('watchedSeries')) || [];
 
-            let filtered = this.watchlist
+            let filtered = this.enrichedWatchlist
                 .map(item => {
-                    const media = mediaData.find(m => m.id === item.id);
-                    if (!media) return null;
-                    const isWatched = (media.type === 'movie' && watchedMovies.includes(media.id)) ||
-                                    (media.type === 'serie' && watchedSeries.includes(media.id));
-                    return { ...media, added_at: item.added_at, isWatched };
+                    const isWatched = (item.type === 'movie' && watchedMovies.includes(item.id)) ||
+                                    (item.type === 'serie' && watchedSeries.includes(item.id));
+                    return { ...item, isWatched };
                 })
                 .filter(item => item && item.type === type);
 
@@ -142,9 +167,9 @@ document.addEventListener('alpine:init', () => {
             const link = isTV ? `serie.html?id=${item.id}` : `film.html?id=${item.id}`;
             const yearAndGenre = `${item.year} • ${item.genres[0]}`;
 
-            let watchedIconHTML = '';
+            let overlayHTML = '';
             if (item.isWatched) {
-                watchedIconHTML = `
+                overlayHTML = `
                     <div class="absolute inset-0 flex items-center justify-center rounded-lg bg-black/60">
                         <div class="text-center">
                             <div class="inline-flex h-8 w-8 items-center justify-center rounded-full bg-green-500 text-white">
@@ -155,13 +180,30 @@ document.addEventListener('alpine:init', () => {
                             <p class="mt-1 text-xs font-semibold text-white">Watched</p>
                         </div>
                     </div>`;
+            } else if (isTV && item.seriesDetails) {
+                const watchedEpisodes = JSON.parse(localStorage.getItem('watchedEpisodes')) || {};
+                const seriesWatchedEpisodes = watchedEpisodes[item.id] || [];
+                const watchedCount = seriesWatchedEpisodes.length;
+                const totalEpisodes = item.seriesDetails.number_of_episodes;
+
+                if (watchedCount > 0 && totalEpisodes > 0) {
+                    const progress = (watchedCount / totalEpisodes) * 100;
+                    const seasonText = item.seriesDetails.last_episode_to_air?.season_number ? `Season ${item.seriesDetails.last_episode_to_air.season_number} -` : '';
+                    overlayHTML = `
+                        <div class="absolute bottom-1 left-1 right-1 rounded bg-black/50 p-1 backdrop-blur-sm">
+                            <div class="h-1 w-full rounded-full bg-gray-500/50">
+                                <div class="h-1 rounded-full bg-primary" style="width: ${progress}%"></div>
+                            </div>
+                            <p class="mt-1 text-center text-[10px] font-semibold text-white">${seasonText} ${watchedCount}/${totalEpisodes} episodes</p>
+                        </div>`;
+                }
             }
 
             return `
                 <a href="${link}" class="flex items-center gap-4 p-4">
                     <div class="relative h-24 w-40 flex-shrink-0">
                         <div class="h-full w-full rounded-lg bg-cover bg-center" style="background-image: url('${item.posterUrl}');"></div>
-                        ${watchedIconHTML}
+                        ${overlayHTML}
                     </div>
                     <div class="flex-1">
                         <p class="text-xs text-gray-500 dark:text-gray-400">${isTV ? 'TV Show' : 'Movie'}</p>
