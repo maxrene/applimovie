@@ -1,4 +1,4 @@
-// details.js - Version Complète et Optimisée
+// details.js - Version Corrigée (Casting Original)
 
 const BASE_URL = 'https://api.themoviedb.org/3';
 const IMG_BASE_POSTER = 'https://image.tmdb.org/t/p/w500';
@@ -32,6 +32,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     initializeWatchlistButton(mediaId);
 
+    // Gestionnaire pour "Voir tout" le casting
     const seeAllLink = document.querySelector('#cast-section a');
     if (seeAllLink) {
         seeAllLink.addEventListener('click', (e) => {
@@ -127,10 +128,13 @@ async function fetchUpdates(id, type) {
             }
             updatePersonUI(creator, 'tv');
 
-            // Si besoin de màj l'année en background
             const firstAirDate = seriesDetailsData.first_air_date;
-            // On ne met pas à jour le DOM ici car c'est déjà géré par formatTMDBData lors du fetch initial ou updateUI
-            
+            const startYear = firstAirDate?.split('-')[0] || '';
+            if(startYear) {
+                const yearEl = document.getElementById('media-year');
+                if(yearEl) yearEl.textContent = startYear;
+            }
+
             if (seriesDetailsData.seasons) {
                 updateSeasonsUI(seriesDetailsData.seasons, id, seriesDetailsData.number_of_episodes);
             }
@@ -172,7 +176,7 @@ function updateUI(data, type, isLocal) {
     if(genresContainer) {
         genresContainer.innerHTML = '';
         const genreList = data.genres.map(g => typeof g === 'string' ? g : g.name); 
-        genreList.slice(0, 3).forEach((g, i) => {
+        genreList.forEach((g, i) => {
             genresContainer.innerHTML += `<span class="bg-white/10 text-xs px-2 py-1 rounded text-gray-300 border border-white/10 backdrop-blur-sm">${g}</span>`;
         });
     }
@@ -260,6 +264,7 @@ function updateStreamingUI(allProvidersData) {
     }
 }
 
+// --- RESTAURATION DE LA LOGIQUE DU CASTING ORIGINAL ---
 function updateCastUI(cast) {
     currentCastData = cast;
     const castContainer = document.getElementById('full-cast-container');
@@ -277,26 +282,42 @@ function renderCastList() {
     const castContainer = document.getElementById('full-cast-container');
     if (!castContainer) return;
 
+    const seeAllLink = document.querySelector('#cast-section a');
     castContainer.innerHTML = '';
-    const displayList = currentCastData.slice(0, 10);
+
+    // Logique 4 ou 20 items
+    const limit = isCastExpanded ? 20 : 4;
+    const displayList = currentCastData.slice(0, limit);
 
     displayList.forEach(member => {
-    const link = member.id ? `person.html?id=${member.id}` : '#';
-    
-    castContainer.innerHTML += `
-        <a href="${link}" class="flex flex-col items-center gap-2 w-20 flex-shrink-0 group">
-            <img class="h-20 w-20 rounded-full object-cover border-2 border-transparent group-hover:border-primary transition-colors bg-gray-800" src="${member.imageUrl}" onerror="this.src='https://placehold.co/64x64'"/>
-            <div class="text-center">
-                <p class="font-medium text-white text-xs truncate w-full group-hover:text-primary">${member.name}</p>
-                <p class="text-[10px] text-gray-400 truncate w-full">${member.character}</p>
-            </div>
-        </a>`;
+        const link = member.id ? `person.html?id=${member.id}` : '#';
+        // Design original : Carte horizontale dans une grille
+        castContainer.innerHTML += `
+            <a href="${link}" class="flex items-center gap-3 group hover:bg-white/10 p-2 rounded-lg transition-colors duration-200">
+                <img class="h-14 w-14 rounded-full object-cover flex-shrink-0 group-hover:scale-105 transition-transform duration-200" src="${member.imageUrl}" onerror="this.src='https://placehold.co/64x64'"/>
+                <div class="min-w-0">
+                    <p class="font-semibold text-white text-sm group-hover:text-primary transition-colors truncate">${member.name}</p>
+                    <p class="text-xs text-gray-400 truncate">${member.character}</p>
+                </div>
+            </a>`;
     });
+
+    // Gestion du lien "Voir tout / Voir moins"
+    if (seeAllLink) {
+        if (currentCastData.length <= 4) {
+            seeAllLink.style.display = 'none';
+        } else {
+            seeAllLink.style.display = 'block';
+            seeAllLink.textContent = isCastExpanded ? 'Voir moins' : 'Voir tout';
+        }
+    }
 }
 
 function toggleCastExpansion(linkElement) {
-    window.location.href = "#"; 
+    isCastExpanded = !isCastExpanded;
+    renderCastList();
 }
+// -----------------------------------------------------
 
 function updatePersonUI(person, type) {
     const section = document.getElementById('director-section');
@@ -471,7 +492,6 @@ function formatTMDBData(data, type) {
         posterUrl: s.poster_path ? IMG_BASE_POSTER + s.poster_path : 'https://placehold.co/200x300'
     })) || [];
 
-    // --- FORMATAGE DATE SÉRIE ---
     let yearStr = 'N/A';
     if (isMovie) {
         yearStr = data.release_date?.split('-')[0] || 'N/A';
@@ -479,7 +499,6 @@ function formatTMDBData(data, type) {
         const start = data.first_air_date?.split('-')[0];
         const end = data.last_air_date?.split('-')[0];
         const status = data.status;
-        
         if (start) {
             if (status === 'Ended' && end && start !== end) {
                 yearStr = `${start} - ${end}`;
@@ -509,7 +528,6 @@ function formatTMDBData(data, type) {
     };
 }
 
-// FONCTIONS MANQUANTES (AWARDS & WATCHLIST)
 const awardIconSVG = `<svg class="h-5 w-5 text-amber-400" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path></svg>`;
 
 function updateAwardsUI(data) {
