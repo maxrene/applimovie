@@ -38,7 +38,7 @@
 </head>
 <body class="bg-background-light dark:bg-background-dark font-display text-gray-800 dark:text-gray-200" x-data="watchlistPage">
 <div class="flex h-screen flex-col">
-   <header class="flex-shrink-0 bg-background-light dark:bg-background-dark z-20">
+   <header class="flex-shrink-0 bg-background-light dark:bg-background-dark z-20 relative">
     <div class="flex items-center p-4 pb-2">
         <a href="index.html" class="p-2 -ml-2">
             <span class="material-symbols-outlined text-gray-800 dark:text-gray-200">arrow_back</span>
@@ -61,7 +61,6 @@
         
         <div class="flex items-center">
             <div class="flex -space-x-3 hover:space-x-1 transition-all duration-200">
-                
                 <template x-if="selectedPlatform">
                     <button @click="selectedPlatform = null" 
                             class="relative z-10 h-10 w-10 rounded-full ring-2 ring-background-light dark:ring-background-dark transition-transform hover:scale-110 hover:z-20"
@@ -73,10 +72,10 @@
                     </button>
                 </template>
 
-                <a href="platforms.html" 
+                <button @click="showPlatformModal = true" 
                    class="relative z-0 flex h-10 w-10 items-center justify-center rounded-full bg-gray-200 dark:bg-gray-800 ring-2 ring-background-light dark:ring-background-dark text-gray-500 dark:text-gray-400 hover:bg-gray-300 dark:hover:bg-gray-700 transition-colors">
                     <span class="material-symbols-outlined text-xl">add</span>
-                </a>
+                </button>
             </div>
         </div>
 
@@ -85,13 +84,11 @@
                 <div class="absolute inset-y-1 w-[calc(50%-4px)] bg-primary rounded-full shadow-md transition-all duration-300 ease-out"
                      :class="watchStatusFilter === 'watched' ? 'translate-x-[100%] left-1' : 'translate-x-0 left-1'">
                 </div>
-
                 <button @click="watchStatusFilter = 'unwatched'" 
                         class="relative z-10 flex-1 text-xs font-bold uppercase tracking-wide transition-colors duration-200 text-center h-full flex items-center justify-center"
                         :class="watchStatusFilter === 'unwatched' ? 'text-white' : 'text-gray-500 dark:text-gray-400'">
                     Watchlist
                 </button>
-
                 <button @click="watchStatusFilter = 'watched'" 
                         class="relative z-10 flex-1 text-xs font-bold uppercase tracking-wide transition-colors duration-200 text-center h-full flex items-center justify-center"
                         :class="watchStatusFilter === 'watched' ? 'text-white' : 'text-gray-500 dark:text-gray-400'">
@@ -105,7 +102,6 @@
                 <button @click="open = !open" class="p-2 text-gray-500 dark:text-gray-400 hover:text-primary transition-colors rounded-full hover:bg-gray-100 dark:hover:bg-white/5">
                     <span class="material-symbols-outlined">sort</span>
                 </button>
-                
                 <div x-show="open" @click.away="open = false" 
                      class="absolute right-0 top-full mt-2 w-40 bg-gray-800 rounded-xl shadow-xl z-50 border border-gray-700 py-2" 
                      x-transition.origin.top.right x-cloak>
@@ -114,12 +110,59 @@
                     <a href="#" @click.prevent="setSort('recently_added'); open = false" class="block px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white">Date d'ajout</a>
                 </div>
             </div>
-
             <button class="p-2 text-gray-500 dark:text-gray-400 hover:text-primary transition-colors rounded-full hover:bg-gray-100 dark:hover:bg-white/5">
                 <span class="material-symbols-outlined">filter_list</span>
             </button>
         </div>
+    </div>
 
+    <div x-show="showPlatformModal" 
+         class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+         x-transition.opacity x-cloak>
+        
+        <div @click.away="showPlatformModal = false" 
+             class="bg-white dark:bg-[#1a1a1a] w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden transform transition-all"
+             x-transition:enter="ease-out duration-300"
+             x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+             x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100">
+            
+            <div class="p-5 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center">
+                <h3 class="text-lg font-bold text-gray-900 dark:text-white">Filtrer par plateforme</h3>
+                <button @click="showPlatformModal = false" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+
+            <div class="p-6 grid grid-cols-3 gap-6">
+                <template x-for="platform in availablePlatforms" :key="platform.id">
+                    <button @click="selectPlatformFromModal(platform)" 
+                            class="flex flex-col items-center gap-2 group">
+                        
+                        <div class="relative w-16 h-16 rounded-full p-0.5 transition-all duration-200"
+                             :class="selectedPlatform && selectedPlatform.name === platform.name ? 'ring-2 ring-primary ring-offset-2 ring-offset-white dark:ring-offset-[#1a1a1a]' : 'hover:scale-105'">
+                            <img :src="platform.logoUrl" :alt="platform.name" 
+                                 class="w-full h-full rounded-full object-cover bg-gray-800 border border-gray-200 dark:border-gray-700">
+                            
+                            <div x-show="selectedPlatform && selectedPlatform.name === platform.name" 
+                                 class="absolute -bottom-1 -right-1 bg-primary text-white rounded-full p-1 shadow-sm border-2 border-white dark:border-[#1a1a1a]">
+                                <span class="material-symbols-outlined text-[12px] font-bold block">check</span>
+                            </div>
+                        </div>
+                        
+                        <span class="text-xs font-medium text-gray-600 dark:text-gray-300 text-center truncate w-full" 
+                              x-text="platform.name"
+                              :class="selectedPlatform && selectedPlatform.name === platform.name ? 'text-primary dark:text-primary' : ''"></span>
+                    </button>
+                </template>
+            </div>
+            
+            <div class="p-4 bg-gray-50 dark:bg-white/5 flex justify-center">
+                <button @click="selectedPlatform = null; showPlatformModal = false" 
+                        class="text-sm font-semibold text-gray-500 hover:text-primary transition-colors">
+                    Tout afficher
+                </button>
+            </div>
+        </div>
     </div>
 </header>
     <main class="flex-1 overflow-y-auto" x-cloak>
