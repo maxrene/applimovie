@@ -55,7 +55,11 @@ document.addEventListener('alpine:init', () => {
 
         async init() {
             this.loadWatchlist();
-            
+            const flagImg = document.getElementById('header-flag');
+            if (flagImg) {
+                flagImg.src = `https://flagcdn.com/w40/${this.userRegion.toLowerCase()}.png`;
+                flagImg.alt = this.userRegion;
+            }
             // 1. Charger les préférences de plateformes du profil
             const savedPlatforms = localStorage.getItem('selectedPlatforms');
             this.myPlatformIds = savedPlatforms ? JSON.parse(savedPlatforms) : [];
