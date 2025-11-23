@@ -3,8 +3,7 @@
 <head>
     <meta charset="utf-8"/>
     <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-    
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' https://image.tmdb.org https://placehold.co http://googleusercontent.com https://flagcdn.com data:; connect-src 'self' https://api.themoviedb.org;">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' https://image.tmdb.org https://placehold.co http://googleusercontent.com https://flagcdn.com https://images.ctfassets.net https://upload.wikimedia.org https://platform.theverge.com https://static1.purepeople.com https://images.seeklogo.com https://logo.clearbit.com data:; connect-src 'self' https://api.themoviedb.org;">
 
     <title>CineMatch</title>
     <link crossorigin="" href="https://fonts.gstatic.com/" rel="preconnect"/>
@@ -25,20 +24,15 @@
         }
     </script>
     <style> 
-        body { min-height: max(884px, 100dvh); } 
-        /* Classe utilitaire pour les icônes remplies/épaisses */
-        .material-symbols-outlined.filled {
-            font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
-        }
-        .material-symbols-outlined.thick {
-            font-variation-settings: 'FILL' 1, 'wght' 700, 'GRAD' 0, 'opsz' 24;
-        }
+        body { height: 100dvh; overflow: hidden; } /* Empêche le scroll global */
+        .material-symbols-outlined.filled { font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .material-symbols-outlined.thick { font-variation-settings: 'FILL' 1, 'wght' 700, 'GRAD' 0, 'opsz' 24; }
     </style>
 </head>
 <body class="bg-background-light dark:bg-background-dark font-display text-gray-900 dark:text-gray-100">
-<div class="flex flex-col min-h-screen">
+<div class="flex flex-col h-screen">
     
-    <header class="sticky top-0 z-10 bg-background-light/80 dark:bg-background-dark/80 backdrop-blur-sm">
+    <header class="flex-shrink-0 sticky top-0 z-10 bg-background-light/80 dark:bg-background-dark/80 backdrop-blur-sm">
         <div class="container mx-auto px-4 py-3">
             <div class="flex items-center justify-between">
                 <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">CineMatch</h1>
@@ -51,7 +45,7 @@
         </div>
     </header>
 
-    <main class="flex-grow">
+    <main class="flex-1 overflow-y-auto scroll-smooth">
         <div id="loading-spinner" class="fixed inset-0 z-50 flex items-center justify-center bg-background-light/80 dark:bg-background-dark/80 backdrop-blur-sm" style="display: none;">
             <svg class="animate-spin h-10 w-10 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -79,11 +73,10 @@
         <section id="apple-tv-section" class="py-6"><h2 class="px-4 mb-3 text-xl font-bold text-gray-900 dark:text-gray-100">Apple TV+ Selection</h2><div class="flex overflow-x-auto snap-x snap-mandatory [-ms-scrollbar-style:none] [scrollbar-width:none] [&amp;::-webkit-scrollbar]:hidden"><div id="apple-tv-container" class="flex px-4 gap-4"></div></div></section>
         <section id="disney-plus-section" class="py-6"><h2 class="px-4 mb-3 text-xl font-bold text-gray-900 dark:text-gray-100">Disney+ Favorites</h2><div class="flex overflow-x-auto snap-x snap-mandatory [-ms-scrollbar-style:none] [scrollbar-width:none] [&amp;::-webkit-scrollbar]:hidden"><div id="disney-plus-container" class="flex px-4 gap-4"></div></div></section>
         <section id="canal-plus-section" class="py-6"><h2 class="px-4 mb-3 text-xl font-bold text-gray-900 dark:text-gray-100">Canal+ Exclusives</h2><div class="flex overflow-x-auto snap-x snap-mandatory [-ms-scrollbar-style:none] [scrollbar-width:none] [&amp;::-webkit-scrollbar]:hidden"><div id="canal-plus-container" class="flex px-4 gap-4"></div></div></section>
-    </main>
+        <div class="h-8"></div> </main>
 
-    <footer class="sticky bottom-0 bg-background-light/90 dark:bg-background-dark/90 backdrop-blur-sm border-t border-gray-200 dark:border-gray-800">
+    <footer class="flex-shrink-0 bg-background-light/90 dark:bg-background-dark/90 backdrop-blur-sm border-t border-gray-200 dark:border-gray-800 z-30">
         <nav class="flex justify-around items-center h-16">
-            
             <a class="flex flex-col items-center justify-center gap-1 text-primary" href="index.html">
                 <span class="material-symbols-outlined filled">home</span>
                 <span class="text-[10px] font-bold">Home</span>
@@ -103,8 +96,8 @@
                 <span class="material-symbols-outlined">bookmark</span>
                 <span class="text-[10px] font-medium">My List</span>
             </a>
-
         </nav>
+        <div class="h-safe-bottom"></div>
     </footer>
 </div>
 <script src="config.js"></script>
