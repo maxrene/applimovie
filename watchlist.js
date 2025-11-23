@@ -5,7 +5,6 @@ document.addEventListener('alpine:init', () => {
         activeTab: 'movie',
         sortOrder: 'popularity',
         
-        // INITIALISÉ PLUS TARD AVEC TOUT
         activePlatformFilters: [], 
         
         watchStatusFilter: 'unwatched',
@@ -137,8 +136,8 @@ document.addEventListener('alpine:init', () => {
                 })
                 .filter(item => item && item.type === type);
 
-            // Modification: On ne filtre PLUS les items. On montre tout.
-            // Les filtres servent uniquement à afficher/masquer les icones sur les cartes.
+            // Important: We do NOT filter by platforms here.
+            // Platform selection is only for UI (icon visibility).
 
             if (this.watchStatusFilter === 'watched') {
                 filtered = filtered.filter(item => item.isWatched);
@@ -146,7 +145,6 @@ document.addEventListener('alpine:init', () => {
                 filtered = filtered.filter(item => !item.isWatched);
             }
 
-            console.log("DEBUG: filteredMedia titles:", filtered.map(i => i.title));
             return filtered;
         },
 
@@ -166,7 +164,6 @@ document.addEventListener('alpine:init', () => {
 
             const mediaHTMLPromises = itemsToRender.map(item => this.createMediaItemHTML(item));
             const mediaHTML = await Promise.all(mediaHTMLPromises);
-            console.log("DEBUG: Generated HTML length:", mediaHTML.length);
             container.innerHTML = mediaHTML.join('');
         },
         async createMediaItemHTML(item) { if (item.type === 'movie') return this.createMovieItemHTML(item); if (item.type === 'serie') return this.createTVItemHTML(item); return ''; },

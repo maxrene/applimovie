@@ -82,6 +82,12 @@ document.addEventListener('alpine:init', () => {
             localStorage.setItem('previousSearches', JSON.stringify(history));
 
             let url = '';
+            // Ensure media_type is present for routing
+            if (!item.media_type) {
+                if (item.title) item.media_type = 'movie';
+                else if (item.name) item.media_type = 'tv';
+            }
+
             switch (item.media_type) {
                 case 'movie': url = `film.html?id=${item.id}`; break;
                 case 'tv': url = `serie.html?id=${item.id}`; break;
@@ -99,6 +105,11 @@ document.addEventListener('alpine:init', () => {
                 case 'person': return 'Acteur';
                 default: return 'Inconnu';
             }
+        },
+
+        clearHistory() {
+            this.previousSearches = [];
+            localStorage.removeItem('previousSearches');
         }
     }));
 });
