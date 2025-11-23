@@ -20,6 +20,7 @@
         }
     </script>
     <title>My List</title>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet"/>
     <style>
         body { min-height: max(884px, 100dvh) }
         .custom-select {
@@ -56,11 +57,15 @@
             <div class="flex items-center justify-between gap-4">
                 <div id="platform-filter" class="flex items-center -space-x-2">
                 </div>
-                <div class="relative">
-                    <select @change="sortMedia($event.target.value)" class="custom-select rounded-md border border-gray-300 bg-background-light py-2 pl-3 pr-10 text-sm font-medium text-gray-700 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary dark:border-gray-600 dark:bg-background-dark dark:text-gray-300">
-                        <option value="popularity">Popularity</option>
-                        <option value="recently_added">Recently Added</option>
-                    </select>
+                <div class="flex items-center space-x-2">
+                    <button @click="toggleSort()" class="flex items-center space-x-1 rounded-full bg-black/30 p-2 text-xs text-gray-400 hover:text-white transition-colors" data-testid="sort-button">
+                        <span class="material-symbols-outlined text-base">swap_vert</span>
+                        <span x-text="`Trier: ${sortLabel}`"></span>
+                    </button>
+                    <button class="flex items-center space-x-1 rounded-full bg-black/30 p-2 text-xs text-gray-600 cursor-not-allowed" disabled>
+                        <span class="material-symbols-outlined text-base">filter_list</span>
+                        <span>Filtrer</span>
+                    </button>
                 </div>
             </div>
             <div class="flex items-center justify-end" x-show="activeTab === 'tv'">
