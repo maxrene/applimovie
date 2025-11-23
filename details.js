@@ -343,8 +343,8 @@ function renderCastList() {
             <a href="${link}" class="flex items-center gap-2 group hover:bg-white/10 p-2 rounded-lg transition-colors duration-200">
                 <img class="h-12 w-12 rounded-full object-cover flex-shrink-0 group-hover:scale-105 transition-transform duration-200 bg-gray-800" src="${member.imageUrl}" onerror="this.src='https://placehold.co/64x64'"/>
                 <div class="min-w-0 flex-1">
-                    <p class="font-semibold text-white text-sm leading-tight group-hover:text-primary transition-colors">${member.name}</p>
-                    <p class="text-xs text-gray-400">${member.character}</p>
+                    <p class="font-semibold text-white text-xs leading-tight group-hover:text-primary transition-colors">${member.name}</p>
+                    <p class="text-[10px] text-gray-400 truncate">${member.character}</p>
                 </div>
             </a>`;
     });
