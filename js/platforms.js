@@ -1,5 +1,4 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // Liste enrichie des plateformes avec les VRAIS logos
     const allPlatforms = [
         { 
             id: 'netflix', 
@@ -49,7 +48,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const platformsContainer = document.getElementById('platforms-container');
     const saveButton = document.getElementById('save-platforms');
 
-    // Récupère les plateformes sauvegardées
     function getSelectedPlatforms() {
         const saved = localStorage.getItem('selectedPlatforms');
         return saved ? JSON.parse(saved) : [];
@@ -63,8 +61,8 @@ document.addEventListener('DOMContentLoaded', () => {
             html += `
                 <div class="platform-item relative flex flex-col items-center gap-2">
                     <input ${isChecked ? 'checked' : ''} class="hidden" id="${platform.id}" type="checkbox"/>
-                    <label class="relative flex aspect-square w-full cursor-pointer items-center justify-center rounded-full border-2 border-transparent transition-all duration-200 hover:scale-105" for="${platform.id}">
-                        <img alt="${platform.name}" class="h-full w-full rounded-full object-contain bg-gray-800 p-3" src="${platform.logoUrl}" onerror="this.src='https://placehold.co/100x100?text=${platform.name[0]}'"/>
+                    <label class="relative flex aspect-square w-full cursor-pointer items-center justify-center rounded-full border-2 border-transparent transition-all duration-200 hover:scale-105 overflow-hidden" for="${platform.id}">
+                        <img alt="${platform.name}" class="h-full w-full object-cover bg-black" src="${platform.logoUrl}" onerror="this.src='https://placehold.co/100x100?text=${platform.name[0]}'"/>
                         
                         <div class="check-icon absolute bottom-0 right-0 flex h-6 w-6 items-center justify-center rounded-full border-2 border-background-light bg-primary text-white opacity-0 transition-all duration-200 dark:border-background-dark">
                             <span class="material-symbols-outlined" style="font-size: 16px;">check</span>
@@ -86,7 +84,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
         localStorage.setItem('selectedPlatforms', JSON.stringify(selected));
-        // Retourne au profil après sauvegarde
         window.location.href = 'profile.html';
     }
 
