@@ -2,12 +2,16 @@
 <html class="dark" lang="en">
 <head>
     <meta charset="utf-8"/>
-    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' https://image.tmdb.org https://placehold.co http://googleusercontent.com https://flagcdn.com https://images.ctfassets.net https://upload.wikimedia.org https://platform.theverge.com https://static1.purepeople.com https://images.seeklogo.com https://logo.clearbit.com data:; connect-src 'self' https://api.themoviedb.org;">
+    <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport"/>
+    
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#121212">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="icons/icon-192.png">
 
     <title>CineMatch</title>
-    <link crossorigin="" href="https://fonts.gstatic.com/" rel="preconnect"/>
-    <link as="style" href="https://fonts.googleapis.com/css2?display=swap&family=Spline+Sans:wght@400;500;700" onload="this.rel='stylesheet'" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Spline+Sans:wght@400;500;700&display=swap" rel="stylesheet"/>
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400..700,0..1,0" rel="stylesheet" />
 
@@ -18,13 +22,12 @@
                 extend: {
                     colors: { "primary": "#ea2a33", "background-light": "#f8f6f6", "background-dark": "#211111" },
                     fontFamily: { "display": ["Spline Sans"] },
-                    borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" },
                 },
             },
         }
     </script>
     <style> 
-        body { height: 100dvh; overflow: hidden; } /* Empêche le scroll global */
+        body { height: 100dvh; overflow: hidden; overscroll-behavior: none; } 
         .material-symbols-outlined.filled { font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
         .material-symbols-outlined.thick { font-variation-settings: 'FILL' 1, 'wght' 700, 'GRAD' 0, 'opsz' 24; }
     </style>
@@ -36,7 +39,6 @@
         <div class="container mx-auto px-4 py-3">
             <div class="flex items-center justify-between">
                 <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">CineMatch</h1>
-                
                 <a href="profile.html" class="flex items-center gap-3 p-1 rounded-full hover:bg-gray-200 dark:hover:bg-white/10 transition-colors">
                     <img id="header-flag" src="https://flagcdn.com/w40/fr.png" alt="FR" class="w-5 h-auto rounded-sm shadow-sm object-cover">
                     <span class="material-symbols-outlined text-3xl text-gray-600 dark:text-gray-300">account_circle</span>
@@ -73,7 +75,8 @@
         <section id="apple-tv-section" class="py-6"><h2 class="px-4 mb-3 text-xl font-bold text-gray-900 dark:text-gray-100">Apple TV+ Selection</h2><div class="flex overflow-x-auto snap-x snap-mandatory [-ms-scrollbar-style:none] [scrollbar-width:none] [&amp;::-webkit-scrollbar]:hidden"><div id="apple-tv-container" class="flex px-4 gap-4"></div></div></section>
         <section id="disney-plus-section" class="py-6"><h2 class="px-4 mb-3 text-xl font-bold text-gray-900 dark:text-gray-100">Disney+ Favorites</h2><div class="flex overflow-x-auto snap-x snap-mandatory [-ms-scrollbar-style:none] [scrollbar-width:none] [&amp;::-webkit-scrollbar]:hidden"><div id="disney-plus-container" class="flex px-4 gap-4"></div></div></section>
         <section id="canal-plus-section" class="py-6"><h2 class="px-4 mb-3 text-xl font-bold text-gray-900 dark:text-gray-100">Canal+ Exclusives</h2><div class="flex overflow-x-auto snap-x snap-mandatory [-ms-scrollbar-style:none] [scrollbar-width:none] [&amp;::-webkit-scrollbar]:hidden"><div id="canal-plus-container" class="flex px-4 gap-4"></div></div></section>
-        <div class="h-8"></div> </main>
+        <div class="h-8"></div> 
+    </main>
 
     <footer class="flex-shrink-0 bg-background-light/90 dark:bg-background-dark/90 backdrop-blur-sm border-t border-gray-200 dark:border-gray-800 z-30">
         <nav class="flex justify-around items-center h-16">
@@ -81,17 +84,14 @@
                 <span class="material-symbols-outlined filled">home</span>
                 <span class="text-[10px] font-bold">Home</span>
             </a>
-
             <a class="flex flex-col items-center justify-center gap-1 text-gray-500 dark:text-gray-400 hover:text-primary dark:hover:text-primary transition-colors" href="#">
                 <span class="material-symbols-outlined thick">local_fire_department</span>
                 <span class="text-[10px] font-medium">Popular</span>
             </a>
-
             <a class="flex flex-col items-center justify-center gap-1 text-gray-500 dark:text-gray-400 hover:text-primary dark:hover:text-primary transition-colors" href="search.html">
                 <span class="material-symbols-outlined">search</span>
                 <span class="text-[10px] font-medium">Search</span>
             </a>
-
             <a class="flex flex-col items-center justify-center gap-1 text-gray-500 dark:text-gray-400 hover:text-primary dark:hover:text-primary transition-colors" href="watchlist.html">
                 <span class="material-symbols-outlined">bookmark</span>
                 <span class="text-[10px] font-medium">My List</span>
@@ -102,5 +102,10 @@
 </div>
 <script src="config.js"></script>
 <script src="app.js"></script>
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js'));
+  }
+</script>
 </body>
 </html>
