@@ -2,20 +2,26 @@ document.addEventListener('alpine:init', () => {
     Alpine.data('popularPage', () => ({
         activeTab: 'movie',
         items: [],
-        isLoading: true,      // Chargement initial (gros spinner)
-        isLoadingMore: false, // Chargement suite (petit spinner en bas)
+        isLoading: true,
+        isLoadingMore: false,
         showServiceBar: false,
         
-        // Pagination
         currentPage: 1,
         totalPages: 1,
 
         // Filtres
-        activePlatformFilters: [],
+        activePlatformFilters: [], // IDs de MES plateformes qui sont ACTIVES
         userSelectedPlatforms: [],
         myPlatformIds: [],
         userRegion: localStorage.getItem('userRegion') || 'FR',
         sortOrder: 'popularity.desc',
+        
+        // Label pour le tri affiché
+        get sortLabel() {
+            if (this.sortOrder === 'popularity.desc') return 'Popularité';
+            if (this.sortOrder === 'vote_average.desc') return 'Mieux notés';
+            return 'Récents';
+        },
 
         tmdbProviderMap: {
             'netflix': 8, 'prime': 119, 'disney': 337, 'apple': 350,
@@ -45,6 +51,9 @@ document.addEventListener('alpine:init', () => {
                 this.myPlatformIds.includes(p.id)
             );
 
+            // PAR DÉFAUT : TOUTES MES PLATEFORMES SONT ACTIVES (Incluses)
+            this.activePlatformFilters = [...this.myPlatformIds];
+
             this.$watch('activePlatformFilters', () => this.resetAndFetch());
             
             this.resetAndFetch();
@@ -61,6 +70,9 @@ document.addEventListener('alpine:init', () => {
         },
 
         togglePlatformFilter(platformId) {
+            // Logique "Inverse" : 
+            // Si présent -> Je le retire (Désélectionné / Grisé)
+            // Si absent -> Je l'ajoute (Sélectionné / Coloré)
             if (this.activePlatformFilters.includes(platformId)) {
                 this.activePlatformFilters = this.activePlatformFilters.filter(id => id !== platformId);
             } else {
@@ -68,25 +80,21 @@ document.addEventListener('alpine:init', () => {
             }
         },
 
-        // Réinitialise la liste pour une nouvelle recherche (filtre, tri...)
         resetAndFetch() {
             this.currentPage = 1;
-            this.items = []; // Vide la liste
+            this.items = [];
             this.fetchContent(1);
         },
 
-        // Charge la page suivante (Scroll infini)
         loadMore() {
             if (!this.isLoading && !this.isLoadingMore && this.currentPage < this.totalPages) {
                 this.fetchContent(this.currentPage + 1);
             }
         },
 
-        // Détection du scroll (appelé depuis le HTML)
         handleScroll(e) {
             const el = e.target;
-            // Si on est à 300px du bas, on charge la suite
-            if (el.scrollHeight - el.scrollTop - el.clientHeight < 300) {
+            if (el.scrollHeight - el.scrollTop - el.clientHeight < 400) {
                 this.loadMore();
             }
         },
@@ -95,11 +103,8 @@ document.addEventListener('alpine:init', () => {
             if (page === 1) this.isLoading = true;
             else this.isLoadingMore = true;
 
-            let targetPlatforms = this.activePlatformFilters.length > 0 
-                ? this.activePlatformFilters 
-                : this.myPlatformIds;
-
-            const providerIds = targetPlatforms
+            // Conversion des filtres ACTIFS en IDs TMDB
+            const providerIds = this.activePlatformFilters
                 .map(id => this.tmdbProviderMap[id])
                 .filter(id => id !== undefined)
                 .join('|');
@@ -110,8 +115,15 @@ document.addEventListener('alpine:init', () => {
             url += `&sort_by=${this.sortOrder}`;
             url += `&watch_region=${this.userRegion}`;
             
+            // Si j'ai des filtres actifs, je filtre. Sinon, je montre tout (ou rien, selon le choix UX).
+            // Ici : Si aucune plateforme active, on montre tout le catalogue (TMDB default).
+            // Si on veut montrer "Rien" quand tout est désélectionné, il faut mettre un if.
             if (providerIds.length > 0) {
                 url += `&with_watch_providers=${providerIds}`;
+            } else if (this.myPlatformIds.length > 0) {
+                // Si l'user a des plateformes mais a tout décoché -> On ne devrait rien voir ?
+                // Ou on considère que tout décoché = tout voir ?
+                // Restons sur la logique TMDB: pas de filtre = tout.
             }
 
             try {
@@ -130,10 +142,10 @@ document.addEventListener('alpine:init', () => {
                         media_type: this.activeTab
                     }));
 
+                    // Filtrage des doublons pour le chargement infini
                     if (page === 1) {
                         this.items = newItems;
                     } else {
-                        // Ajoute à la suite sans doublons (sécurité)
                         const existingIds = new Set(this.items.map(i => i.id));
                         const filteredNew = newItems.filter(i => !existingIds.has(i.id));
                         this.items = [...this.items, ...filteredNew];
@@ -143,7 +155,7 @@ document.addEventListener('alpine:init', () => {
                     this.totalPages = data.total_pages;
                 }
             } catch (error) {
-                console.error("Erreur lors du chargement :", error);
+                console.error("Erreur:", error);
             } finally {
                 this.isLoading = false;
                 this.isLoadingMore = false;
