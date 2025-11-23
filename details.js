@@ -1,4 +1,4 @@
-// details.js - Version Optimisée (Casting Mobile Lisible)
+// details.js - Version Corrigée (Dates Séries & Jaquette)
 
 const BASE_URL = 'https://api.themoviedb.org/3';
 const IMG_BASE_POSTER = 'https://image.tmdb.org/t/p/w500';
@@ -127,12 +127,26 @@ async function fetchUpdates(id, type) {
             }
             updatePersonUI(creator, 'tv');
 
+            // --- CORRECTION DATE (Logique intelligente) ---
             const firstAirDate = seriesDetailsData.first_air_date;
+            const lastAirDate = seriesDetailsData.last_air_date;
+            const status = seriesDetailsData.status;
             const startYear = firstAirDate?.split('-')[0] || '';
+            
             if(startYear) {
                 const yearEl = document.getElementById('media-year');
-                if(yearEl) yearEl.textContent = startYear;
+                if(yearEl) {
+                    if (status === 'Returning Series') {
+                        yearEl.textContent = `${startYear} - Présent`;
+                    } else if (status === 'Ended') {
+                        const endYear = lastAirDate?.split('-')[0];
+                        yearEl.textContent = (endYear && startYear !== endYear) ? `${startYear} - ${endYear}` : startYear;
+                    } else {
+                        yearEl.textContent = startYear;
+                    }
+                }
             }
+            // ----------------------------------------------
 
             if (seriesDetailsData.seasons) {
                 updateSeasonsUI(seriesDetailsData.seasons, id, seriesDetailsData.number_of_episodes);
@@ -263,7 +277,6 @@ function updateStreamingUI(allProvidersData) {
     }
 }
 
-// --- CASTING OPTIMISÉ MOBILE (NOM ENTIER) ---
 function updateCastUI(cast) {
     currentCastData = cast;
     const castContainer = document.getElementById('full-cast-container');
@@ -289,7 +302,6 @@ function renderCastList() {
 
     displayList.forEach(member => {
         const link = member.id ? `person.html?id=${member.id}` : '#';
-        // Modif : Gap réduit (2), Image réduite (h-12), Texte xs, Pas de truncate sur le nom + leading-tight
         castContainer.innerHTML += `
             <a href="${link}" class="flex items-center gap-2 group hover:bg-white/10 p-2 rounded-lg transition-colors duration-200">
                 <img class="h-12 w-12 rounded-full object-cover flex-shrink-0 group-hover:scale-105 transition-transform duration-200 bg-gray-800" src="${member.imageUrl}" onerror="this.src='https://placehold.co/64x64'"/>
@@ -314,7 +326,6 @@ function toggleCastExpansion(linkElement) {
     isCastExpanded = !isCastExpanded;
     renderCastList();
 }
-// ----------------------------------------------
 
 function updatePersonUI(person, type) {
     const section = document.getElementById('director-section');
