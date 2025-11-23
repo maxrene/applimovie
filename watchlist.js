@@ -299,8 +299,10 @@ document.addEventListener('alpine:init', () => {
             
             const providers = item.apiDetails?.providers || item.availableOn || [];
             const platformsHTML = this.createPlatformIconsHTML(providers);
+            
+            // Modification ici : mt-5 pour sauter une ligne visuellement
             const availableLine = platformsHTML 
-                ? `<div class="mt-2 flex items-center gap-2 text-xs text-gray-400">
+                ? `<div class="mt-5 flex items-center gap-2 text-xs text-gray-400">
                      <span>Available on:</span>
                      <div class="flex items-center gap-1">${platformsHTML}</div>
                    </div>`
