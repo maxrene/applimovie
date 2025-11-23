@@ -97,9 +97,13 @@ document.addEventListener('alpine:init', () => {
             return filtered;
         },
 
-        sortMedia(order) {
-            this.sortOrder = order;
+        toggleSort() {
+            this.sortOrder = this.sortOrder === 'popularity' ? 'recently_added' : 'popularity';
             this.renderMedia();
+        },
+
+        get sortLabel() {
+            return this.sortOrder === 'popularity' ? 'Popularity' : 'Recently Added';
         },
 
         renderMedia() {

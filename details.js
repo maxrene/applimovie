@@ -18,7 +18,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!mediaId) return console.error("Pas d'ID");
 
     initializeWatchlistButton(mediaId);
-    initializeWatchedButton(mediaId);
 
     const seeAllLink = document.querySelector('#cast-section a') || document.querySelector('a[href="#"][class*="text-primary"]');
     if (seeAllLink) {
@@ -533,109 +532,68 @@ function initializeWatchlistButton(mediaId) {
 }
 
 function toggleWatchlist(mediaId) {
-    let watchlist = JSON.parse(localStorage.getItem('watchlist')) || [];
     const mediaIdNum = parseInt(mediaId, 10);
-    const index = watchlist.findIndex(item => item.id === mediaIdNum);
+    const isMovie = window.location.pathname.includes('film.html');
+    const watchedListKey = isMovie ? 'watchedMovies' : 'watchedSeries';
 
-    if (index > -1) {
-        watchlist.splice(index, 1);
-        // If removed from watchlist, also remove from watched list
-        const isMovie = window.location.pathname.includes('film.html');
-        const watchedListKey = isMovie ? 'watchedMovies' : 'watchedSeries';
-        let watchedList = JSON.parse(localStorage.getItem(watchedListKey)) || [];
-        const watchedIndex = watchedList.indexOf(mediaIdNum);
-        if (watchedIndex > -1) {
-            watchedList.splice(watchedIndex, 1);
-            localStorage.setItem(watchedListKey, JSON.stringify(watchedList));
-            updateWatchedButton(mediaId);
-        }
+    let watchlist = JSON.parse(localStorage.getItem('watchlist')) || [];
+    let watchedList = JSON.parse(localStorage.getItem(watchedListKey)) || [];
+
+    const isInWatchlist = watchlist.some(item => item.id === mediaIdNum);
+    const isWatched = watchedList.includes(mediaIdNum);
+
+    if (isWatched) {
+        // State 3 (Watched) -> State 1 (Not on list)
+        // Remove from both lists
+        watchlist = watchlist.filter(item => item.id !== mediaIdNum);
+        watchedList = watchedList.filter(id => id !== mediaIdNum);
+    } else if (isInWatchlist) {
+        // State 2 (On Watchlist) -> State 3 (Watched)
+        // Add to watched list
+        watchedList.push(mediaIdNum);
     } else {
+        // State 1 (Not on list) -> State 2 (On Watchlist)
+        // Add to watchlist
         watchlist.push({ id: mediaIdNum, added_at: new Date().toISOString() });
     }
 
     localStorage.setItem('watchlist', JSON.stringify(watchlist));
-    updateWatchlistButton(mediaId);
-}
-
-function initializeWatchedButton(mediaId) {
-    const watchedButton = document.getElementById('watched-button');
-    if (!watchedButton) return;
-
-    updateWatchedButton(mediaId);
-
-    watchedButton.addEventListener('click', () => {
-        toggleWatched(mediaId);
-    });
-}
-
-function toggleWatched(mediaId) {
-    const isMovie = window.location.pathname.includes('film.html');
-    const watchedListKey = isMovie ? 'watchedMovies' : 'watchedSeries';
-    let watchedList = JSON.parse(localStorage.getItem(watchedListKey)) || [];
-    const mediaIdNum = parseInt(mediaId, 10);
-    const index = watchedList.indexOf(mediaIdNum);
-
-    if (index > -1) {
-        watchedList.splice(index, 1);
-    } else {
-        watchedList.push(mediaIdNum);
-        // Also add to watchlist if not already there
-        let watchlist = JSON.parse(localStorage.getItem('watchlist')) || [];
-        if (!watchlist.some(item => item.id === mediaIdNum)) {
-            watchlist.push({ id: mediaIdNum, added_at: new Date().toISOString() });
-            localStorage.setItem('watchlist', JSON.stringify(watchlist));
-            updateWatchlistButton(mediaId);
-        }
-    }
-
     localStorage.setItem(watchedListKey, JSON.stringify(watchedList));
-    updateWatchedButton(mediaId);
-}
-
-function updateWatchedButton(mediaId) {
-    const watchedButton = document.getElementById('watched-button');
-    if (!watchedButton) return;
-
-    const isMovie = window.location.pathname.includes('film.html');
-    const watchedListKey = isMovie ? 'watchedMovies' : 'watchedSeries';
-    let watchedList = JSON.parse(localStorage.getItem(watchedListKey)) || [];
-    const mediaIdNum = parseInt(mediaId, 10);
-    const isWatched = watchedList.includes(mediaIdNum);
-
-    const icon = watchedButton.querySelector('.material-symbols-outlined');
-    const text = watchedButton.querySelector('span:last-child');
-
-    if (isWatched) {
-        watchedButton.classList.remove('bg-gray-700');
-        watchedButton.classList.add('bg-green-600');
-        icon.textContent = 'visibility';
-        text.textContent = 'Watched';
-    } else {
-        watchedButton.classList.remove('bg-green-600');
-        watchedButton.classList.add('bg-gray-700');
-        icon.textContent = 'visibility_off';
-        text.textContent = 'Mark Watched';
-    }
+    updateWatchlistButton(mediaId);
 }
 
 function updateWatchlistButton(mediaId) {
     const watchlistButton = document.getElementById('watchlist-button');
     if (!watchlistButton) return;
 
-    let watchlist = JSON.parse(localStorage.getItem('watchlist')) || [];
     const mediaIdNum = parseInt(mediaId, 10);
+    const isMovie = window.location.pathname.includes('film.html');
+    const watchedListKey = isMovie ? 'watchedMovies' : 'watchedSeries';
+
+    const watchlist = JSON.parse(localStorage.getItem('watchlist')) || [];
+    const watchedList = JSON.parse(localStorage.getItem(watchedListKey)) || [];
+
     const isInWatchlist = watchlist.some(item => item.id === mediaIdNum);
+    const isWatched = watchedList.includes(mediaIdNum);
 
     const icon = watchlistButton.querySelector('.material-symbols-outlined');
     const text = watchlistButton.querySelector('span:last-child');
 
-    if (isInWatchlist) {
-        watchlistButton.classList.remove('bg-gray-700');
+    // Reset classes
+    watchlistButton.classList.remove('bg-gray-700', 'bg-primary', 'bg-green-600');
+
+    if (isWatched) {
+        // State 3: Watched
+        watchlistButton.classList.add('bg-green-600');
+        icon.textContent = 'visibility';
+        text.textContent = 'Watched';
+    } else if (isInWatchlist) {
+        // State 2: On Watchlist
         watchlistButton.classList.add('bg-primary');
         icon.textContent = 'check';
         text.textContent = 'On Watchlist';
     } else {
-        watchlistButton.classList.remove('bg-primary');
+        // State 1: Not on list
         watchlistButton.classList.add('bg-gray-700');
         icon.textContent = 'add';
         text.textContent = 'Watchlist';
