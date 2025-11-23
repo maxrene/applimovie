@@ -1,4 +1,4 @@
-// details.js - Version Mise à Jour (Note intégrée)
+// details.js - Version Finale Corrigée
 
 const BASE_URL = 'https://api.themoviedb.org/3';
 const IMG_BASE_POSTER = 'https://image.tmdb.org/t/p/w500';
@@ -109,6 +109,25 @@ async function fetchUpdates(id, type) {
             const seriesDetailsRes = await fetch(seriesDetailsUrl);
             const seriesDetailsData = await seriesDetailsRes.json();
 
+            // Update Date & Status
+            const firstAirDate = seriesDetailsData.first_air_date;
+            const lastAirDate = seriesDetailsData.last_air_date;
+            const status = seriesDetailsData.status;
+            const startYear = firstAirDate?.split('-')[0] || '';
+            
+            const yearEl = document.getElementById('media-year');
+            if(yearEl && startYear) {
+                if (status === 'Returning Series') {
+                    yearEl.textContent = `${startYear} - Présent`;
+                } else if (status === 'Ended') {
+                    const endYear = lastAirDate?.split('-')[0];
+                    yearEl.textContent = (endYear && startYear !== endYear) ? `${startYear} - ${endYear}` : startYear;
+                } else {
+                    yearEl.textContent = startYear;
+                }
+            }
+
+            // Update Creator
             let creator = null;
             if (seriesDetailsData.created_by && seriesDetailsData.created_by.length > 0) {
                 const c = seriesDetailsData.created_by[0];
@@ -126,25 +145,6 @@ async function fetchUpdates(id, type) {
                 }
             }
             updatePersonUI(creator, 'tv');
-
-            const firstAirDate = seriesDetailsData.first_air_date;
-            const lastAirDate = seriesDetailsData.last_air_date;
-            const status = seriesDetailsData.status;
-            const startYear = firstAirDate?.split('-')[0] || '';
-            
-            if(startYear) {
-                const yearEl = document.getElementById('media-year');
-                if(yearEl) {
-                    if (status === 'Returning Series') {
-                        yearEl.textContent = `${startYear} - Présent`;
-                    } else if (status === 'Ended') {
-                        const endYear = lastAirDate?.split('-')[0];
-                        yearEl.textContent = (endYear && startYear !== endYear) ? `${startYear} - ${endYear}` : startYear;
-                    } else {
-                        yearEl.textContent = startYear;
-                    }
-                }
-            }
 
             if (seriesDetailsData.seasons) {
                 updateSeasonsUI(seriesDetailsData.seasons, id, seriesDetailsData.number_of_episodes);
@@ -167,13 +167,12 @@ function updateUI(data, type, isLocal) {
     document.getElementById('media-year').textContent = data.year;
     document.getElementById('media-synopsis').textContent = data.synopsis;
 
-    // Ancienne place (page Film)
+    // Gestion Note (Page Film: media-imdb, Page Série: media-rating)
     const imdbEl = document.getElementById('media-imdb');
     if(imdbEl) imdbEl.textContent = data.imdb;
     
-    // Nouvelle place (page Série)
     const ratingEl = document.getElementById('media-rating');
-    if(ratingEl) ratingEl.textContent = data.imdb;
+    if(ratingEl) ratingEl.textContent = data.imdb; // On affiche la même note (TMDB ou IMDb)
 
     const rtEl = document.getElementById('media-rt');
     if(rtEl && data.rottenTomatoes !== 'xx') {
@@ -478,6 +477,161 @@ function toggleEpisodeWatchedStatus(seriesId, episodeId, totalEpisodes) {
             updateWatchlistButton(seriesId);
         }
     }
+}
+
+function formatTMDBData(data, type) {
+    const isMovie = type === 'movie';
+    let dir = { name: 'Unknown', imageUrl: 'https://placehold.co/64x64' };
+    if(isMovie) {
+        const d = data.credits?.crew?.find(c => c.job === 'Director');
+        if(d) dir = { name: d.name, imageUrl: d.profile_path ? IMG_BASE_PROFILE + d.profile_path : dir.imageUrl };
+    } else if(data.created_by?.length > 0) {
+        dir = { name: data.created_by[0].name, imageUrl: data.created_by[0].profile_path ? IMG_BASE_PROFILE + data.created_by[0].profile_path : dir.imageUrl };
+    }
+
+    const cast = data.credits?.cast?.map(c => ({
+        id: c.id,
+        name: c.name,
+        character: c.character,
+        imageUrl: c.profile_path ? IMG_BASE_PROFILE + c.profile_path : 'https://placehold.co/64x64'
+    })) || [];
+
+    const similar = data.similar?.results?.map(s => ({
+        id: s.id,
+        title: s.title,
+        posterUrl: s.poster_path ? IMG_BASE_POSTER + s.poster_path : 'https://placehold.co/200x300'
+    })) || [];
+
+    let yearStr = 'N/A';
+    if (isMovie) {
+        yearStr = data.release_date?.split('-')[0] || 'N/A';
+    } else {
+        const start = data.first_air_date?.split('-')[0];
+        const end = data.last_air_date?.split('-')[0];
+        const status = data.status;
+        if (start) {
+            if (status === 'Ended' && end && start !== end) {
+                yearStr = `${start} - ${end}`;
+            } else if (status === 'Returning Series') {
+                yearStr = `${start} - Présent`;
+            } else {
+                yearStr = start;
+            }
+        }
+    }
+
+    return {
+        id: data.id,
+        title: isMovie ? data.title : data.name,
+        year: yearStr,
+        genres: data.genres || [],
+        duration: isMovie ? `${Math.floor(data.runtime/60)}h ${data.runtime%60}m` : '',
+        seasons: !isMovie ? data.number_of_seasons : null,
+        imdb: data.vote_average?.toFixed(1) || 'N/A',
+        rottenTomatoes: 'TMDB',
+        synopsis: data.overview,
+        posterUrl: data.poster_path ? IMG_BASE_POSTER + data.poster_path : '',
+        bannerUrl: data.backdrop_path ? IMG_BASE_BANNER + data.backdrop_path : '',
+        director: dir,
+        cast: cast,
+        similarMovies: similar
+    };
+}
+
+const awardIconSVG = `<svg class="h-5 w-5 text-amber-400" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path></svg>`;
+
+function updateAwardsUI(data) {
+    const awardsSection = document.getElementById('awards-section');
+    if (!awardsSection) return;
+
+    let wins = 0;
+    let nominations = 0;
+    let awardName = '';
+
+    const externalAwardInfo = window.awardsData && window.awardsData[data.id];
+
+    if (externalAwardInfo) {
+        wins = externalAwardInfo.wins;
+        nominations = externalAwardInfo.nominations;
+        awardName = externalAwardInfo.type === 'movie' ? 'Oscar' : 'Emmy';
+    } else {
+        const isMovie = data.type === 'movie' || (data.title && !data.name); 
+        awardName = isMovie ? 'Oscar' : 'Emmy';
+        wins = isMovie ? (data.oscarWins || 0) : (data.emmyWins || 0);
+        nominations = isMovie ? (data.oscarNominations || 0) : (data.emmyNominations || 0);
+    }
+
+    let awardsHTML = '';
+    if (wins > 0) {
+        awardsHTML += `<div class="flex items-center gap-2 text-sm">${awardIconSVG}<span class="font-medium text-gray-300">${wins} ${awardName} win${wins > 1 ? 's' : ''}</span></div>`;
+    }
+    if (nominations > 0) {
+        awardsHTML += `<div class="flex items-center gap-2 text-sm">${awardIconSVG}<span class="font-medium text-gray-300">${nominations} ${awardName} nomination${nominations > 1 ? 's' : ''}</span></div>`;
+    }
+
+    if (awardsHTML) {
+        awardsSection.innerHTML = awardsHTML;
+        awardsSection.style.display = 'flex';
+        awardsSection.className = "mt-4 flex flex-col gap-2 border-t border-gray-800 pt-4";
+    } else {
+        awardsSection.style.display = 'none';
+    }
+}
+
+function initializeWatchlistButton(mediaId) {
+    const btn = document.getElementById('watchlist-button');
+    if(btn) {
+        updateWatchlistButton(mediaId);
+        const newBtn = btn.cloneNode(true);
+        btn.parentNode.replaceChild(newBtn, btn);
+        newBtn.addEventListener('click', () => toggleWatchlist(mediaId));
+    }
+}
+
+async function toggleWatchlist(mediaId) {
+    const mediaIdNum = parseInt(mediaId, 10);
+    const isMovie = window.location.pathname.includes('film.html');
+    const watchedListKey = isMovie ? 'watchedMovies' : 'watchedSeries';
+    let watchlist = JSON.parse(localStorage.getItem('watchlist')) || [];
+    let watchedList = JSON.parse(localStorage.getItem(watchedListKey)) || [];
+    const isInWatchlist = watchlist.some(item => item.id === mediaIdNum);
+    const isWatched = watchedList.includes(mediaIdNum);
+
+    if (isWatched) {
+        watchlist = watchlist.filter(item => item.id !== mediaIdNum);
+        watchedList = watchedList.filter(id => id !== mediaIdNum);
+        localStorage.setItem('watchlist', JSON.stringify(watchlist));
+        localStorage.setItem(watchedListKey, JSON.stringify(watchedList));
+        updateWatchlistButton(mediaId);
+    } else if (isInWatchlist) {
+        if (!isMovie) {
+             showConfirmationModal(mediaId, 99); 
+             return;
+        }
+        watchedList.push(mediaIdNum);
+        localStorage.setItem(watchedListKey, JSON.stringify(watchedList));
+        updateWatchlistButton(mediaId);
+    } else {
+        watchlist.push({ id: mediaIdNum, added_at: new Date().toISOString() });
+        localStorage.setItem('watchlist', JSON.stringify(watchlist));
+        updateWatchlistButton(mediaId);
+    }
+}
+
+function showConfirmationModal(seriesId, total) {
+    const modal = document.getElementById('confirmation-modal');
+    modal.style.display = 'flex';
+    document.getElementById('modal-cancel-button').onclick = () => modal.style.display = 'none';
+    document.getElementById('modal-confirm-button').onclick = () => {
+        const seriesIdNum = parseInt(seriesId, 10);
+        let watchedList = JSON.parse(localStorage.getItem('watchedSeries')) || [];
+        if (!watchedList.includes(seriesIdNum)) {
+            watchedList.push(seriesIdNum);
+            localStorage.setItem('watchedSeries', JSON.stringify(watchedList));
+        }
+        modal.style.display = 'none';
+        updateWatchlistButton(seriesId);
+    };
 }
 
 function updateWatchlistButton(mediaId) {
