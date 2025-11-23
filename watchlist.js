@@ -4,82 +4,66 @@ document.addEventListener('alpine:init', () => {
         enrichedWatchlist: [],
         activeTab: 'tv', // 'movie' ou 'tv'
         sortOrder: 'popularity',
-        selectedPlatform: null,
-        watchStatusFilter: 'unwatched', // Par défaut sur "Watchlist" (non vu)
         
-        // État de la modale et préférences utilisateur
-        showPlatformModal: false,
+        // NOUVEAU : Tableau pour gérer plusieurs filtres en même temps
+        activePlatformFilters: [], 
+        
+        watchStatusFilter: 'unwatched', // 'watched' ou 'unwatched'
+        
+        // État et préférences utilisateur
         userRegion: localStorage.getItem('userRegion') || 'FR',
         myPlatformIds: [], // IDs des plateformes cochées dans le profil
-        userSelectedPlatforms: [],
-        // Liste pour la pop-up de filtre (Header) - calculée dynamiquement
-        availableHeaderPlatforms: [],
+        userSelectedPlatforms: [], // Objets complets des plateformes de l'utilisateur (pour l'affichage)
 
-        // Liste statique pour le mapping des logos (utilisée par la modale si besoin)
+        // Liste des plateformes avec les VRAIS logos (via Clearbit pour l'instant)
         availablePlatforms: [
-            { id: 'netflix', name: 'Netflix', logoUrl: 'https://image.tmdb.org/t/p/original/t2yyOv40HZeVlLjDaoV36ipKs6n.jpg' },
-            { id: 'prime', name: 'Prime Video', logoUrl: 'https://image.tmdb.org/t/p/original/emthp39XA2YScoU8t5t7TB3Vgnh.jpg' },
-            { id: 'disney', name: 'Disney+', logoUrl: 'https://image.tmdb.org/t/p/original/7rwgEs15tFwyR9NPQ5vpzxTj19Q.jpg' },
-            { id: 'apple', name: 'Apple TV+', logoUrl: 'https://image.tmdb.org/t/p/original/2E03IAfXddG5uqCtzsME3sRSfvi.jpg' },
-            { id: 'canal', name: 'Canal+', logoUrl: 'https://image.tmdb.org/t/p/original/9a1c28D5E3s5rY1s6t7Q8oJ8j8.jpg' },
-            { id: 'paramount', name: 'Paramount+', logoUrl: 'https://image.tmdb.org/t/p/original/h5t071f4q5l9t5h4nK5j1l8f3.jpg' },
-            { id: 'max', name: 'Max', logoUrl: 'https://image.tmdb.org/t/p/original/61M6r4f6p2p4p2p4p2p4.jpg' },
-            { id: 'skygo', name: 'Sky Go', logoUrl: 'https://image.tmdb.org/t/p/original/1qm5l5r5l5r5l5.jpg' },
-            { id: 'now', name: 'Now', logoUrl: 'https://image.tmdb.org/t/p/original/p3Z1z1z1z1.jpg' }
+            { id: 'netflix', name: 'Netflix', logoUrl: 'https://logo.clearbit.com/netflix.com' },
+            { id: 'prime', name: 'Prime Video', logoUrl: 'https://logo.clearbit.com/primevideo.com' },
+            { id: 'disney', name: 'Disney+', logoUrl: 'https://logo.clearbit.com/disneyplus.com' },
+            { id: 'apple', name: 'Apple TV+', logoUrl: 'https://logo.clearbit.com/tv.apple.com' },
+            { id: 'canal', name: 'Canal+', logoUrl: 'https://logo.clearbit.com/canalplus.com' },
+            { id: 'paramount', name: 'Paramount+', logoUrl: 'https://logo.clearbit.com/paramountplus.com' },
+            { id: 'max', name: 'Max', logoUrl: 'https://logo.clearbit.com/max.com' },
+            { id: 'skygo', name: 'Sky Go', logoUrl: 'https://logo.clearbit.com/sky.com' },
+            { id: 'now', name: 'Now', logoUrl: 'https://logo.clearbit.com/nowtv.com' }
         ],
 
         async init() {
             this.loadWatchlist();
             
-            // Charger les préférences de plateformes
+            // 1. Charger les préférences de plateformes du profil
             const savedPlatforms = localStorage.getItem('selectedPlatforms');
             this.myPlatformIds = savedPlatforms ? JSON.parse(savedPlatforms) : [];
+
+            // 2. Préparer la liste d'affichage (seulement celles que l'utilisateur possède)
             this.userSelectedPlatforms = this.availablePlatforms.filter(p => 
                 this.myPlatformIds.includes(p.id)
             );
+
             await this.fetchAndEnrichWatchlist();
             
-            // Construire la liste des filtres disponibles (basé sur le contenu ET mes plateformes)
-            this.extractUserPlatforms();
-
+            // Surveillance des variables pour rafraîchir l'affichage
             this.$watch('activeTab', () => this.renderMedia());
             this.$watch('watchStatusFilter', () => this.renderMedia());
-            this.$watch('selectedPlatform', () => this.renderMedia());
+            this.$watch('activePlatformFilters', () => this.renderMedia()); // Rafraîchir quand on clique sur un logo
 
             await this.renderMedia();
         },
 
-        // Sélectionner une plateforme depuis la modale
-        selectPlatformFromModal(platform) {
-            if (this.selectedPlatform && this.selectedPlatform.id === platform.id) {
-                this.selectedPlatform = null;
+        // Gestion du clic sur un filtre (Multi-sélection)
+        togglePlatformFilter(platformId) {
+            if (this.activePlatformFilters.includes(platformId)) {
+                // Si déjà actif, on l'enlève
+                this.activePlatformFilters = this.activePlatformFilters.filter(id => id !== platformId);
             } else {
-                this.selectedPlatform = platform;
+                // Sinon on l'ajoute
+                this.activePlatformFilters.push(platformId);
             }
-            this.showPlatformModal = false;
         },
 
         loadWatchlist() {
             const savedList = localStorage.getItem('watchlist');
             this.watchlist = savedList ? JSON.parse(savedList) : [];
-        },
-
-        // Construit la liste des plateformes affichées dans le header (Pop-up)
-        extractUserPlatforms() {
-            const platformMap = new Map();
-            
-            this.enrichedWatchlist.forEach(item => {
-                const providers = this.getProvidersForItem(item);
-                providers.forEach(p => {
-                    const internalId = this.getInternalPlatformId(p.provider_name);
-                    // On ne montre dans le filtre que si l'utilisateur l'a dans ses "Mes Plateformes"
-                    if (this.myPlatformIds.includes(internalId)) {
-                        const logoUrl = p.logo_path ? `https://image.tmdb.org/t/p/original${p.logo_path}` : p.logoUrl;
-                        platformMap.set(internalId, { id: internalId, name: p.provider_name, logoUrl });
-                    }
-                });
-            });
-            this.availableHeaderPlatforms = Array.from(platformMap.values());
         },
 
         getInternalPlatformId(tmdbName) {
@@ -96,24 +80,23 @@ document.addEventListener('alpine:init', () => {
             return 'other';
         },
 
-        // LOGIQUE CENTRALE DE DISPONIBILITÉ (Pays + Canal)
+        // LOGIQUE DE DISPONIBILITÉ (Pays + Canal)
         getProvidersForItem(item) {
             if (!item.apiDetails || !item.apiDetails['watch/providers']) return [];
             
             const providersData = item.apiDetails['watch/providers'].results;
             let combinedProviders = [];
 
-            // 1. Providers du pays sélectionné (FR ou IE)
+            // 1. Providers du pays sélectionné
             if (providersData[this.userRegion] && providersData[this.userRegion].flatrate) {
                 combinedProviders = [...providersData[this.userRegion].flatrate];
             }
 
-            // 2. Exception Canal+ (Toujours vérifier la dispo FR si je suis en Irlande et que j'ai Canal)
+            // 2. Exception Canal+ (Si hors France mais abonné Canal)
             if (this.userRegion !== 'FR' && this.myPlatformIds.includes('canal')) {
                 if (providersData['FR'] && providersData['FR'].flatrate) {
                     const canalProvider = providersData['FR'].flatrate.find(p => p.provider_id === 392 || p.provider_name.includes('Canal'));
                     if (canalProvider) {
-                        // Éviter les doublons
                         if (!combinedProviders.some(p => p.provider_id === canalProvider.provider_id)) {
                             combinedProviders.push(canalProvider);
                         }
@@ -164,7 +147,6 @@ document.addEventListener('alpine:init', () => {
             localStorage.setItem(key, JSON.stringify(item));
         },
 
-        // Fetch sans filtrage de région ici (on récupère tout l'objet providers)
         async fetchMovieDetails(movieId) {
             const cacheKey = `movie-details-${movieId}`;
             const cachedData = this.getCachedData(cacheKey);
@@ -218,17 +200,20 @@ document.addEventListener('alpine:init', () => {
                     const isWatched = (normalizedType === 'movie' && watchedMovies.includes(item.id)) ||
                                     (normalizedType === 'serie' && watchedSeries.includes(item.id));
                     
-                    // On calcule les providers dynamiques ici
+                    // Calcul des providers
                     const dynamicProviders = this.getProvidersForItem(item);
 
                     return { ...item, type: normalizedType, isWatched, dynamicProviders };
                 })
                 .filter(item => item && item.type === type);
 
-            // Filtre Header (Plateforme unique sélectionnée)
-            if (this.selectedPlatform) {
+            // --- NOUVEAU FILTRE MULTIPLE ---
+            // Si on a des filtres actifs, on garde les items dispos sur AU MOINS UNE des plateformes sélectionnées
+            if (this.activePlatformFilters.length > 0) {
                 filtered = filtered.filter(item =>
-                    item.dynamicProviders.some(p => this.getInternalPlatformId(p.provider_name) === this.selectedPlatform.id)
+                    item.dynamicProviders.some(p => 
+                        this.activePlatformFilters.includes(this.getInternalPlatformId(p.provider_name))
+                    )
                 );
             }
 
@@ -296,7 +281,6 @@ document.addEventListener('alpine:init', () => {
             return '';
         },
 
-        // Générateur de bouton Check
         createCheckButtonHTML(itemId, isWatched, type, extraAction = '') {
             const action = type === 'movie' 
                 ? `toggleMovieWatched(${itemId})` 
@@ -310,15 +294,11 @@ document.addEventListener('alpine:init', () => {
             </button>`;
         },
 
-        // Générateur d'icones plateformes (filtrées par préférences)
+        // Générateur d'icônes plateformes
         createPlatformIconsHTML(providers) {
             if (!providers || providers.length === 0) return '';
-            
             const myProviders = providers.filter(p => this.myPlatformIds.includes(this.getInternalPlatformId(p.provider_name)));
-            
-            // Si aucune de mes plateformes n'a le contenu, on n'affiche rien (ou on pourrait afficher un message)
             if (myProviders.length === 0) return '';
-
             return myProviders.map(p => {
                 const logo = p.logo_path ? `https://image.tmdb.org/t/p/original${p.logo_path}` : p.logoUrl;
                 return `<img src="${logo}" alt="${p.provider_name}" class="h-4 w-4 rounded-sm" title="${p.provider_name}">`;
@@ -337,18 +317,14 @@ document.addEventListener('alpine:init', () => {
             const durationStr = item.duration || (item.apiDetails?.runtime ? this.formatDuration(item.apiDetails.runtime) : 'N/A');
             const genresStr = item.genres && item.genres.length > 0 ? item.genres[0] : 'Genre';
             const metaLine = `${item.year} • ${genresStr} • ${durationStr}`;
-            
             const platformsHTML = this.createPlatformIconsHTML(item.dynamicProviders);
-            
             const availableLine = platformsHTML 
                 ? `<div class="mt-5 flex items-center gap-2 text-xs text-gray-400">
                      <span>Available on:</span>
                      <div class="flex items-center gap-1">${platformsHTML}</div>
                    </div>`
                 : '';
-
             const checkButton = this.createCheckButtonHTML(item.id, item.isWatched, 'movie');
-
             return `
                 <div class="relative flex items-start gap-4 p-4 hover:bg-white/5 transition-colors rounded-lg">
                     <a href="${link}" class="w-24 flex-shrink-0 group">
@@ -406,24 +382,19 @@ document.addEventListener('alpine:init', () => {
 
         createUnwatchedTVItemHTML(item) {
             if (!item.apiDetails || !item.apiDetails.seasons) return '<div class="p-4 text-gray-400">Loading details...</div>';
-
             const firstSeason = item.apiDetails.seasons.find(s => s.season_number === 1);
             if (!firstSeason || !firstSeason.episodes || firstSeason.episodes.length === 0) return '';
             const firstEpisode = firstSeason.episodes.find(e => e.episode_number === 1);
             if (!firstEpisode) return '';
-
             const platformsHTML = this.createPlatformIconsHTML(item.dynamicProviders);
             const totalSeasons = item.apiDetails.number_of_seasons;
             const startYear = String(item.year).split(' - ')[0];
-
             const infoLine = `<div class="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 mt-1">
                 <span>${totalSeasons} Saisons • ${startYear}</span>
                 ${platformsHTML ? '<span class="text-gray-600">•</span>' : ''}
                 <div class="flex items-center gap-1">${platformsHTML}</div>
             </div>`;
-
             const checkButton = this.createCheckButtonHTML(item.id, false, 'tv', firstEpisode.id);
-
             return `
                 <div class="relative flex items-start gap-4 p-4 hover:bg-white/5 transition-colors rounded-lg">
                     <a href="serie.html?id=${item.id}" class="w-24 flex-shrink-0">
@@ -448,9 +419,7 @@ document.addEventListener('alpine:init', () => {
         createInProgressTVItemHTML(item, seriesWatchedEpisodes) {
             let nextEpisode = null;
             let currentSeasonForProgress = null;
-
             const sortedSeasons = item.apiDetails.seasons.filter(s => s.season_number > 0).sort((a, b) => a.season_number - b.season_number);
-
             for (const season of sortedSeasons) {
                 const sortedEpisodes = season.episodes.sort((a, b) => a.episode_number - b.episode_number);
                 for (const episode of sortedEpisodes) {
@@ -462,26 +431,20 @@ document.addEventListener('alpine:init', () => {
                 }
                 if (nextEpisode) break;
             }
-
             if (!nextEpisode || !currentSeasonForProgress) return this.createUnwatchedTVItemHTML(item);
-
             const seasonEpisodeIds = new Set(currentSeasonForProgress.episodes.map(e => e.id));
             const seasonWatchedCount = [...seriesWatchedEpisodes].filter(id => seasonEpisodeIds.has(id)).length;
             const remainingInSeason = currentSeasonForProgress.episodes.length - seasonWatchedCount;
             const totalProgress = (seriesWatchedEpisodes.size / item.apiDetails.number_of_episodes) * 100;
-
             const platformsHTML = this.createPlatformIconsHTML(item.dynamicProviders);
             const totalSeasons = item.apiDetails.number_of_seasons;
             const startYear = String(item.year).split(' - ')[0];
-
              const infoLine = `<div class="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 mt-1">
                 <span>${totalSeasons} Saisons • ${startYear}</span>
                 ${platformsHTML ? '<span class="text-gray-600">•</span>' : ''}
                 <div class="flex items-center gap-1">${platformsHTML}</div>
             </div>`;
-
             const checkButton = this.createCheckButtonHTML(item.id, false, 'tv', nextEpisode.id);
-
             return `
                 <div class="relative p-4 hover:bg-white/5 transition-colors rounded-lg">
                     <div class="flex gap-4">
@@ -513,21 +476,17 @@ document.addEventListener('alpine:init', () => {
                 </div>`;
         },
 
-        formatEpisodeNumber(num) {
-            return String(num).padStart(2, '0');
-        },
+        formatEpisodeNumber(num) { return String(num).padStart(2, '0'); },
 
         async markEpisodeWatched(seriesId, episodeId) {
             if(!episodeId) return;
             let watchedEpisodes = JSON.parse(localStorage.getItem('watchedEpisodes')) || {};
             if (!watchedEpisodes[seriesId]) watchedEpisodes[seriesId] = [];
             const seriesIdNum = parseInt(seriesId, 10);
-
             if (!watchedEpisodes[seriesId].includes(episodeId)) {
                 watchedEpisodes[seriesId].push(episodeId);
                 localStorage.setItem('watchedEpisodes', JSON.stringify(watchedEpisodes));
             }
-
             const item = this.enrichedWatchlist.find(i => i.id === seriesIdNum);
             if (item && item.apiDetails && watchedEpisodes[seriesId].length >= item.apiDetails.number_of_episodes) {
                 let watchedSeries = JSON.parse(localStorage.getItem('watchedSeries')) || [];
