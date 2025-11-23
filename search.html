@@ -43,7 +43,7 @@
         <div class="px-4 pb-4">
             <div class="relative">
                 <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400">search</span>
-                <input x-model="searchQuery" class="w-full pl-10 pr-10 py-2.5 rounded-lg bg-background-light dark:bg-primary/10 border border-gray-200 dark:border-primary/20 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/50" placeholder="Rechercher..." type="text"/>
+                <input x-model="searchQuery" class="w-full pl-10 pr-10 py-2.5 rounded-lg bg-background-light dark:bg-primary/10 border border-gray-200 dark:border-primary/20 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/50" placeholder="Rechercher..." type="search"/>
                 <button x-show="searchQuery.length > 0" @click="searchQuery = ''; searchResults = []" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400">
                     <span class="material-symbols-outlined">close</span>
                 </button>
@@ -51,96 +51,19 @@
         </div>
     </header>
 
-    <main class="flex-grow overflow-y-auto pb-20">
-        <!-- Résultats de recherche -->
-        <div x-show="searchQuery.length > 1" class="p-4 space-y-4" x-cloak>
+    <main class="flex-grow p-4">
+        <div x-show="searchQuery.length > 1 && searchResults.length > 0" class="space-y-4" x-cloak>
             <template x-for="item in searchResults" :key="item.id">
-                <a @click.prevent="handleItemClick(item)" href="#" class="flex items-start gap-4 p-2 -m-2 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 transition-colors">
-                    <img :src="item.poster_path ? `https://image.tmdb.org/t/p/w200${item.poster_path}` : 'https://via.placeholder.com/200x300.png?text=No+Image'" class="w-16 h-24 object-cover rounded-md shadow-sm">
-                    <div class="flex-1 min-w-0 py-1">
-                        <p class="font-bold text-gray-900 dark:text-white truncate" x-text="item.title || item.name"></p>
-                        <div class="flex items-center gap-2 mt-1 text-sm text-gray-500 dark:text-gray-400">
-                            <span x-text="(item.release_date || item.first_air_date || '').split('-')[0]"></span>
-                            <span class="text-xs">•</span>
-                             <span x-text="item.media_type === 'movie' ? 'Film' : 'Série'"></span>
-                        </div>
-                        <div class="flex items-center gap-1 mt-1 text-yellow-500" x-show="item.vote_average">
-                            <span class="material-symbols-outlined text-[16px] filled">star</span>
-                            <span class="text-sm text-gray-700 dark:text-gray-300 font-medium" x-text="item.vote_average ? item.vote_average.toFixed(1) : ''"></span>
-                        </div>
+                <a @click.prevent="handleItemClick(item)" href="#" class="flex items-center gap-4 p-2 -m-2 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 transition-colors">
+                    <img :src="item.poster_path ? `https://image.tmdb.org/t/p/w200${item.poster_path}` : 'https://via.placeholder.com/200x300.png?text=No+Image'" class="w-12 h-16 object-cover rounded-md">
+                    <div class="flex-1">
+                        <p class="font-semibold text-gray-900 dark:text-white" x-text="item.title || item.name"></p>
+                        <p class="text-sm text-gray-500 dark:text-gray-400" x-text="item.media_type === 'movie' ? 'Film' : 'Série TV'"></p>
                     </div>
                 </a>
             </template>
-             <div x-show="searchResults.length === 0 && searchQuery.length > 1" class="text-center text-gray-500 mt-8">
-                Aucun résultat trouvé
-            </div>
         </div>
-
-        <!-- Accueil Recherche (Récent + Populaire) -->
-        <div x-show="searchQuery.length <= 1" x-cloak>
-
-            <!-- Recherches récentes -->
-            <section x-show="previousSearches.length > 0" class="py-6">
-                 <div class="px-4 mb-3 flex items-center justify-between">
-                    <h2 class="text-lg font-bold text-gray-900 dark:text-white">Recherches récentes</h2>
-                    <button @click="clearHistory()" class="text-xs font-semibold text-primary">Effacer</button>
-                 </div>
-                 <div class="flex overflow-x-auto snap-x snap-mandatory px-4 gap-4 [-ms-scrollbar-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                    <template x-for="item in previousSearches" :key="item.id">
-                        <a @click.prevent="handleItemClick(item)" href="#" class="flex-shrink-0 w-32 snap-start group flex flex-col">
-                            <div class="relative w-full aspect-[2/3] rounded-lg overflow-hidden bg-gray-800 shadow-md">
-                                <img :src="item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : 'https://via.placeholder.com/200x300'" loading="lazy" class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105">
-                                <template x-if="item.media_type !== 'movie'">
-                                    <div class="absolute top-1 left-1 z-10 bg-black/70 backdrop-blur-sm px-1.5 py-0.5 rounded text-[8px] font-bold text-white uppercase tracking-wider border border-white/10">TV</div>
-                                </template>
-                                <div class="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors"></div>
-                            </div>
-
-                            <p class="mt-2 text-xs font-bold text-gray-900 dark:text-white truncate leading-tight" x-text="item.title || item.name"></p>
-
-                            <div class="flex items-center gap-1 mt-0.5 text-[10px] text-gray-500 dark:text-gray-400">
-                                <span x-text="(item.release_date || item.first_air_date || '').split('-')[0]"></span>
-                                <span class="text-gray-400">•</span>
-                                <div class="flex items-center gap-0.5 text-yellow-500">
-                                    <span class="material-symbols-outlined text-[10px] filled">star</span>
-                                    <span class="text-gray-600 dark:text-gray-300 font-medium" x-text="item.vote_average ? item.vote_average.toFixed(1) : 'N/A'"></span>
-                                </div>
-                            </div>
-                        </a>
-                    </template>
-                 </div>
-            </section>
-
-            <!-- Recherches populaires -->
-            <section class="py-6 pt-2">
-                <h2 class="px-4 mb-3 text-lg font-bold text-gray-900 dark:text-white">Tendances</h2>
-                <div class="flex overflow-x-auto snap-x snap-mandatory px-4 gap-4 [-ms-scrollbar-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                   <template x-for="item in popularSearches" :key="item.id">
-                       <a @click.prevent="handleItemClick(item)" href="#" class="flex-shrink-0 w-36 snap-start group flex flex-col">
-                           <div class="relative w-full aspect-[2/3] rounded-lg overflow-hidden bg-gray-800 shadow-md">
-                               <img :src="item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : 'https://via.placeholder.com/200x300'" loading="lazy" class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105">
-                               <template x-if="item.media_type !== 'movie'">
-                                   <div class="absolute top-1 left-1 z-10 bg-black/70 backdrop-blur-sm px-1.5 py-0.5 rounded text-[8px] font-bold text-white uppercase tracking-wider border border-white/10">TV</div>
-                               </template>
-                               <div class="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors"></div>
-                           </div>
-
-                           <p class="mt-2 text-xs font-bold text-gray-900 dark:text-white truncate leading-tight" x-text="item.title || item.name"></p>
-
-                           <div class="flex items-center gap-1 mt-0.5 text-[10px] text-gray-500 dark:text-gray-400">
-                               <span x-text="(item.release_date || item.first_air_date || '').split('-')[0]"></span>
-                               <span class="text-gray-400">•</span>
-                               <div class="flex items-center gap-0.5 text-yellow-500">
-                                   <span class="material-symbols-outlined text-[10px] filled">star</span>
-                                   <span class="text-gray-600 dark:text-gray-300 font-medium" x-text="item.vote_average ? item.vote_average.toFixed(1) : 'N/A'"></span>
-                               </div>
-                           </div>
-                       </a>
-                   </template>
-                </div>
-            </section>
-        </div>
-    </main>
+        </main>
 
     <footer class="sticky bottom-0 bg-background-light/90 dark:bg-background-dark/90 backdrop-blur-sm border-t border-gray-200 dark:border-gray-800">
         <nav class="flex justify-around items-center h-16">
