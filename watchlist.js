@@ -88,28 +88,62 @@ document.addEventListener('alpine:init', () => {
         },
 
         async fetchAndEnrichWatchlist() {
+            // First pass: Merge local mediaData if available
             const watchlistWithMediaData = this.watchlist.map(item => {
-                const media = mediaData.find(m => m.id === item.id);
-                return { ...media, ...item, apiDetails: null };
+                const media = (typeof mediaData !== 'undefined') ? mediaData.find(m => m.id === item.id) : null;
+                return { ...(media || {}), ...item, apiDetails: null };
             });
 
-            const promises = watchlistWithMediaData.map(item => {
-                if (!item) return Promise.resolve(null);
-                if (item.type === 'serie' || item.type === 'tv') { return this.fetchFullSeriesDetails(item.id); }
-                else if (item.type === 'movie') { return this.fetchMovieDetails(item.id); }
-                return Promise.resolve(null);
+            const promises = watchlistWithMediaData.map(async item => {
+                if (!item) return null;
+
+                // 1. If type is known, fetch accordingly
+                if (item.type === 'serie' || item.type === 'tv') {
+                    return this.fetchFullSeriesDetails(item.id);
+                } else if (item.type === 'movie') {
+                    return this.fetchMovieDetails(item.id);
+                }
+
+                // 2. If type is UNKNOWN (e.g. added from search but not in local data), try movie first, then TV
+                // This is the fallback to ensure items don't disappear
+                const movieData = await this.fetchMovieDetails(item.id);
+                if (movieData) {
+                    item.type = 'movie'; // Update the item's type in memory
+                    return movieData;
+                }
+
+                const tvData = await this.fetchFullSeriesDetails(item.id);
+                if (tvData) {
+                    item.type = 'serie'; // Update the item's type in memory
+                    return tvData;
+                }
+
+                // If both fail, we might still want to show it if we have minimal data,
+                // but usually this means the ID is bad or API is down.
+                return null;
             });
 
             const results = await Promise.all(promises);
+
             this.enrichedWatchlist = watchlistWithMediaData.map(item => {
                 if (!item) return null;
+
+                // Find the result corresponding to this item (API result)
                 const details = results.find(d => d && d.id === item.id);
+
                 if (details) {
                     item.apiDetails = details;
+                    // Enrich missing fields from API
                     if (!item.title) item.title = details.title || details.name;
                     if (!item.posterUrl) item.posterUrl = details.poster_path ? `https://image.tmdb.org/t/p/w500${details.poster_path}` : 'https://placehold.co/300x450?text=No+Image';
                     if (!item.year) item.year = (details.release_date || details.first_air_date || '').split('-')[0];
                     if (!item.genres || item.genres.length === 0) item.genres = details.genres ? details.genres.map(g => g.name) : [];
+                } else {
+                    // Fallback for items with NO API data (so they don't disappear)
+                    // If we don't have a type, we default to 'movie' so it shows up somewhere
+                    if (!item.type) item.type = 'movie';
+                    if (!item.posterUrl) item.posterUrl = 'https://placehold.co/300x450?text=No+Data';
+                    if (!item.title) item.title = `Unknown Title (${item.id})`;
                 }
                 return item;
             }).filter(Boolean);
