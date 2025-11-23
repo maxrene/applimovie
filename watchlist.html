@@ -31,85 +31,137 @@
 </head>
 <body class="bg-background-light dark:bg-background-dark font-display text-gray-800 dark:text-gray-200" x-data="watchlistPage">
 <div class="flex h-screen flex-col">
-   <header class="flex-shrink-0 bg-background-light dark:bg-background-dark z-20 relative">
-    <div class="flex items-center justify-between p-4 pb-2">
-        <h1 class="text-xl font-bold text-gray-900 dark:text-white pl-2">My List</h1>
-        
+   <header class="flex-shrink-0 bg-background-light dark:bg-background-dark z-20 relative shadow-sm">
+    
+    <div class="flex items-center justify-between p-4 pb-0">
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">My List</h1>
         <a href="profile.html" class="flex items-center gap-3 p-1 rounded-full hover:bg-gray-200 dark:hover:bg-white/10 transition-colors">
             <img id="header-flag" src="https://flagcdn.com/w40/fr.png" alt="FR" class="w-5 h-auto rounded-sm shadow-sm object-cover">
             <span class="material-symbols-outlined text-3xl text-gray-600 dark:text-gray-300">account_circle</span>
         </a>
     </div>
 
-    <div class="border-b border-gray-200/20 dark:border-gray-700/50">
-        <nav aria-label="Tabs" class="flex px-4">
-            <a href="#" @click.prevent="activeTab = 'movie'" 
-               :class="{'border-primary text-primary': activeTab === 'movie', 'border-transparent text-gray-500 dark:text-gray-400 hover:border-gray-300 hover:text-gray-700': activeTab !== 'movie'}" 
-               class="border-b-2 flex-1 whitespace-nowrap py-3 px-1 text-center text-sm font-semibold transition-colors">Movies</a>
-            <a href="#" @click.prevent="activeTab = 'tv'" 
-               :class="{'border-primary text-primary': activeTab === 'tv', 'border-transparent text-gray-500 dark:text-gray-400 hover:border-gray-300 hover:text-gray-700': activeTab !== 'tv'}" 
-               class="border-b-2 flex-1 whitespace-nowrap py-3 px-1 text-center text-sm font-semibold transition-colors">TV Shows</a>
-        </nav>
-    </div>
-
-    <div class="flex items-center gap-3 px-4 py-3 overflow-x-auto no-scrollbar border-b border-gray-200/20 dark:border-gray-700/50">
-        <button @click="activePlatformFilters = []"
-                class="flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-colors border h-10"
-                :class="activePlatformFilters.length === 0 
-                        ? 'bg-primary border-primary text-white' 
-                        : 'bg-gray-800 border-gray-700 text-gray-400 hover:bg-gray-700'">
-            Tout
-        </button>
-        <template x-for="platform in userSelectedPlatforms" :key="platform.id">
-            <button @click="togglePlatformFilter(platform.id)" 
-                    class="relative flex-shrink-0 w-10 h-10 rounded-lg transition-all duration-200 border-2 overflow-hidden"
-                    :class="activePlatformFilters.includes(platform.id) 
-                            ? 'border-primary scale-105 shadow-lg shadow-primary/20 grayscale-0' 
-                            : 'border-transparent opacity-60 grayscale hover:grayscale-0 hover:opacity-100'">
-                <img :src="platform.logoUrl" class="w-full h-full object-cover bg-black">
-                <div x-show="activePlatformFilters.includes(platform.id)" 
-                     class="absolute inset-0 bg-primary/30 flex items-center justify-center">
-                     <span class="material-symbols-outlined text-white text-lg drop-shadow-md" style="font-weight: 700;">check</span>
-                </div>
+    <div class="px-4 mt-3">
+        <div class="relative flex w-full border-b border-gray-200 dark:border-gray-800">
+            <div class="absolute bottom-0 h-0.5 bg-primary transition-all duration-300 ease-out w-1/2"
+                 :style="activeTab === 'movie' ? 'left: 0%' : 'left: 50%'">
+            </div>
+            
+            <button @click="activeTab = 'movie'" 
+                    class="flex-1 py-3 text-center text-sm font-bold uppercase tracking-wide transition-colors"
+                    :class="activeTab === 'movie' ? 'text-primary' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'">
+                Films
             </button>
-        </template>
-        <a href="platforms.html" class="flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-lg bg-gray-800 border border-gray-700 text-gray-400 hover:text-white hover:bg-gray-700 transition-colors ml-auto">
-            <span class="material-symbols-outlined text-xl">edit</span>
-        </a>
+            <button @click="activeTab = 'tv'" 
+                    class="flex-1 py-3 text-center text-sm font-bold uppercase tracking-wide transition-colors"
+                    :class="activeTab === 'tv' ? 'text-primary' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'">
+                Séries
+            </button>
+        </div>
     </div>
 
-    <div class="flex items-center justify-between px-4 py-2 gap-2">
-        <div class="flex-1 flex justify-center">
-            <div class="relative flex w-full max-w-xs items-center bg-gray-200 dark:bg-gray-800 rounded-full p-1 h-10 cursor-pointer">
-                <div class="absolute inset-y-1 w-[calc(50%-4px)] bg-primary rounded-full shadow-md transition-all duration-300 ease-out"
+    <div class="flex items-center justify-between px-4 py-3 gap-2">
+        
+        <div class="flex-shrink-0">
+            <button @click="showServiceBar = !showServiceBar" class="flex items-center group" title="Filtrer par plateforme">
+                <div class="flex -space-x-3 transition-all duration-200" :class="showServiceBar ? 'opacity-50' : 'opacity-100'">
+                    <template x-for="(platform, index) in userSelectedPlatforms.slice(0, 3)" :key="platform.id">
+                        <img :src="platform.logoUrl" class="w-9 h-9 rounded-full border-2 border-background-light dark:border-background-dark bg-gray-800 object-cover z-10">
+                    </template>
+                    
+                    <div x-show="userSelectedPlatforms.length > 3" class="w-9 h-9 rounded-full border-2 border-background-light dark:border-background-dark bg-gray-700 flex items-center justify-center text-[10px] text-white font-bold z-0">
+                        +<span x-text="userSelectedPlatforms.length - 3"></span>
+                    </div>
+                    
+                    <div x-show="userSelectedPlatforms.length === 0" class="w-9 h-9 rounded-full border-2 border-background-light dark:border-background-dark bg-gray-800 flex items-center justify-center text-gray-400">
+                        <span class="material-symbols-outlined text-sm">add</span>
+                    </div>
+                </div>
+                <span class="material-symbols-outlined text-gray-400 text-xl ml-1 transition-transform duration-200" 
+                      :class="showServiceBar ? 'rotate-180 text-primary' : ''">expand_more</span>
+            </button>
+        </div>
+
+        <div class="flex-1 flex justify-center max-w-[200px]">
+            <div class="relative flex w-full items-center bg-gray-200 dark:bg-gray-800 rounded-lg p-1 h-9 cursor-pointer shadow-inner">
+                <div class="absolute inset-y-1 w-[calc(50%-4px)] bg-white dark:bg-gray-600 rounded-md shadow-sm transition-all duration-300 ease-out"
                      :class="watchStatusFilter === 'watched' ? 'translate-x-[100%] left-1' : 'translate-x-0 left-1'">
                 </div>
-                <button @click="watchStatusFilter = 'unwatched'" class="relative z-10 flex-1 text-xs font-bold uppercase tracking-wide transition-colors duration-200 text-center h-full flex items-center justify-center" :class="watchStatusFilter === 'unwatched' ? 'text-white' : 'text-gray-500 dark:text-gray-400'">Watchlist</button>
-                <button @click="watchStatusFilter = 'watched'" class="relative z-10 flex-1 text-xs font-bold uppercase tracking-wide transition-colors duration-200 text-center h-full flex items-center justify-center" :class="watchStatusFilter === 'watched' ? 'text-white' : 'text-gray-500 dark:text-gray-400'">Vu</button>
+                <button @click="watchStatusFilter = 'unwatched'" 
+                        class="relative z-10 flex-1 text-[11px] font-bold uppercase tracking-wider text-center h-full flex items-center justify-center transition-colors"
+                        :class="watchStatusFilter === 'unwatched' ? 'text-gray-900 dark:text-white' : 'text-gray-500 dark:text-gray-400'">
+                    Watchlist
+                </button>
+                <button @click="watchStatusFilter = 'watched'" 
+                        class="relative z-10 flex-1 text-[11px] font-bold uppercase tracking-wider text-center h-full flex items-center justify-center transition-colors"
+                        :class="watchStatusFilter === 'watched' ? 'text-gray-900 dark:text-white' : 'text-gray-500 dark:text-gray-400'">
+                    Vu
+                </button>
             </div>
         </div>
-        <div class="flex items-center gap-1">
+
+        <div class="flex items-center gap-1 flex-shrink-0">
             <div class="relative" x-data="{ open: false }">
                 <button @click="open = !open" class="p-2 text-gray-500 dark:text-gray-400 hover:text-primary transition-colors rounded-full hover:bg-gray-100 dark:hover:bg-white/5">
                     <span class="material-symbols-outlined">sort</span>
                 </button>
-                <div x-show="open" @click.away="open = false" class="absolute right-0 top-full mt-2 w-40 bg-gray-800 rounded-xl shadow-xl z-50 border border-gray-700 py-2" x-transition x-cloak>
-                    <a href="#" @click.prevent="setSort('popularity'); open = false" class="block px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white">Popularité</a>
-                    <a href="#" @click.prevent="setSort('release_date'); open = false" class="block px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white">Date de sortie</a>
-                    <a href="#" @click.prevent="setSort('recently_added'); open = false" class="block px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white">Date d'ajout</a>
+                <div x-show="open" @click.away="open = false" class="absolute right-0 top-full mt-2 w-48 bg-gray-800 rounded-xl shadow-xl z-50 border border-gray-700 py-2" x-transition x-cloak>
+                    <a href="#" @click.prevent="setSort('popularity'); open = false" class="block px-4 py-3 text-sm text-gray-300 hover:bg-gray-700 hover:text-white border-b border-gray-700/50">Popularité</a>
+                    <a href="#" @click.prevent="setSort('release_date'); open = false" class="block px-4 py-3 text-sm text-gray-300 hover:bg-gray-700 hover:text-white border-b border-gray-700/50">Date de sortie</a>
+                    <a href="#" @click.prevent="setSort('recently_added'); open = false" class="block px-4 py-3 text-sm text-gray-300 hover:bg-gray-700 hover:text-white">Date d'ajout</a>
                 </div>
             </div>
+            <button class="p-2 text-gray-500 dark:text-gray-400 hover:text-primary transition-colors rounded-full hover:bg-gray-100 dark:hover:bg-white/5">
+                <span class="material-symbols-outlined">filter_list</span>
+            </button>
         </div>
     </div>
+
+    <div x-show="showServiceBar" 
+         x-transition:enter="transition ease-out duration-200"
+         x-transition:enter-start="opacity-0 -translate-y-2 height-0"
+         x-transition:enter-end="opacity-100 translate-y-0 height-auto"
+         x-transition:leave="transition ease-in duration-150"
+         x-transition:leave-start="opacity-100 translate-y-0 height-auto"
+         x-transition:leave-end="opacity-0 -translate-y-2 height-0"
+         class="bg-gray-50 dark:bg-[#151515] border-b border-gray-200 dark:border-gray-800 py-3 px-4 flex items-center gap-3 overflow-x-auto no-scrollbar shadow-inner" x-cloak>
+        
+        <a href="platforms.html" class="flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-xl bg-gray-200 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-500 hover:text-primary hover:border-primary transition-all">
+            <span class="material-symbols-outlined text-lg">edit</span>
+        </a>
+
+        <div class="w-px h-6 bg-gray-300 dark:bg-gray-700 flex-shrink-0 mx-1"></div>
+
+        <template x-for="platform in userSelectedPlatforms" :key="platform.id">
+            <button @click="togglePlatformFilter(platform.id)" 
+                    class="relative flex-shrink-0 w-10 h-10 rounded-xl transition-all duration-200 border-2 overflow-hidden group"
+                    :class="activePlatformFilters.includes(platform.id) 
+                            ? 'border-primary opacity-100 scale-105 shadow-md' 
+                            : 'border-transparent opacity-40 hover:opacity-80 grayscale'">
+                
+                <img :src="platform.logoUrl" class="w-full h-full object-cover bg-black">
+                
+                <div x-show="activePlatformFilters.includes(platform.id)" 
+                     class="absolute inset-0 bg-primary/30 flex items-center justify-center backdrop-blur-[1px]">
+                     <span class="material-symbols-outlined text-white text-lg font-bold drop-shadow-md">check</span>
+                </div>
+            </button>
+        </template>
+    </div>
+
 </header>
+
     <main class="flex-1 overflow-y-auto" x-cloak>
-        <div id="media-list" class="divide-y divide-gray-200/20 dark:divide-gray-700/50"></div>
-        <div id="empty-state" class="hidden text-center p-8">
-            <p class="text-gray-500 dark:text-gray-400">Your list is empty.</p>
+        <div id="media-list" class="divide-y divide-gray-200/20 dark:divide-gray-700/50">
+             </div>
+        <div id="empty-state" class="hidden text-center p-8 flex flex-col items-center justify-center h-full">
+            <span class="material-symbols-outlined text-6xl text-gray-700 mb-4">movie_filter</span>
+            <p class="text-gray-500 dark:text-gray-400 text-lg font-medium">Aucun résultat.</p>
+            <p class="text-gray-600 dark:text-gray-500 text-sm mt-2">Essayez de modifier vos filtres.</p>
         </div>
     </main>
-    
-    <footer class="sticky bottom-0 bg-background-light/90 dark:bg-background-dark/90 backdrop-blur-sm border-t border-gray-200 dark:border-gray-800">
+
+    <footer class="sticky bottom-0 bg-background-light/90 dark:bg-background-dark/90 backdrop-blur-sm border-t border-gray-200 dark:border-gray-800 z-30">
         <nav class="flex justify-around items-center h-16">
             <a class="flex flex-col items-center justify-center gap-1 text-gray-500 dark:text-gray-400 hover:text-primary dark:hover:text-primary transition-colors" href="index.html">
                 <span class="material-symbols-outlined">home</span>
@@ -130,8 +182,10 @@
         </nav>
     </footer>
 </div>
+
 <script src="config.js"></script>
 <script src="data.js"></script>
 <script src="watchlist.js"></script>
+
 </body>
 </html>
