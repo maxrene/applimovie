@@ -70,12 +70,35 @@ document.addEventListener('alpine:init', () => {
             }).filter(Boolean);
         },
 
+        getCachedData(key) {
+            const cached = localStorage.getItem(key);
+            if (!cached) return null;
+
+            const { timestamp, data } = JSON.parse(cached);
+            const isExpired = (new Date().getTime() - timestamp) > 24 * 60 * 60 * 1000; // 24 hours
+
+            return isExpired ? null : data;
+        },
+
+        setCachedData(key, data) {
+            const item = {
+                timestamp: new Date().getTime(),
+                data: data
+            };
+            localStorage.setItem(key, JSON.stringify(item));
+        },
+
         async fetchMovieDetails(movieId) {
+            const cacheKey = `movie-details-${movieId}`;
+            const cachedData = this.getCachedData(cacheKey);
+            if (cachedData) return cachedData;
+
             try {
                 const res = await fetch(`https://api.themoviedb.org/3/movie/${movieId}?api_key=${TMDB_API_KEY}&append_to_response=watch/providers&language=fr-FR`);
                 if (!res.ok) return null;
                 const data = await res.json();
                 data.providers = data['watch/providers']?.results?.FR?.flatrate || [];
+                this.setCachedData(cacheKey, data);
                 return data;
             } catch (e) {
                 return null;
@@ -83,6 +106,10 @@ document.addEventListener('alpine:init', () => {
         },
 
         async fetchFullSeriesDetails(seriesId) {
+            const cacheKey = `series-details-${seriesId}`;
+            const cachedData = this.getCachedData(cacheKey);
+            if (cachedData) return cachedData;
+
             try {
                 const seriesRes = await fetch(`https://api.themoviedb.org/3/tv/${seriesId}?api_key=${TMDB_API_KEY}&append_to_response=watch/providers&language=fr-FR`);
                 if (!seriesRes.ok) return null;
@@ -98,6 +125,8 @@ document.addEventListener('alpine:init', () => {
 
                 const seasonsWithEpisodes = await Promise.all(seasonPromises);
                 seriesData.seasons = seasonsWithEpisodes.filter(s => s);
+
+                this.setCachedData(cacheKey, seriesData);
                 return seriesData;
             } catch (e) {
                 console.error(`Failed to fetch full details for series ${seriesId}:`, e);
@@ -209,10 +238,18 @@ document.addEventListener('alpine:init', () => {
         },
 
         async createMediaItemHTML(item) {
-            const isTV = item.type === 'serie';
-            const link = isTV ? `serie.html?id=${item.id}` : `film.html?id=${item.id}`;
-            const yearAndGenre = `${item.year} • ${item.genres[0]}`;
+            if (item.type === 'movie') {
+                return this.createMovieItemHTML(item);
+            }
+            if (item.type === 'serie') {
+                return this.createTVItemHTML(item);
+            }
+            return '';
+        },
 
+        createMovieItemHTML(item) {
+            const link = `film.html?id=${item.id}`;
+            const yearAndGenre = `${item.year} • ${item.genres[0]}`;
             const providers = item.apiDetails?.providers;
             const platformLogo = providers && providers.length > 0
                 ? `<img src="https://image.tmdb.org/t/p/w500${providers[0].logo_path}" alt="${providers[0].provider_name}" class="h-4 w-4 rounded-sm">`
@@ -224,42 +261,11 @@ document.addEventListener('alpine:init', () => {
                     <div class="absolute inset-0 flex items-center justify-center rounded-lg bg-black/60">
                         <div class="text-center">
                             <div class="inline-flex h-8 w-8 items-center justify-center rounded-full bg-green-500 text-white">
-                                <svg fill="none" height="20" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="3" viewBox="0 0 24 24" width="20" xmlns="http://www.w3.org/2000/svg">
-                                    <polyline points="20 6 9 17 4 12"></polyline>
-                                </svg>
+                                <svg fill="none" height="20" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="3" viewBox="0 0 24 24" width="20" xmlns="http://www.w3.org/2000/svg"><polyline points="20 6 9 17 4 12"></polyline></svg>
                             </div>
                             <p class="mt-1 text-xs font-semibold text-white">Watched</p>
                         </div>
                     </div>`;
-            } else if (isTV && item.apiDetails) {
-                const watchedEpisodes = JSON.parse(localStorage.getItem('watchedEpisodes')) || {};
-                const seriesWatchedEpisodes = new Set(watchedEpisodes[item.id] || []);
-                const watchedCount = seriesWatchedEpisodes.size;
-
-                if (watchedCount > 0 && watchedCount < item.apiDetails.number_of_episodes) {
-                    let nextEpisode = null;
-                    const sortedSeasons = item.apiDetails.seasons
-                        .filter(s => s.season_number > 0)
-                        .sort((a, b) => a.season_number - b.season_number);
-
-                    for (const season of sortedSeasons) {
-                        const sortedEpisodes = season.episodes.sort((a, b) => a.episode_number - b.episode_number);
-                        for (const episode of sortedEpisodes) {
-                            if (!seriesWatchedEpisodes.has(episode.id)) {
-                                nextEpisode = episode;
-                                break;
-                            }
-                        }
-                        if (nextEpisode) break;
-                    }
-
-                    if (nextEpisode) {
-                        overlayHTML = `
-                        <div class="absolute bottom-1 left-1 right-1 rounded bg-black/50 p-1 backdrop-blur-sm text-center">
-                           <p class="text-[10px] font-semibold text-white">Next: S${this.formatEpisodeNumber(nextEpisode.season_number)}E${this.formatEpisodeNumber(nextEpisode.episode_number)}</p>
-                        </div>`;
-                    }
-                }
             }
 
             return `
@@ -271,17 +277,162 @@ document.addEventListener('alpine:init', () => {
                     <div class="flex-1">
                         <div class="flex items-center gap-2">
                            ${platformLogo}
-                           <p class="text-xs text-gray-500 dark:text-gray-400">${isTV ? 'TV Show' : 'Movie'}</p>
+                           <p class="text-xs text-gray-500 dark:text-gray-400">Movie</p>
                         </div>
                         <h3 class="font-bold text-gray-900 dark:text-white mt-1">${item.title}</h3>
                         <p class="text-sm text-gray-500 dark:text-gray-400">${yearAndGenre}</p>
                     </div>
-                </a>
-            `;
+                </a>`;
+        },
+
+        createTVItemHTML(item) {
+            const watchedEpisodes = JSON.parse(localStorage.getItem('watchedEpisodes')) || {};
+            const seriesWatchedEpisodes = new Set(watchedEpisodes[item.id] || []);
+            const watchedCount = seriesWatchedEpisodes.size;
+
+            if (item.isWatched || (item.apiDetails && watchedCount > 0 && watchedCount === item.apiDetails.number_of_episodes)) {
+                 return `
+                    <a href="serie.html?id=${item.id}" class="flex items-center gap-4 p-4">
+                        <div class="relative h-24 w-40 flex-shrink-0">
+                            <div class="h-full w-full rounded-lg bg-cover bg-center" style="background-image: url('${item.posterUrl}');"></div>
+                            <div class="absolute inset-0 flex items-center justify-center rounded-lg bg-black/60">
+                                <div class="text-center">
+                                    <div class="inline-flex h-8 w-8 items-center justify-center rounded-full bg-green-500 text-white"><svg fill="none" height="20" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="3" viewBox="0 0 24 24" width="20" xmlns="http://www.w3.org/2000/svg"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+                                    <p class="mt-1 text-xs font-semibold text-white">Watched</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex-1">
+                            <h3 class="font-bold text-gray-900 dark:text-white">${item.title}</h3>
+                            <p class="text-sm text-gray-500 dark:text-gray-400">${item.year} • ${item.genres[0]}</p>
+                        </div>
+                    </a>`;
+            }
+
+            if (watchedCount > 0 && item.apiDetails) {
+                return this.createInProgressTVItemHTML(item, seriesWatchedEpisodes);
+            }
+
+            return this.createUnwatchedTVItemHTML(item);
+        },
+
+        createUnwatchedTVItemHTML(item) {
+            if (!item.apiDetails || !item.apiDetails.seasons) return '<div class="p-4 text-gray-400">Loading show details...</div>';
+
+            const firstSeason = item.apiDetails.seasons.find(s => s.season_number === 1);
+            if (!firstSeason || !firstSeason.episodes || firstSeason.episodes.length === 0) return '';
+
+            const firstEpisode = firstSeason.episodes.find(e => e.episode_number === 1);
+            if (!firstEpisode) return '';
+
+            const providers = item.apiDetails?.providers;
+            const platformHTML = providers && providers.length > 0
+                ? `<div class="flex items-center gap-2 mt-2">
+                       <span class="text-xs text-gray-400">dispo sur</span>
+                       <img src="https://image.tmdb.org/t/p/w500${providers[0].logo_path}" alt="${providers[0].provider_name}" class="h-5">
+                   </div>`
+                : '';
+
+            const totalSeasons = item.apiDetails.number_of_seasons;
+            const startYear = item.year.split(' - ')[0];
+
+            return `
+                <div class="flex items-start gap-4 p-4">
+                    <a href="serie.html?id=${item.id}" class="w-24 flex-shrink-0">
+                        <img class="w-full rounded-lg" src="${item.posterUrl}" alt="${item.title}">
+                    </a>
+                    <div class="flex-1">
+                        <a href="serie.html?id=${item.id}">
+                            <h3 class="font-bold text-lg text-white">${item.title}</h3>
+                            <p class="text-sm text-gray-400">${totalSeasons} saisons | ${startYear}</p>
+                        </a>
+                        <div class="mt-4">
+                            <p class="text-sm font-semibold text-gray-300">${firstEpisode.name}</p>
+                            ${platformHTML}
+                        </div>
+                    </div>
+                </div>`;
+        },
+
+        createInProgressTVItemHTML(item, seriesWatchedEpisodes) {
+            let nextEpisode = null;
+            let currentSeasonForProgress = null;
+
+            const sortedSeasons = item.apiDetails.seasons
+                .filter(s => s.season_number > 0)
+                .sort((a, b) => a.season_number - b.season_number);
+
+            for (const season of sortedSeasons) {
+                const sortedEpisodes = season.episodes.sort((a, b) => a.episode_number - b.episode_number);
+                for (const episode of sortedEpisodes) {
+                    if (!seriesWatchedEpisodes.has(episode.id)) {
+                        nextEpisode = episode;
+                        currentSeasonForProgress = season;
+                        break;
+                    }
+                }
+                if (nextEpisode) break;
+            }
+
+            if (!nextEpisode || !currentSeasonForProgress) {
+                return this.createUnwatchedTVItemHTML(item);
+            }
+
+            const seasonEpisodeIds = new Set(currentSeasonForProgress.episodes.map(e => e.id));
+            const seasonWatchedCount = [...seriesWatchedEpisodes].filter(id => seasonEpisodeIds.has(id)).length;
+            const remainingInSeason = currentSeasonForProgress.episodes.length - seasonWatchedCount;
+            const totalProgress = (seriesWatchedEpisodes.size / item.apiDetails.number_of_episodes) * 100;
+
+            return `
+                <div class="p-4">
+                    <div class="flex items-start gap-4">
+                        <a href="serie.html?id=${item.id}" class="w-24 flex-shrink-0">
+                            <img class="w-full rounded-lg" src="${item.posterUrl}" alt="${item.title}">
+                            <p class="text-xs text-center text-gray-400 mt-1">${remainingInSeason} restants dans la Saison</p>
+                        </a>
+                        <div class="flex-1">
+                             <a href="serie.html?id=${item.id}">
+                                <h3 class="text-lg font-bold text-white">S${this.formatEpisodeNumber(nextEpisode.season_number)} E${this.formatEpisodeNumber(nextEpisode.episode_number)}</h3>
+                                <p class="text-sm text-gray-300">${item.title}</p>
+                                <p class="text-xs text-gray-400 mt-1">${nextEpisode.name}</p>
+                            </a>
+                        </div>
+                        <button aria-label="Mark episode as watched" @click="markEpisodeWatched(${item.id}, ${nextEpisode.id})" class="h-8 w-8 rounded-full border-2 border-gray-500 text-gray-500 flex items-center justify-center flex-shrink-0 hover:border-green-500 hover:text-green-500 transition-colors">
+                            <svg fill="currentColor" height="20" viewBox="0 0 20 20" width="20"><path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"></path></svg>
+                        </button>
+                    </div>
+                    <div class="mt-3 h-1 w-full rounded-full bg-gray-700">
+                        <div class="h-1 rounded-full bg-green-500" style="width: ${totalProgress}%"></div>
+                    </div>
+                </div>`;
         },
 
         formatEpisodeNumber(num) {
             return String(num).padStart(2, '0');
+        },
+
+        async markEpisodeWatched(seriesId, episodeId) {
+            let watchedEpisodes = JSON.parse(localStorage.getItem('watchedEpisodes')) || {};
+            if (!watchedEpisodes[seriesId]) watchedEpisodes[seriesId] = [];
+
+            const seriesIdNum = parseInt(seriesId, 10);
+
+            if (!watchedEpisodes[seriesId].includes(episodeId)) {
+                watchedEpisodes[seriesId].push(episodeId);
+                localStorage.setItem('watchedEpisodes', JSON.stringify(watchedEpisodes));
+            }
+
+            const item = this.enrichedWatchlist.find(i => i.id === seriesIdNum);
+            if (item && item.apiDetails && watchedEpisodes[seriesId].length === item.apiDetails.number_of_episodes) {
+                let watchedSeries = JSON.parse(localStorage.getItem('watchedSeries')) || [];
+                if (!watchedSeries.includes(seriesIdNum)) {
+                    watchedSeries.push(seriesIdNum);
+                    localStorage.setItem('watchedSeries', JSON.stringify(watchedSeries));
+                }
+                item.isWatched = true;
+            }
+
+            await this.renderMedia();
         }
     }));
 });
