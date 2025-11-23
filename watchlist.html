@@ -38,52 +38,90 @@
 </head>
 <body class="bg-background-light dark:bg-background-dark font-display text-gray-800 dark:text-gray-200" x-data="watchlistPage">
 <div class="flex h-screen flex-col">
-    <header class="flex-shrink-0">
-        <div class="flex items-center p-4">
-            <a href="index.html" class="p-2">
-                <svg class="text-gray-800 dark:text-gray-200" fill="currentColor" height="24" viewBox="0 0 256 256" width="24" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M224,128a8,8,0,0,1-8,8H59.31l58.35,58.34a8,8,0,0,1-11.32,11.32l-72-72a8,8,0,0,1,0-11.32l72-72a8,8,0,0,1,11.32,11.32L59.31,120H216A8,8,0,0,1,224,128Z"></path>
-                </svg>
-            </a>
-            <h1 class="flex-1 text-center text-xl font-bold text-gray-900 dark:text-white pr-10">Watchlist</h1>
-        </div>
-        <div class="border-b border-gray-200/20 dark:border-gray-700/50">
-            <nav aria-label="Tabs" class="flex px-4">
-                <a href="#" @click.prevent="activeTab = 'movie'" :class="{'border-primary text-primary': activeTab === 'movie', 'border-transparent text-gray-500 dark:text-gray-400 hover:border-gray-300 hover:text-gray-700': activeTab !== 'movie'}" class="border-b-2 flex-1 whitespace-nowrap py-4 px-1 text-center text-sm font-semibold">Movies</a>
-                <a href="#" @click.prevent="activeTab = 'tv'" :class="{'border-primary text-primary': activeTab === 'tv', 'border-transparent text-gray-500 dark:text-gray-400 hover:border-gray-300 hover:text-gray-700': activeTab !== 'tv'}" class="border-b-2 flex-1 whitespace-nowrap py-4 px-1 text-center text-sm font-semibold">TV Shows</a>
-            </nav>
-        </div>
-        <div class="flex flex-col gap-4 p-4 border-b border-gray-200/20 dark:border-gray-700/50">
-            <div class="flex items-center justify-between gap-4">
-                <div id="platform-filter" class="flex items-center -space-x-2">
-                </div>
-                <div class="flex items-center space-x-2" x-data="{ sortMenuOpen: false }">
-                    <div class="relative">
-                        <button @click="sortMenuOpen = !sortMenuOpen" class="flex items-center space-x-1 rounded-full bg-black/30 p-2 text-xs text-gray-400 hover:text-white transition-colors" data-testid="sort-button">
-                            <span class="material-symbols-outlined text-base">swap_vert</span>
-                            <span x-text="`Trier: ${sortLabel}`"></span>
-                        </button>
-                        <div x-show="sortMenuOpen" @click.away="sortMenuOpen = false" class="absolute right-0 mt-2 w-48 bg-gray-800 rounded-md shadow-lg z-20">
-                            <a href="#" @click.prevent="setSort('popularity'); sortMenuOpen = false" class="block px-4 py-2 text-sm text-gray-300 hover:bg-gray-700">Popularité</a>
-                            <a href="#" @click.prevent="setSort('release_date'); sortMenuOpen = false" class="block px-4 py-2 text-sm text-gray-300 hover:bg-gray-700">Date de sortie</a>
-                            <a href="#" @click.prevent="setSort('recently_added'); sortMenuOpen = false" class="block px-4 py-2 text-sm text-gray-300 hover:bg-gray-700">Date d'ajout</a>
+   <header class="flex-shrink-0 bg-background-light dark:bg-background-dark z-20">
+    <div class="flex items-center p-4 pb-2">
+        <a href="index.html" class="p-2 -ml-2">
+            <span class="material-symbols-outlined text-gray-800 dark:text-gray-200">arrow_back</span>
+        </a>
+        <h1 class="flex-1 text-center text-xl font-bold text-gray-900 dark:text-white pr-6">My List</h1>
+    </div>
+
+    <div class="border-b border-gray-200/20 dark:border-gray-700/50">
+        <nav aria-label="Tabs" class="flex px-4">
+            <a href="#" @click.prevent="activeTab = 'movie'" 
+               :class="{'border-primary text-primary': activeTab === 'movie', 'border-transparent text-gray-500 dark:text-gray-400 hover:border-gray-300 hover:text-gray-700': activeTab !== 'movie'}" 
+               class="border-b-2 flex-1 whitespace-nowrap py-3 px-1 text-center text-sm font-semibold transition-colors">Movies</a>
+            <a href="#" @click.prevent="activeTab = 'tv'" 
+               :class="{'border-primary text-primary': activeTab === 'tv', 'border-transparent text-gray-500 dark:text-gray-400 hover:border-gray-300 hover:text-gray-700': activeTab !== 'tv'}" 
+               class="border-b-2 flex-1 whitespace-nowrap py-3 px-1 text-center text-sm font-semibold transition-colors">TV Shows</a>
+        </nav>
+    </div>
+
+    <div class="flex items-center justify-between px-4 py-4 gap-2">
+        
+        <div class="flex items-center">
+            <div class="flex -space-x-3 hover:space-x-1 transition-all duration-200">
+                
+                <template x-if="selectedPlatform">
+                    <button @click="selectedPlatform = null" 
+                            class="relative z-10 h-10 w-10 rounded-full ring-2 ring-background-light dark:ring-background-dark transition-transform hover:scale-110 hover:z-20"
+                            :title="selectedPlatform.name">
+                        <img :src="selectedPlatform.logoUrl" class="h-full w-full rounded-full object-cover bg-gray-800">
+                        <div class="absolute -top-1 -right-1 bg-gray-800 rounded-full p-0.5 border border-gray-600">
+                            <span class="material-symbols-outlined text-[10px] text-white block">close</span>
                         </div>
-                    </div>
-                    <button class="flex items-center space-x-1 rounded-full bg-black/30 p-2 text-xs text-gray-600 cursor-not-allowed" disabled>
-                        <span class="material-symbols-outlined text-base">filter_list</span>
-                        <span>Filtrer</span>
                     </button>
-                </div>
-            </div>
-            <div class="flex items-center justify-center">
-                <div class="flex items-center space-x-2 rounded-full bg-black/30 p-1">
-                    <button @click="watchStatusFilter = 'all'" :class="{'bg-primary text-white': watchStatusFilter === 'all', 'text-gray-400': watchStatusFilter !== 'all'}" class="rounded-full py-2 px-4 text-center text-sm font-semibold transition-colors duration-300">Tout</button>
-                    <button @click="watchStatusFilter = 'watched'" :class="{'bg-primary text-white': watchStatusFilter === 'watched', 'text-gray-400': watchStatusFilter !== 'watched'}" class="rounded-full py-2 px-4 text-center text-sm font-semibold transition-colors duration-300">Vu</button>
-                    <button @click="watchStatusFilter = 'unwatched'" :class="{'bg-primary text-white': watchStatusFilter === 'unwatched', 'text-gray-400': watchStatusFilter !== 'unwatched'}" class="rounded-full py-2 px-4 text-center text-sm font-semibold transition-colors duration-300">Pas encore vu</button>
-                </div>
+                </template>
+
+                <a href="platforms.html" 
+                   class="relative z-0 flex h-10 w-10 items-center justify-center rounded-full bg-gray-200 dark:bg-gray-800 ring-2 ring-background-light dark:ring-background-dark text-gray-500 dark:text-gray-400 hover:bg-gray-300 dark:hover:bg-gray-700 transition-colors">
+                    <span class="material-symbols-outlined text-xl">add</span>
+                </a>
             </div>
         </div>
-    </header>
+
+        <div class="flex-1 flex justify-center max-w-[200px]">
+            <div class="relative flex w-full items-center bg-gray-200 dark:bg-gray-800 rounded-full p-1 h-10 cursor-pointer">
+                <div class="absolute inset-y-1 w-[calc(50%-4px)] bg-primary rounded-full shadow-md transition-all duration-300 ease-out"
+                     :class="watchStatusFilter === 'watched' ? 'translate-x-[100%] left-1' : 'translate-x-0 left-1'">
+                </div>
+
+                <button @click="watchStatusFilter = 'unwatched'" 
+                        class="relative z-10 flex-1 text-xs font-bold uppercase tracking-wide transition-colors duration-200 text-center h-full flex items-center justify-center"
+                        :class="watchStatusFilter === 'unwatched' ? 'text-white' : 'text-gray-500 dark:text-gray-400'">
+                    Watchlist
+                </button>
+
+                <button @click="watchStatusFilter = 'watched'" 
+                        class="relative z-10 flex-1 text-xs font-bold uppercase tracking-wide transition-colors duration-200 text-center h-full flex items-center justify-center"
+                        :class="watchStatusFilter === 'watched' ? 'text-white' : 'text-gray-500 dark:text-gray-400'">
+                    Vu
+                </button>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-1">
+            <div class="relative" x-data="{ open: false }">
+                <button @click="open = !open" class="p-2 text-gray-500 dark:text-gray-400 hover:text-primary transition-colors rounded-full hover:bg-gray-100 dark:hover:bg-white/5">
+                    <span class="material-symbols-outlined">sort</span>
+                </button>
+                
+                <div x-show="open" @click.away="open = false" 
+                     class="absolute right-0 top-full mt-2 w-40 bg-gray-800 rounded-xl shadow-xl z-50 border border-gray-700 py-2" 
+                     x-transition.origin.top.right x-cloak>
+                    <a href="#" @click.prevent="setSort('popularity'); open = false" class="block px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white">Popularité</a>
+                    <a href="#" @click.prevent="setSort('release_date'); open = false" class="block px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white">Date de sortie</a>
+                    <a href="#" @click.prevent="setSort('recently_added'); open = false" class="block px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white">Date d'ajout</a>
+                </div>
+            </div>
+
+            <button class="p-2 text-gray-500 dark:text-gray-400 hover:text-primary transition-colors rounded-full hover:bg-gray-100 dark:hover:bg-white/5">
+                <span class="material-symbols-outlined">filter_list</span>
+            </button>
+        </div>
+
+    </div>
+</header>
     <main class="flex-1 overflow-y-auto" x-cloak>
         <div id="media-list" class="divide-y divide-gray-200/20 dark:divide-gray-700/50">
              <!-- Media items will be injected here by mylist.js -->
