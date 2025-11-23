@@ -2,52 +2,28 @@ document.addEventListener('alpine:init', () => {
     Alpine.data('watchlistPage', () => ({
         watchlist: [],
         enrichedWatchlist: [],
-        activeTab: 'tv', // 'movie' ou 'tv'
+        
+        // Démarrage sur Films par défaut
+        activeTab: 'movie', 
         sortOrder: 'popularity',
         
-        // Tableau pour gérer plusieurs filtres en même temps
         activePlatformFilters: [], 
+        watchStatusFilter: 'unwatched',
         
-        watchStatusFilter: 'unwatched', // 'watched' ou 'unwatched'
-        
-        // État et préférences utilisateur
+        // Contrôle du tiroir de services
+        showServiceBar: false,
+
         userRegion: localStorage.getItem('userRegion') || 'FR',
         myPlatformIds: [], 
-        userSelectedPlatforms: [], // Pour l'affichage
+        userSelectedPlatforms: [], 
 
-        // LISTE DES PLATEFORMES AVEC VOS URLS PERSONNALISÉES
         availablePlatforms: [
-            { 
-                id: 'netflix', 
-                name: 'Netflix', 
-                logoUrl: 'https://images.ctfassets.net/4cd45et68cgf/Rx83JoRDMkYNlMC9MKzcB/2b14d5a59fc3937afd3f03191e19502d/Netflix-Symbol.png?w=700&h=456' 
-            },
-            { 
-                id: 'prime', 
-                name: 'Prime Video', 
-                logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/ca/Amazon_Prime_Video_logo_%282024%29.svg/1024px-Amazon_Prime_Video_logo_%282024%29.svg.png' 
-            },
-            { 
-                id: 'disney', 
-                name: 'Disney+', 
-                logoUrl: 'https://platform.theverge.com/wp-content/uploads/sites/2/chorus/uploads/chorus_asset/file/25357066/Disney__Logo_March_2024.png?quality=90&strip=all&crop=0,0,100,100' 
-            },
-            { 
-                id: 'apple', 
-                name: 'Apple TV+', 
-                logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/ad/AppleTVLogo.svg/768px-AppleTVLogo.svg.png' 
-            },
-            { 
-                id: 'canal', 
-                name: 'Canal+', 
-                logoUrl: 'https://static1.purepeople.com/articles/0/46/23/10/@/6655765-logo-de-la-chaine-canal-1200x0-2.png' 
-            },
-            { 
-                id: 'paramount', 
-                name: 'Paramount+', 
-                logoUrl: 'https://images.seeklogo.com/logo-png/39/1/paramount-logo-png_seeklogo-397501.png' 
-            },
-            // Pour ceux-ci, on garde les logos automatiques car pas d'URL fournie
+            { id: 'netflix', name: 'Netflix', logoUrl: 'https://images.ctfassets.net/4cd45et68cgf/Rx83JoRDMkYNlMC9MKzcB/2b14d5a59fc3937afd3f03191e19502d/Netflix-Symbol.png?w=700&h=456' },
+            { id: 'prime', name: 'Prime Video', logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/ca/Amazon_Prime_Video_logo_%282024%29.svg/1024px-Amazon_Prime_Video_logo_%282024%29.svg.png' },
+            { id: 'disney', name: 'Disney+', logoUrl: 'https://platform.theverge.com/wp-content/uploads/sites/2/chorus/uploads/chorus_asset/file/25357066/Disney__Logo_March_2024.png?quality=90&strip=all&crop=0,0,100,100' },
+            { id: 'apple', name: 'Apple TV+', logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/ad/AppleTVLogo.svg/768px-AppleTVLogo.svg.png' },
+            { id: 'canal', name: 'Canal+', logoUrl: 'https://static1.purepeople.com/articles/0/46/23/10/@/6655765-logo-de-la-chaine-canal-1200x0-2.png' },
+            { id: 'paramount', name: 'Paramount+', logoUrl: 'https://images.seeklogo.com/logo-png/39/1/paramount-logo-png_seeklogo-397501.png' },
             { id: 'max', name: 'Max', logoUrl: 'https://logo.clearbit.com/max.com' },
             { id: 'skygo', name: 'Sky Go', logoUrl: 'https://logo.clearbit.com/sky.com' },
             { id: 'now', name: 'Now', logoUrl: 'https://logo.clearbit.com/nowtv.com' }
@@ -55,23 +31,23 @@ document.addEventListener('alpine:init', () => {
 
         async init() {
             this.loadWatchlist();
+            
+            // Mise à jour drapeau
             const flagImg = document.getElementById('header-flag');
             if (flagImg) {
                 flagImg.src = `https://flagcdn.com/w40/${this.userRegion.toLowerCase()}.png`;
                 flagImg.alt = this.userRegion;
             }
-            // 1. Charger les préférences de plateformes du profil
+
             const savedPlatforms = localStorage.getItem('selectedPlatforms');
             this.myPlatformIds = savedPlatforms ? JSON.parse(savedPlatforms) : [];
 
-            // 2. Préparer la liste d'affichage (seulement celles que l'utilisateur possède)
             this.userSelectedPlatforms = this.availablePlatforms.filter(p => 
                 this.myPlatformIds.includes(p.id)
             );
 
             await this.fetchAndEnrichWatchlist();
             
-            // Surveillance des variables pour rafraîchir l'affichage
             this.$watch('activeTab', () => this.renderMedia());
             this.$watch('watchStatusFilter', () => this.renderMedia());
             this.$watch('activePlatformFilters', () => this.renderMedia());
@@ -79,13 +55,10 @@ document.addEventListener('alpine:init', () => {
             await this.renderMedia();
         },
 
-        // Gestion du clic sur un filtre (Multi-sélection)
         togglePlatformFilter(platformId) {
             if (this.activePlatformFilters.includes(platformId)) {
-                // Si déjà actif, on l'enlève
                 this.activePlatformFilters = this.activePlatformFilters.filter(id => id !== platformId);
             } else {
-                // Sinon on l'ajoute
                 this.activePlatformFilters.push(platformId);
             }
         },
@@ -95,127 +68,17 @@ document.addEventListener('alpine:init', () => {
             this.watchlist = savedList ? JSON.parse(savedList) : [];
         },
 
-        getInternalPlatformId(tmdbName) {
-            const lower = tmdbName.toLowerCase();
-            if (lower.includes('netflix')) return 'netflix';
-            if (lower.includes('amazon') || lower.includes('prime')) return 'prime';
-            if (lower.includes('disney')) return 'disney';
-            if (lower.includes('apple')) return 'apple';
-            if (lower.includes('canal')) return 'canal';
-            if (lower.includes('paramount')) return 'paramount';
-            if (lower.includes('max') || lower.includes('hbo')) return 'max';
-            if (lower.includes('sky')) return 'skygo';
-            if (lower.includes('now')) return 'now';
-            return 'other';
-        },
-
-        getProvidersForItem(item) {
-            if (!item.apiDetails || !item.apiDetails['watch/providers']) return [];
-            
-            const providersData = item.apiDetails['watch/providers'].results;
-            let combinedProviders = [];
-
-            // 1. Providers du pays sélectionné
-            if (providersData[this.userRegion] && providersData[this.userRegion].flatrate) {
-                combinedProviders = [...providersData[this.userRegion].flatrate];
-            }
-
-            // 2. Exception Canal+ (Si hors France mais abonné Canal)
-            if (this.userRegion !== 'FR' && this.myPlatformIds.includes('canal')) {
-                if (providersData['FR'] && providersData['FR'].flatrate) {
-                    const canalProvider = providersData['FR'].flatrate.find(p => p.provider_id === 392 || p.provider_name.includes('Canal'));
-                    if (canalProvider) {
-                        if (!combinedProviders.some(p => p.provider_id === canalProvider.provider_id)) {
-                            combinedProviders.push(canalProvider);
-                        }
-                    }
-                }
-            }
-            return combinedProviders;
-        },
-
-        async fetchAndEnrichWatchlist() {
-            const watchlistWithMediaData = this.watchlist.map(item => {
-                const media = mediaData.find(m => m.id === item.id);
-                return { ...media, ...item, apiDetails: null };
-            });
-
-            const promises = watchlistWithMediaData.map(item => {
-                if (!item) return Promise.resolve(null);
-                if (item.type === 'serie' || item.type === 'tv') {
-                    return this.fetchFullSeriesDetails(item.id);
-                } else if (item.type === 'movie') {
-                    return this.fetchMovieDetails(item.id);
-                }
-                return Promise.resolve(null);
-            });
-
-            const results = await Promise.all(promises);
-
-            this.enrichedWatchlist = watchlistWithMediaData.map(item => {
-                if (!item) return null;
-                const details = results.find(d => d && d.id === item.id);
-                if (details) {
-                    item.apiDetails = details;
-                }
-                return item;
-            }).filter(Boolean);
-        },
-
-        getCachedData(key) {
-            const cached = localStorage.getItem(key);
-            if (!cached) return null;
-            const { timestamp, data } = JSON.parse(cached);
-            const isExpired = (new Date().getTime() - timestamp) > 24 * 60 * 60 * 1000;
-            return isExpired ? null : data;
-        },
-
-        setCachedData(key, data) {
-            const item = { timestamp: new Date().getTime(), data: data };
-            localStorage.setItem(key, JSON.stringify(item));
-        },
-
-        async fetchMovieDetails(movieId) {
-            const cacheKey = `movie-details-${movieId}`;
-            const cachedData = this.getCachedData(cacheKey);
-            if (cachedData) return cachedData;
-
-            try {
-                const res = await fetch(`https://api.themoviedb.org/3/movie/${movieId}?api_key=${TMDB_API_KEY}&append_to_response=watch/providers`);
-                if (!res.ok) return null;
-                const data = await res.json();
-                this.setCachedData(cacheKey, data);
-                return data;
-            } catch (e) { return null; }
-        },
-
-        async fetchFullSeriesDetails(seriesId) {
-            const cacheKey = `series-details-${seriesId}`;
-            const cachedData = this.getCachedData(cacheKey);
-            if (cachedData) return cachedData;
-
-            try {
-                const seriesRes = await fetch(`https://api.themoviedb.org/3/tv/${seriesId}?api_key=${TMDB_API_KEY}&append_to_response=watch/providers`);
-                if (!seriesRes.ok) return null;
-                const seriesData = await seriesRes.json();
-
-                const seasonPromises = seriesData.seasons
-                    .filter(s => s.season_number > 0)
-                    .map(season =>
-                        fetch(`https://api.themoviedb.org/3/tv/${seriesId}/season/${season.season_number}?api_key=${TMDB_API_KEY}`)
-                        .then(res => res.ok ? res.json() : null)
-                    );
-
-                const seasonsWithEpisodes = await Promise.all(seasonPromises);
-                seriesData.seasons = seasonsWithEpisodes.filter(s => s);
-
-                this.setCachedData(cacheKey, seriesData);
-                return seriesData;
-            } catch (e) { return null; }
-        },
-
+        getInternalPlatformId(tmdbName) { const lower = tmdbName.toLowerCase(); if (lower.includes('netflix')) return 'netflix'; if (lower.includes('amazon') || lower.includes('prime')) return 'prime'; if (lower.includes('disney')) return 'disney'; if (lower.includes('apple')) return 'apple'; if (lower.includes('canal')) return 'canal'; if (lower.includes('paramount')) return 'paramount'; if (lower.includes('max') || lower.includes('hbo')) return 'max'; if (lower.includes('sky')) return 'skygo'; if (lower.includes('now')) return 'now'; return 'other'; },
+        getProvidersForItem(item) { if (!item.apiDetails || !item.apiDetails['watch/providers']) return []; const providersData = item.apiDetails['watch/providers'].results; let combinedProviders = []; if (providersData[this.userRegion] && providersData[this.userRegion].flatrate) { combinedProviders = [...providersData[this.userRegion].flatrate]; } if (this.userRegion !== 'FR' && this.myPlatformIds.includes('canal')) { if (providersData['FR'] && providersData['FR'].flatrate) { const canalProvider = providersData['FR'].flatrate.find(p => p.provider_id === 392 || p.provider_name.includes('Canal')); if (canalProvider) { if (!combinedProviders.some(p => p.provider_id === canalProvider.provider_id)) { combinedProviders.push(canalProvider); } } } } return combinedProviders; },
+        async fetchAndEnrichWatchlist() { const watchlistWithMediaData = this.watchlist.map(item => { const media = mediaData.find(m => m.id === item.id); return { ...media, ...item, apiDetails: null }; }); const promises = watchlistWithMediaData.map(item => { if (!item) return Promise.resolve(null); if (item.type === 'serie' || item.type === 'tv') { return this.fetchFullSeriesDetails(item.id); } else if (item.type === 'movie') { return this.fetchMovieDetails(item.id); } return Promise.resolve(null); }); const results = await Promise.all(promises); this.enrichedWatchlist = watchlistWithMediaData.map(item => { if (!item) return null; const details = results.find(d => d && d.id === item.id); if (details) { item.apiDetails = details; } return item; }).filter(Boolean); },
+        getCachedData(key) { const cached = localStorage.getItem(key); if (!cached) return null; const { timestamp, data } = JSON.parse(cached); const isExpired = (new Date().getTime() - timestamp) > 24 * 60 * 60 * 1000; return isExpired ? null : data; },
+        setCachedData(key, data) { const item = { timestamp: new Date().getTime(), data: data }; localStorage.setItem(key, JSON.stringify(item)); },
+        async fetchMovieDetails(movieId) { const cacheKey = `movie-details-${movieId}`; const cachedData = this.getCachedData(cacheKey); if (cachedData) return cachedData; try { const res = await fetch(`https://api.themoviedb.org/3/movie/${movieId}?api_key=${TMDB_API_KEY}&append_to_response=watch/providers`); if (!res.ok) return null; const data = await res.json(); this.setCachedData(cacheKey, data); return data; } catch (e) { return null; } },
+        async fetchFullSeriesDetails(seriesId) { const cacheKey = `series-details-${seriesId}`; const cachedData = this.getCachedData(cacheKey); if (cachedData) return cachedData; try { const seriesRes = await fetch(`https://api.themoviedb.org/3/tv/${seriesId}?api_key=${TMDB_API_KEY}&append_to_response=watch/providers`); if (!seriesRes.ok) return null; const seriesData = await seriesRes.json(); const seasonPromises = seriesData.seasons.filter(s => s.season_number > 0).map(season => fetch(`https://api.themoviedb.org/3/tv/${seriesId}/season/${season.season_number}?api_key=${TMDB_API_KEY}`).then(res => res.ok ? res.json() : null)); const seasonsWithEpisodes = await Promise.all(seasonPromises); seriesData.seasons = seasonsWithEpisodes.filter(s => s); this.setCachedData(cacheKey, seriesData); return seriesData; } catch (e) { return null; } },
+        
         get filteredMedia() {
-            const type = this.activeTab === 'tv' ? 'serie' : 'movie';
+            // FILTRAGE TYPE
+            const type = this.activeTab === 'movie' ? 'movie' : 'serie'; 
             const watchedMovies = JSON.parse(localStorage.getItem('watchedMovies')) || [];
             const watchedSeries = JSON.parse(localStorage.getItem('watchedSeries')) || [];
 
@@ -234,6 +97,7 @@ document.addEventListener('alpine:init', () => {
                 })
                 .filter(item => item && item.type === type);
 
+            // FILTRAGE PLATEFORMES
             if (this.activePlatformFilters.length > 0) {
                 filtered = filtered.filter(item =>
                     item.dynamicProviders.some(p => 
@@ -242,6 +106,7 @@ document.addEventListener('alpine:init', () => {
                 );
             }
 
+            // FILTRAGE STATUS (WATCHLIST/VU)
             if (this.watchStatusFilter === 'watched') {
                 filtered = filtered.filter(item => item.isWatched);
             } else if (this.watchStatusFilter === 'unwatched') {
@@ -289,11 +154,11 @@ document.addEventListener('alpine:init', () => {
 
             if (itemsToRender.length === 0) {
                 container.innerHTML = '';
-                if (emptyState) emptyState.style.display = 'block';
+                if (emptyState) emptyState.classList.remove('hidden');
                 return;
             }
 
-            if (emptyState) emptyState.style.display = 'none';
+            if (emptyState) emptyState.classList.add('hidden');
             const mediaHTMLPromises = itemsToRender.map(item => this.createMediaItemHTML(item));
             const mediaHTML = await Promise.all(mediaHTMLPromises);
             container.innerHTML = mediaHTML.join('');
@@ -324,9 +189,8 @@ document.addEventListener('alpine:init', () => {
             if (myProviders.length === 0) return '';
             return myProviders.map(p => {
                 const platformObj = this.availablePlatforms.find(ap => ap.id === this.getInternalPlatformId(p.provider_name));
-                // Utiliser le logo personnalisé s'il existe, sinon l'URL TMDB
                 const logo = platformObj ? platformObj.logoUrl : (p.logo_path ? `https://image.tmdb.org/t/p/original${p.logo_path}` : p.logoUrl);
-                return `<img src="${logo}" alt="${p.provider_name}" class="h-4 w-4 rounded-sm object-contain bg-gray-800" title="${p.provider_name}">`;
+                return `<img src="${logo}" alt="${p.provider_name}" class="h-4 w-4 rounded-sm object-cover bg-gray-800" title="${p.provider_name}">`;
             }).join('');
         },
 
