@@ -1,4 +1,4 @@
-// details.js - Version Corrigée (Casting Original)
+// details.js - Version Optimisée (Casting Mobile Lisible)
 
 const BASE_URL = 'https://api.themoviedb.org/3';
 const IMG_BASE_POSTER = 'https://image.tmdb.org/t/p/w500';
@@ -32,7 +32,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     initializeWatchlistButton(mediaId);
 
-    // Gestionnaire pour "Voir tout" le casting
     const seeAllLink = document.querySelector('#cast-section a');
     if (seeAllLink) {
         seeAllLink.addEventListener('click', (e) => {
@@ -264,7 +263,7 @@ function updateStreamingUI(allProvidersData) {
     }
 }
 
-// --- RESTAURATION DE LA LOGIQUE DU CASTING ORIGINAL ---
+// --- CASTING OPTIMISÉ MOBILE (NOM ENTIER) ---
 function updateCastUI(cast) {
     currentCastData = cast;
     const castContainer = document.getElementById('full-cast-container');
@@ -285,24 +284,22 @@ function renderCastList() {
     const seeAllLink = document.querySelector('#cast-section a');
     castContainer.innerHTML = '';
 
-    // Logique 4 ou 20 items
     const limit = isCastExpanded ? 20 : 4;
     const displayList = currentCastData.slice(0, limit);
 
     displayList.forEach(member => {
         const link = member.id ? `person.html?id=${member.id}` : '#';
-        // Design original : Carte horizontale dans une grille
+        // Modif : Gap réduit (2), Image réduite (h-12), Texte xs, Pas de truncate sur le nom + leading-tight
         castContainer.innerHTML += `
-            <a href="${link}" class="flex items-center gap-3 group hover:bg-white/10 p-2 rounded-lg transition-colors duration-200">
-                <img class="h-14 w-14 rounded-full object-cover flex-shrink-0 group-hover:scale-105 transition-transform duration-200" src="${member.imageUrl}" onerror="this.src='https://placehold.co/64x64'"/>
-                <div class="min-w-0">
-                    <p class="font-semibold text-white text-sm group-hover:text-primary transition-colors truncate">${member.name}</p>
-                    <p class="text-xs text-gray-400 truncate">${member.character}</p>
+            <a href="${link}" class="flex items-center gap-2 group hover:bg-white/10 p-2 rounded-lg transition-colors duration-200">
+                <img class="h-12 w-12 rounded-full object-cover flex-shrink-0 group-hover:scale-105 transition-transform duration-200 bg-gray-800" src="${member.imageUrl}" onerror="this.src='https://placehold.co/64x64'"/>
+                <div class="min-w-0 flex-1">
+                    <p class="font-semibold text-white text-xs leading-tight group-hover:text-primary transition-colors">${member.name}</p>
+                    <p class="text-[10px] text-gray-400 truncate">${member.character}</p>
                 </div>
             </a>`;
     });
 
-    // Gestion du lien "Voir tout / Voir moins"
     if (seeAllLink) {
         if (currentCastData.length <= 4) {
             seeAllLink.style.display = 'none';
@@ -317,7 +314,7 @@ function toggleCastExpansion(linkElement) {
     isCastExpanded = !isCastExpanded;
     renderCastList();
 }
-// -----------------------------------------------------
+// ----------------------------------------------
 
 function updatePersonUI(person, type) {
     const section = document.getElementById('director-section');
