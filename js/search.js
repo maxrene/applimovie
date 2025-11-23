@@ -91,6 +91,11 @@ document.addEventListener('alpine:init', () => {
             window.location.href = url;
         },
 
+        clearHistory() {
+            this.previousSearches = [];
+            localStorage.removeItem('previousSearches');
+        },
+
         getItemType(item, forPopular = false) {
              const mediaType = forPopular ? item.media_type : (item.media_type || (item.known_for_department ? 'person' : 'movie'));
             switch (mediaType) {
