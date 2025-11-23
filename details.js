@@ -647,7 +647,9 @@ async function toggleWatchlist(mediaId) {
         localStorage.setItem(watchedListKey, JSON.stringify(watchedList));
         updateWatchlistButton(mediaId);
     } else {
-        watchlist.push({ id: mediaIdNum, added_at: new Date().toISOString() });
+        // Fix: Save the type (movie/serie) to avoid missing metadata issues in Watchlist
+        const type = isMovie ? 'movie' : 'serie';
+        watchlist.push({ id: mediaIdNum, type: type, added_at: new Date().toISOString() });
         localStorage.setItem('watchlist', JSON.stringify(watchlist));
         updateWatchlistButton(mediaId);
     }
