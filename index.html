@@ -3,18 +3,13 @@
 <head>
     <meta charset="utf-8"/>
     <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport"/>
-    
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#121212">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="apple-touch-icon" href="icons/icon-192.png">
-
     <title>CineMatch</title>
     <link href="https://fonts.googleapis.com/css2?family=Spline+Sans:wght@400;500;700&display=swap" rel="stylesheet"/>
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400..700,0..1,0" rel="stylesheet" />
-
     <script>
         tailwind.config = {
             darkMode: "class",
@@ -35,10 +30,10 @@
 <body class="bg-background-light dark:bg-background-dark font-display text-gray-900 dark:text-gray-100">
 <div class="flex flex-col h-screen">
     
-    <header class="flex-shrink-0 sticky top-0 z-10 bg-background-light/80 dark:bg-background-dark/80 backdrop-blur-sm">
+    <header class="flex-shrink-0 sticky top-0 z-10 bg-background-light/80 dark:bg-background-dark/80 backdrop-blur-sm border-b border-gray-200/50 dark:border-gray-800/50">
         <div class="container mx-auto px-4 py-3">
             <div class="flex items-center justify-between">
-                <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">CineMatch</h1>
+                <h1 class="text-xl font-bold text-primary tracking-tight">CineMatch</h1>
                 <a href="profile.html" class="flex items-center gap-3 p-1 rounded-full hover:bg-gray-200 dark:hover:bg-white/10 transition-colors">
                     <img id="header-flag" src="https://flagcdn.com/w40/fr.png" alt="FR" class="w-5 h-auto rounded-sm shadow-sm object-cover">
                     <span class="material-symbols-outlined text-3xl text-gray-600 dark:text-gray-300">account_circle</span>
@@ -47,7 +42,7 @@
         </div>
     </header>
 
-    <main class="flex-1 overflow-y-auto scroll-smooth">
+    <main class="flex-1 overflow-y-auto scroll-smooth pb-24">
         <div id="loading-spinner" class="fixed inset-0 z-50 flex items-center justify-center bg-background-light/80 dark:bg-background-dark/80 backdrop-blur-sm" style="display: none;">
             <svg class="animate-spin h-10 w-10 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -55,57 +50,48 @@
             </svg>
         </div>
 
-        <div class="px-4 py-4">
-            <div class="grid grid-cols-3 gap-1 rounded-full bg-gray-200 dark:bg-gray-800 p-1">
-                <button id="filter-both" class="px-4 py-2 text-sm font-semibold rounded-full bg-primary text-white">Both</button>
-                <button id="filter-movies" class="px-4 py-2 text-sm font-semibold rounded-full text-gray-600 dark:text-gray-300">Movies Only</button>
-                <button id="filter-series" class="px-4 py-2 text-sm font-semibold rounded-full text-gray-600 dark:text-gray-300">TV Shows Only</button>
-            </div>
-        </div>
-
-        <section id="popular-section" class="py-6 pt-2">
-          <h2 class="px-4 mb-3 text-xl font-bold text-gray-900 dark:text-gray-100">Trendy Movies</h2>
+        <section id="popular-section" class="py-6 pt-6">
+          <div class="px-4 mb-3 flex items-center justify-between">
+              <h2 class="text-lg font-bold text-gray-900 dark:text-white">Tendances</h2>
+              <a href="popular.html" class="text-xs font-semibold text-primary">Voir tout</a>
+          </div>
           <div class="flex overflow-x-auto snap-x snap-mandatory [-ms-scrollbar-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <div id="popular-container" class="flex px-4 gap-4"></div>
           </div>
         </section>
         
-        <section id="netflix-section" class="py-6"><h2 class="px-4 mb-3 text-xl font-bold text-gray-900 dark:text-gray-100">Netflix Picks</h2><div class="flex overflow-x-auto snap-x snap-mandatory [-ms-scrollbar-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"><div id="netflix-container" class="flex px-4 gap-4"></div></div></section>
-        <section id="prime-video-section" class="py-6"><h2 class="px-4 mb-3 text-xl font-bold text-gray-900 dark:text-gray-100">Amazon Prime Exclusives</h2><div class="flex overflow-x-auto snap-x snap-mandatory [-ms-scrollbar-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"><div id="prime-video-container" class="flex px-4 gap-4"></div></div></section>
-        <section id="apple-tv-section" class="py-6"><h2 class="px-4 mb-3 text-xl font-bold text-gray-900 dark:text-gray-100">Apple TV+ Selection</h2><div class="flex overflow-x-auto snap-x snap-mandatory [-ms-scrollbar-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"><div id="apple-tv-container" class="flex px-4 gap-4"></div></div></section>
-        <section id="disney-plus-section" class="py-6"><h2 class="px-4 mb-3 text-xl font-bold text-gray-900 dark:text-gray-100">Disney+ Favorites</h2><div class="flex overflow-x-auto snap-x snap-mandatory [-ms-scrollbar-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"><div id="disney-plus-container" class="flex px-4 gap-4"></div></div></section>
-        <section id="canal-plus-section" class="py-6"><h2 class="px-4 mb-3 text-xl font-bold text-gray-900 dark:text-gray-100">Canal+ Exclusives</h2><div class="flex overflow-x-auto snap-x snap-mandatory [-ms-scrollbar-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"><div id="canal-plus-container" class="flex px-4 gap-4"></div></div></section>
-        <div class="h-8"></div> 
+        <section id="netflix-section" class="py-4"><h2 class="px-4 mb-3 text-lg font-bold">Sur Netflix</h2><div class="flex overflow-x-auto snap-x snap-mandatory [-ms-scrollbar-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"><div id="netflix-container" class="flex px-4 gap-4"></div></div></section>
+        <section id="prime-video-section" class="py-4"><h2 class="px-4 mb-3 text-lg font-bold">Sur Prime Video</h2><div class="flex overflow-x-auto snap-x snap-mandatory [-ms-scrollbar-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"><div id="prime-video-container" class="flex px-4 gap-4"></div></div></section>
+        <section id="canal-plus-section" class="py-4"><h2 class="px-4 mb-3 text-lg font-bold">Sur Canal+</h2><div class="flex overflow-x-auto snap-x snap-mandatory [-ms-scrollbar-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"><div id="canal-plus-container" class="flex px-4 gap-4"></div></div></section>
+        <section id="disney-plus-section" class="py-4"><h2 class="px-4 mb-3 text-lg font-bold">Sur Disney+</h2><div class="flex overflow-x-auto snap-x snap-mandatory [-ms-scrollbar-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"><div id="disney-plus-container" class="flex px-4 gap-4"></div></div></section>
+        <section id="apple-tv-section" class="py-4"><h2 class="px-4 mb-3 text-lg font-bold">Sur Apple TV+</h2><div class="flex overflow-x-auto snap-x snap-mandatory [-ms-scrollbar-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"><div id="apple-tv-container" class="flex px-4 gap-4"></div></div></section>
+        <section id="paramount-section" class="py-4"><h2 class="px-4 mb-3 text-lg font-bold">Sur Paramount+</h2><div class="flex overflow-x-auto snap-x snap-mandatory [-ms-scrollbar-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"><div id="paramount-container" class="flex px-4 gap-4"></div></div></section>
+        
     </main>
 
-    <footer class="flex-shrink-0 bg-background-light/90 dark:bg-background-dark/90 backdrop-blur-sm border-t border-gray-200 dark:border-gray-800 z-30">
-        <nav class="flex justify-around items-center h-16">
-            <a class="flex flex-col items-center justify-center gap-1 text-primary" href="index.html">
-                <span class="material-symbols-outlined filled">home</span>
-                <span class="text-[10px] font-bold">Home</span>
+    <footer class="flex-shrink-0 bg-background-light/90 dark:bg-background-dark/90 backdrop-blur-md border-t border-gray-200 dark:border-gray-800 z-30 h-20 pb-2">
+        <nav class="flex justify-around items-center h-full">
+            <a class="flex flex-col items-center justify-center gap-1 text-primary transition-colors w-16" href="index.html">
+                <span class="material-symbols-outlined filled text-2xl">home</span>
+                <span class="text-[10px] font-bold">Accueil</span>
             </a>
-            <a class="flex flex-col items-center justify-center gap-1 text-gray-500 dark:text-gray-400 hover:text-primary dark:hover:text-primary transition-colors" href="popular.html">
-                <span class="material-symbols-outlined thick">local_fire_department</span>
-                <span class="text-[10px] font-medium">Popular</span>
+            <a class="flex flex-col items-center justify-center gap-1 text-gray-500 dark:text-gray-400 hover:text-primary transition-colors w-16" href="popular.html">
+                <span class="material-symbols-outlined thick text-2xl">local_fire_department</span>
+                <span class="text-[10px] font-medium">Populaire</span>
             </a>
-            <a class="flex flex-col items-center justify-center gap-1 text-gray-500 dark:text-gray-400 hover:text-primary dark:hover:text-primary transition-colors" href="search.html">
-                <span class="material-symbols-outlined">search</span>
-                <span class="text-[10px] font-medium">Search</span>
+            <a class="flex flex-col items-center justify-center gap-1 text-gray-500 dark:text-gray-400 hover:text-primary transition-colors w-16" href="search.html">
+                <span class="material-symbols-outlined text-2xl">search</span>
+                <span class="text-[10px] font-medium">Recherche</span>
             </a>
-            <a class="flex flex-col items-center justify-center gap-1 text-gray-500 dark:text-gray-400 hover:text-primary dark:hover:text-primary transition-colors" href="watchlist.html">
-                <span class="material-symbols-outlined">bookmark</span>
-                <span class="text-[10px] font-medium">My List</span>
+            <a class="flex flex-col items-center justify-center gap-1 text-gray-500 dark:text-gray-400 hover:text-primary transition-colors w-16" href="watchlist.html">
+                <span class="material-symbols-outlined text-2xl">bookmark</span>
+                <span class="text-[10px] font-medium">Ma Liste</span>
             </a>
         </nav>
-        <div class="h-safe-bottom"></div>
     </footer>
 </div>
 <script src="config.js"></script>
 <script src="app.js"></script>
-<script>
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js'));
-  }
-</script>
+<script>if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js'));}</script>
 </body>
 </html>
