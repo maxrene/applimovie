@@ -334,8 +334,7 @@ document.addEventListener('alpine:init', () => {
                 : '';
 
             const totalSeasons = item.apiDetails.number_of_seasons;
-            const startYear = item.year.split(' - ')[0];
-
+            const startYear = String(item.year).split(' - ')[0];
             return `
                 <div class="flex items-start gap-4 p-4">
                     <a href="serie.html?id=${item.id}" class="w-24 flex-shrink-0">
