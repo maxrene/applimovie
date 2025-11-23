@@ -607,7 +607,7 @@ function updateAwardsUI(data) {
     if (awardsHTML) {
         awardsSection.innerHTML = awardsHTML;
         awardsSection.style.display = 'flex';
-        awardsSection.className = "mt-4 flex flex-col gap-2 border-t border-gray-800 pt-4";
+        awardsSection.className = "mt-4 mb-6 flex flex-col gap-2 border-t border-b border-gray-800 py-4";
     } else {
         awardsSection.style.display = 'none';
     }
