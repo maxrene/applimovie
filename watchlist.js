@@ -1,4 +1,3 @@
-
 document.addEventListener('alpine:init', () => {
     Alpine.data('watchlistPage', () => ({
         watchlist: [],
@@ -12,7 +11,7 @@ document.addEventListener('alpine:init', () => {
         async init() {
             this.loadWatchlist();
             await this.fetchAndEnrichWatchlist();
-            this.extractPlatforms(); // Keep for UI, but data comes from API
+            this.extractPlatforms();
 
             this.$watch('activeTab', () => this.renderMedia());
             this.$watch('watchStatusFilter', () => this.renderMedia());
@@ -50,7 +49,7 @@ document.addEventListener('alpine:init', () => {
 
             const promises = watchlistWithMediaData.map(item => {
                 if (!item) return Promise.resolve(null);
-                if (item.type === 'serie') {
+                if (item.type === 'serie' || item.type === 'tv') { // Ensure compatibility
                     return this.fetchFullSeriesDetails(item.id);
                 } else if (item.type === 'movie') {
                     return this.fetchMovieDetails(item.id);
@@ -75,7 +74,7 @@ document.addEventListener('alpine:init', () => {
             if (!cached) return null;
 
             const { timestamp, data } = JSON.parse(cached);
-            const isExpired = (new Date().getTime() - timestamp) > 24 * 60 * 60 * 1000; // 24 hours
+            const isExpired = (new Date().getTime() - timestamp) > 24 * 60 * 60 * 1000;
 
             return isExpired ? null : data;
         },
@@ -138,7 +137,7 @@ document.addEventListener('alpine:init', () => {
             const container = document.getElementById('platform-filter');
             if (!container) return;
 
-            container.innerHTML = ''; // Clear existing
+            container.innerHTML = ''; 
             this.platforms.forEach((platform, index) => {
                 const button = document.createElement('button');
                 button.className = `z-${40 - index} h-8 w-8 rounded-full bg-cover bg-center ring-2 ring-offset-2 ring-offset-background-light dark:ring-offset-background-dark transition-all hover:ring-primary`;
@@ -153,11 +152,11 @@ document.addEventListener('alpine:init', () => {
 
                 button.addEventListener('click', () => {
                     if (this.selectedPlatform && this.selectedPlatform.name === platform.name) {
-                        this.selectedPlatform = null; // Deselect
+                        this.selectedPlatform = null; 
                     } else {
                         this.selectedPlatform = platform;
                     }
-                    this.renderPlatformFilters(); // Re-render to update styles
+                    this.renderPlatformFilters(); 
                 });
                 container.appendChild(button);
             });
@@ -170,15 +169,23 @@ document.addEventListener('alpine:init', () => {
 
             let filtered = this.enrichedWatchlist
                 .map(item => {
-                    const isWatched = (item.type === 'movie' && watchedMovies.includes(item.id)) ||
-                                    (item.type === 'serie' && watchedSeries.includes(item.id));
-                    return { ...item, isWatched };
+                    // Patch temporaire si le type manque
+                    if (!item.type && item.title) item.type = 'movie'; 
+                    if (!item.type && item.name) item.type = 'serie';
+
+                    // Normalisation type serie/tv
+                    const normalizedType = (item.type === 'tv') ? 'serie' : item.type;
+                    
+                    const isWatched = (normalizedType === 'movie' && watchedMovies.includes(item.id)) ||
+                                    (normalizedType === 'serie' && watchedSeries.includes(item.id));
+                    return { ...item, type: normalizedType, isWatched };
                 })
                 .filter(item => item && item.type === type);
 
             if (this.selectedPlatform) {
                 filtered = filtered.filter(item =>
-                    item.availableOn && item.availableOn.some(p => p.name === this.selectedPlatform.name)
+                    (item.availableOn && item.availableOn.some(p => p.name === this.selectedPlatform.name)) ||
+                    (item.apiDetails?.providers && item.apiDetails.providers.some(p => p.provider_name === this.selectedPlatform.name))
                 );
             }
 
@@ -213,14 +220,17 @@ document.addEventListener('alpine:init', () => {
                 itemsToRender.sort((a, b) => new Date(b.added_at) - new Date(a.added_at));
             } else if (this.sortOrder === 'release_date') {
                 itemsToRender.sort((a, b) => {
-                    const dateA = new Date(a.year.split(' - ')[0]);
-                    const dateB = new Date(b.year.split(' - ')[0]);
+                    // Gestion sécurisée de l'année
+                    const yearAStr = String(a.year || '');
+                    const yearBStr = String(b.year || '');
+                    const dateA = new Date(yearAStr.split(' - ')[0]);
+                    const dateB = new Date(yearBStr.split(' - ')[0]);
                     return dateB - dateA;
                 });
-            } else { // Popularity (default)
+            } else { 
                  itemsToRender.sort((a, b) => {
-                    const imdbA = a.imdb === 'xx' ? 0 : parseFloat(a.imdb);
-                    const imdbB = b.imdb === 'xx' ? 0 : parseFloat(b.imdb);
+                    const imdbA = a.imdb === 'xx' || !a.imdb ? 0 : parseFloat(a.imdb);
+                    const imdbB = b.imdb === 'xx' || !b.imdb ? 0 : parseFloat(b.imdb);
                     return imdbB - imdbA;
                 });
             }
@@ -247,42 +257,76 @@ document.addEventListener('alpine:init', () => {
             return '';
         },
 
+        // Helper pour générer l'icône de validation (Tick) style JustWatch
+        createCheckButtonHTML(itemId, isWatched, type, extraAction = '') {
+            const action = type === 'movie' 
+                ? `toggleMovieWatched(${itemId})` 
+                : `markEpisodeWatched(${itemId}, ${extraAction})`; // extraAction sera l'ID episode pour TV
+
+            // Style inspiré du screenshot: rond, fond sombre, bordure légère, check gris si pas vu, check coloré/plein si vu
+            const bgClass = isWatched ? 'bg-primary border-primary text-white' : 'bg-black/40 border-gray-600 text-gray-500 hover:text-white hover:border-gray-400';
+            
+            return `
+            <button @click.prevent.stop="${action}" class="flex h-8 w-8 items-center justify-center rounded-full border transition-all ${bgClass} z-10 shrink-0 ml-2">
+                <span class="material-symbols-outlined text-[20px]">check</span>
+            </button>`;
+        },
+
+        // Helper pour afficher les plateformes en ligne
+        createPlatformIconsHTML(providers) {
+            if (!providers || providers.length === 0) return '';
+            return providers.map(p => {
+                const logo = p.logo_path ? `https://image.tmdb.org/t/p/w500${p.logo_path}` : p.logoUrl;
+                return `<img src="${logo}" alt="${p.provider_name}" class="h-4 w-4 rounded-sm" title="${p.provider_name || p.name}">`;
+            }).join('');
+        },
+
+        // Calcul de la durée formatée
+        formatDuration(runtime) {
+            if (!runtime) return '';
+            const h = Math.floor(runtime / 60);
+            const m = runtime % 60;
+            return `${h}h ${m}m`;
+        },
+
         createMovieItemHTML(item) {
             const link = `film.html?id=${item.id}`;
-            const yearAndGenre = `${item.year} • ${item.genres[0]}`;
-            const providers = item.apiDetails?.providers;
-            const platformLogo = providers && providers.length > 0
-                ? `<img src="https://image.tmdb.org/t/p/w500${providers[0].logo_path}" alt="${providers[0].provider_name}" class="h-4 w-4 rounded-sm">`
+            const durationStr = item.duration || (item.apiDetails?.runtime ? this.formatDuration(item.apiDetails.runtime) : 'N/A');
+            const genresStr = item.genres && item.genres.length > 0 ? item.genres[0] : 'Genre';
+            
+            // Ligne de métadonnées : Année • Genre • Durée
+            const metaLine = `${item.year} • ${genresStr} • ${durationStr}`;
+            
+            const providers = item.apiDetails?.providers || item.availableOn || [];
+            const platformsHTML = this.createPlatformIconsHTML(providers);
+            const availableLine = platformsHTML 
+                ? `<div class="mt-2 flex items-center gap-2 text-xs text-gray-400">
+                     <span>Available on:</span>
+                     <div class="flex items-center gap-1">${platformsHTML}</div>
+                   </div>`
                 : '';
 
-            let overlayHTML = '';
-            if (item.isWatched) {
-                overlayHTML = `
-                    <div class="absolute inset-0 flex items-center justify-center rounded-lg bg-black/60">
-                        <div class="text-center">
-                            <div class="inline-flex h-8 w-8 items-center justify-center rounded-full bg-green-500 text-white">
-                                <svg fill="none" height="20" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="3" viewBox="0 0 24 24" width="20" xmlns="http://www.w3.org/2000/svg"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                            </div>
-                            <p class="mt-1 text-xs font-semibold text-white">Watched</p>
-                        </div>
-                    </div>`;
-            }
+            const checkButton = this.createCheckButtonHTML(item.id, item.isWatched, 'movie');
 
             return `
-                <a href="${link}" class="flex items-center gap-4 p-4">
-                    <div class="relative h-24 w-40 flex-shrink-0">
-                        <div class="h-full w-full rounded-lg bg-cover bg-center" style="background-image: url('${item.posterUrl}');"></div>
-                        ${overlayHTML}
-                    </div>
-                    <div class="flex-1">
-                        <div class="flex items-center gap-2">
-                           ${platformLogo}
-                           <p class="text-xs text-gray-500 dark:text-gray-400">Movie</p>
+                <div class="relative flex items-start gap-4 p-4 hover:bg-white/5 transition-colors rounded-lg">
+                    <a href="${link}" class="w-24 flex-shrink-0 group">
+                        <div class="relative w-full aspect-[2/3] rounded-lg overflow-hidden">
+                             <img src="${item.posterUrl}" alt="${item.title}" class="w-full h-full object-cover group-hover:scale-105 transition-transform">
+                             ${item.isWatched ? '<div class="absolute inset-0 bg-black/40 flex items-center justify-center"><span class="material-symbols-outlined text-white">visibility</span></div>' : ''}
                         </div>
-                        <h3 class="font-bold text-gray-900 dark:text-white mt-1">${item.title}</h3>
-                        <p class="text-sm text-gray-500 dark:text-gray-400">${yearAndGenre}</p>
+                    </a>
+                    <div class="flex-1 min-w-0">
+                         <div class="flex justify-between items-start">
+                             <a href="${link}" class="block pr-2">
+                                <h3 class="font-bold text-lg text-white truncate leading-tight">${item.title}</h3>
+                             </a>
+                             ${checkButton}
+                         </div>
+                         <p class="text-sm text-gray-400 mt-1">${metaLine}</p>
+                         ${availableLine}
                     </div>
-                </a>`;
+                </div>`;
         },
 
         createTVItemHTML(item) {
@@ -291,22 +335,27 @@ document.addEventListener('alpine:init', () => {
             const watchedCount = seriesWatchedEpisodes.size;
 
             if (item.isWatched || (item.apiDetails && watchedCount > 0 && watchedCount === item.apiDetails.number_of_episodes)) {
+                 // Série entièrement vue
+                 const checkButton = this.createCheckButtonHTML(item.id, true, 'serie', 'all'); // Fake ID for all
                  return `
-                    <a href="serie.html?id=${item.id}" class="flex items-center gap-4 p-4">
-                        <div class="relative h-24 w-40 flex-shrink-0">
-                            <div class="h-full w-full rounded-lg bg-cover bg-center" style="background-image: url('${item.posterUrl}');"></div>
-                            <div class="absolute inset-0 flex items-center justify-center rounded-lg bg-black/60">
-                                <div class="text-center">
-                                    <div class="inline-flex h-8 w-8 items-center justify-center rounded-full bg-green-500 text-white"><svg fill="none" height="20" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="3" viewBox="0 0 24 24" width="20" xmlns="http://www.w3.org/2000/svg"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
-                                    <p class="mt-1 text-xs font-semibold text-white">Watched</p>
+                    <div class="relative flex items-center gap-4 p-4 hover:bg-white/5 transition-colors rounded-lg">
+                        <a href="serie.html?id=${item.id}" class="w-24 flex-shrink-0">
+                            <div class="relative w-full aspect-[2/3] rounded-lg overflow-hidden">
+                                <img src="${item.posterUrl}" class="w-full h-full object-cover">
+                                <div class="absolute inset-0 flex items-center justify-center bg-black/60">
+                                    <span class="material-symbols-outlined text-white">visibility</span>
                                 </div>
                             </div>
+                        </a>
+                        <div class="flex-1 min-w-0">
+                            <div class="flex justify-between items-start">
+                                <h3 class="font-bold text-lg text-white truncate">${item.title}</h3>
+                                ${checkButton}
+                            </div>
+                            <p class="text-sm text-gray-400">${String(item.year).split(' - ')[0]} • ${item.genres[0]}</p>
+                            <p class="text-xs text-green-500 mt-2 font-medium">Série terminée</p>
                         </div>
-                        <div class="flex-1">
-                            <h3 class="font-bold text-gray-900 dark:text-white">${item.title}</h3>
-                            <p class="text-sm text-gray-500 dark:text-gray-400">${item.year} • ${item.genres[0]}</p>
-                        </div>
-                    </a>`;
+                    </div>`;
             }
 
             if (watchedCount > 0 && item.apiDetails) {
@@ -317,7 +366,7 @@ document.addEventListener('alpine:init', () => {
         },
 
         createUnwatchedTVItemHTML(item) {
-            if (!item.apiDetails || !item.apiDetails.seasons) return '<div class="p-4 text-gray-400">Loading show details...</div>';
+            if (!item.apiDetails || !item.apiDetails.seasons) return '<div class="p-4 text-gray-400">Loading details...</div>';
 
             const firstSeason = item.apiDetails.seasons.find(s => s.season_number === 1);
             if (!firstSeason || !firstSeason.episodes || firstSeason.episodes.length === 0) return '';
@@ -325,29 +374,39 @@ document.addEventListener('alpine:init', () => {
             const firstEpisode = firstSeason.episodes.find(e => e.episode_number === 1);
             if (!firstEpisode) return '';
 
-            const providers = item.apiDetails?.providers;
-            const platformHTML = providers && providers.length > 0
-                ? `<div class="flex items-center gap-2 mt-2">
-                       <span class="text-xs text-gray-400">dispo sur</span>
-                       <img src="https://image.tmdb.org/t/p/w500${providers[0].logo_path}" alt="${providers[0].provider_name}" class="h-5">
-                   </div>`
-                : '';
-
+            const providers = item.apiDetails?.providers || item.availableOn || [];
+            const platformsHTML = this.createPlatformIconsHTML(providers);
             const totalSeasons = item.apiDetails.number_of_seasons;
             const startYear = String(item.year).split(' - ')[0];
+
+            // Ligne unifiée : Saisons • Année • Plateformes
+            const infoLine = `<div class="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 mt-1">
+                <span>${totalSeasons} Saisons • ${startYear}</span>
+                ${platformsHTML ? '<span class="text-gray-600">•</span>' : ''}
+                <div class="flex items-center gap-1">${platformsHTML}</div>
+            </div>`;
+
+            // Bouton check pour le premier épisode
+            const checkButton = this.createCheckButtonHTML(item.id, false, 'tv', firstEpisode.id);
+
             return `
-                <div class="flex items-start gap-4 p-4">
+                <div class="relative flex items-start gap-4 p-4 hover:bg-white/5 transition-colors rounded-lg">
                     <a href="serie.html?id=${item.id}" class="w-24 flex-shrink-0">
-                        <img class="w-full rounded-lg" src="${item.posterUrl}" alt="${item.title}">
+                        <img class="w-full aspect-[2/3] rounded-lg object-cover" src="${item.posterUrl}" alt="${item.title}">
                     </a>
-                    <div class="flex-1">
-                        <a href="serie.html?id=${item.id}">
-                            <h3 class="font-bold text-lg text-white">${item.title}</h3>
-                            <p class="text-sm text-gray-400">${totalSeasons} saisons | ${startYear}</p>
-                        </a>
-                        <div class="mt-4">
-                            <p class="text-sm font-semibold text-gray-300">${firstEpisode.name}</p>
-                            ${platformHTML}
+                    <div class="flex-1 min-w-0">
+                        <div class="flex justify-between items-start">
+                            <a href="serie.html?id=${item.id}" class="block">
+                                <h3 class="font-bold text-lg text-white truncate leading-tight">${item.title}</h3>
+                            </a>
+                            ${checkButton}
+                        </div>
+                        
+                        ${infoLine}
+                        
+                        <div class="mt-3">
+                            <p class="text-xs font-semibold text-primary uppercase tracking-wide">Prochain épisode</p>
+                            <p class="text-sm font-medium text-gray-300 mt-0.5 truncate">S01 E01 - ${firstEpisode.name}</p>
                         </div>
                     </div>
                 </div>`;
@@ -382,45 +441,49 @@ document.addEventListener('alpine:init', () => {
             const remainingInSeason = currentSeasonForProgress.episodes.length - seasonWatchedCount;
             const totalProgress = (seriesWatchedEpisodes.size / item.apiDetails.number_of_episodes) * 100;
 
-            const providers = item.apiDetails?.providers;
-            const platformLogo = providers && providers.length > 0
-                ? `<img src="https://image.tmdb.org/t/p/w500${providers[0].logo_path}" alt="${providers[0].provider_name}" class="h-4 w-4 rounded-sm">`
-                : '';
-
+            const providers = item.apiDetails?.providers || item.availableOn || [];
+            const platformsHTML = this.createPlatformIconsHTML(providers);
             const totalSeasons = item.apiDetails.number_of_seasons;
             const startYear = String(item.year).split(' - ')[0];
+
+             // Ligne unifiée : Saisons • Année • Plateformes
+             const infoLine = `<div class="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 mt-1">
+                <span>${totalSeasons} Saisons • ${startYear}</span>
+                ${platformsHTML ? '<span class="text-gray-600">•</span>' : ''}
+                <div class="flex items-center gap-1">${platformsHTML}</div>
+            </div>`;
+
+            const checkButton = this.createCheckButtonHTML(item.id, false, 'tv', nextEpisode.id);
+
             return `
-                <div class="relative overflow-hidden p-4">
+                <div class="relative p-4 hover:bg-white/5 transition-colors rounded-lg">
                     <div class="flex gap-4">
                         <div class="w-24 flex-shrink-0">
                             <a href="serie.html?id=${item.id}">
-                                <img alt="${item.title} cover" class="w-full rounded-md object-cover aspect-[2/3]" src="${item.posterUrl}">
+                                <img alt="${item.title} cover" class="w-full aspect-[2/3] rounded-lg object-cover" src="${item.posterUrl}">
                             </a>
                         </div>
-                        <div class="flex min-w-0 flex-1 flex-col justify-between py-1">
-                            <div>
-                                <a href="serie.html?id=${item.id}">
-                                    <h3 class="font-bold text-base text-gray-900 dark:text-white truncate">${item.title}</h3>
+                        <div class="flex min-w-0 flex-1 flex-col">
+                            <div class="flex justify-between items-start">
+                                <a href="serie.html?id=${item.id}" class="block">
+                                    <h3 class="font-bold text-lg text-white truncate leading-tight">${item.title}</h3>
                                 </a>
-                                <div class="flex items-center gap-2 mt-0.5">
-                                    <p class="text-xs text-gray-500 dark:text-gray-400">${totalSeasons} Seasons • ${startYear}</p>
-                                    ${platformLogo}
-                                </div>
+                                ${checkButton}
                             </div>
-                            <div class="mt-2 space-y-1">
-                                <p class="text-xs font-medium text-gray-500 dark:text-gray-400">S${this.formatEpisodeNumber(nextEpisode.season_number)}E${this.formatEpisodeNumber(nextEpisode.episode_number)}</p>
-                                <div class="flex items-center justify-between gap-2">
-                                    <p class="truncate text-sm text-gray-700 dark:text-gray-300">${nextEpisode.name}</p>
-                                    <button @click="markEpisodeWatched(${item.id}, ${nextEpisode.id})" class="flex-shrink-0 p-1 text-gray-400 hover:text-green-500 dark:hover:text-green-400 -mr-1">
-                                        <span class="material-symbols-outlined" style="font-size: 20px; font-variation-settings: 'FILL' 0, 'wght' 300;">check_circle</span>
-                                    </button>
-                                </div>
+                            
+                            ${infoLine}
+
+                            <div class="mt-3">
+                                <p class="text-xs font-semibold text-primary uppercase tracking-wide">
+                                    S${this.formatEpisodeNumber(nextEpisode.season_number)} E${this.formatEpisodeNumber(nextEpisode.episode_number)}
+                                    <span class="text-gray-500 normal-case font-normal ml-1">(${remainingInSeason} restants)</span>
+                                </p>
+                                <p class="text-sm font-medium text-gray-300 mt-0.5 truncate">${nextEpisode.name}</p>
                             </div>
                         </div>
                     </div>
-                    <div class="absolute bottom-4 right-4 text-xs font-medium text-gray-500 dark:text-gray-400">${remainingInSeason} remaining</div>
-                    <div class="absolute bottom-0 left-0 right-0 h-1 bg-green-500/20 dark:bg-green-500/10">
-                        <div class="h-1 bg-green-500" style="width: ${totalProgress}%"></div>
+                    <div class="absolute bottom-0 left-4 right-4 h-1 bg-gray-700 rounded-full overflow-hidden mb-2">
+                        <div class="h-full bg-primary" style="width: ${totalProgress}%"></div>
                     </div>
                 </div>`;
         },
@@ -430,6 +493,7 @@ document.addEventListener('alpine:init', () => {
         },
 
         async markEpisodeWatched(seriesId, episodeId) {
+            if(!episodeId) return;
             let watchedEpisodes = JSON.parse(localStorage.getItem('watchedEpisodes')) || {};
             if (!watchedEpisodes[seriesId]) watchedEpisodes[seriesId] = [];
 
@@ -441,7 +505,8 @@ document.addEventListener('alpine:init', () => {
             }
 
             const item = this.enrichedWatchlist.find(i => i.id === seriesIdNum);
-            if (item && item.apiDetails && watchedEpisodes[seriesId].length === item.apiDetails.number_of_episodes) {
+            // Vérifier si série terminée
+            if (item && item.apiDetails && watchedEpisodes[seriesId].length >= item.apiDetails.number_of_episodes) {
                 let watchedSeries = JSON.parse(localStorage.getItem('watchedSeries')) || [];
                 if (!watchedSeries.includes(seriesIdNum)) {
                     watchedSeries.push(seriesIdNum);
@@ -450,6 +515,21 @@ document.addEventListener('alpine:init', () => {
                 item.isWatched = true;
             }
 
+            await this.renderMedia();
+        },
+
+        // Nouvelle fonction pour marquer un film comme vu directement depuis la liste
+        async toggleMovieWatched(movieId) {
+            let watchedMovies = JSON.parse(localStorage.getItem('watchedMovies')) || [];
+            const movieIdNum = parseInt(movieId, 10);
+
+            if (watchedMovies.includes(movieIdNum)) {
+                watchedMovies = watchedMovies.filter(id => id !== movieIdNum);
+            } else {
+                watchedMovies.push(movieIdNum);
+            }
+            
+            localStorage.setItem('watchedMovies', JSON.stringify(watchedMovies));
             await this.renderMedia();
         }
     }));
