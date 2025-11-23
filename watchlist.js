@@ -5,8 +5,23 @@ document.addEventListener('alpine:init', () => {
         activeTab: 'tv', // 'movie' or 'tv'
         sortOrder: 'popularity',
         selectedPlatform: null,
-        platforms: [],
-        watchStatusFilter: 'unwatched',
+        platforms: [], // Gardé pour compatibilité interne
+        
+        // NOUVEAU : Filtre par défaut sur 'unwatched' pour le toggle
+        watchStatusFilter: 'unwatched', 
+        
+        // NOUVEAU : État pour la modale
+        showPlatformModal: false,
+
+        // NOUVEAU : Liste statique des plateformes pour la pop-up
+        availablePlatforms: [
+            { id: 'netflix', name: 'Netflix', logoUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuC0rIaugx3YyVBcESzwX2dFsnoHm5B0b0WDyWKNVUHquDGKPEb_CHN1yht5SLbKULWsYhjqBibOYAGD-BnmqVhj5aulPTi9Kd0gOaUU4fRZOq2R_B_SOikLDCnJS--3EZYe6HSmRgPsCVGTsZafBM5m3RTAShVZehiTXFlKtEevgoEj1FcX_fOwHTmobnQgwPqcpkX9kdXZZzRpvOkHmiMpQKrpAjXzhKomSoHF2Pas5Tx9tXJFxaetT7OQPi83B4fNaOIXIFtDNa8L' },
+            { id: 'prime', name: 'Prime Video', logoUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBT5h0V32YyOdVJXW5EjGwHOaQH4LSi9YpQLEMrTHOLiS0NtOBka7f810AsHBY0VZgbTxKPD7CURemU0Bo-kiMRwG49r6CDsD6sP202J7n39sDybcMU0XSmQd5Ua61cmq6I63hgstmk7Prbt3wEEkp_hPykKxOpsesfXTLMh8iwLTIjCahoRKkf4xhbbDG0QUU-oZrSfVS5AfdJFL4Hu6hT-WuvdHgDScDxwIt55-x3aqo20_SRAH4KrR3AB2AM0H_z0S9fRYOFXZJJ' },
+            { id: 'apple', name: 'Apple TV+', logoUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDyk5bySVHPhnxCCgjtup-sOnBAoTktS5TQSwVXUF7IrhSAvRBRZorqaV9q32nUOXGZPdF9n8qbIae9P5HxAwaV6FdldIAxo9SuSOoIbqfNIgM9Qj18za8ZgL0KNTewFcfWXtSwi6DxhpbpdPKq7zTvDok7wI0A9nKYdzscquYNo4eAUg_cc3MLJB-eKcO6QgCn37Vix25I_ea0VsaC_pgyrYEFIfgbdZnKszvrq-NiotfJaDplPKLDbzcRxbZeCA7Mqazq4M2Xgz8q' },
+            { id: 'disney', name: 'Disney+', logoUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuC8PuXbrn6vbG7jvEzqcKNzTiJ_otn5zhGtFxc2O25nkP7Op_YCK0GzRkhmJQDGymI11CLc9mWz6UgRFh6PESgakbQ0l6eLehsD_K2U3pUK56eMqqm-NTmfON9rUt8VcLhdjReYqwcRZ6ZIYgtdp1YLTXGn7eQrIMK4Mjt4tGpRAjisGiYEOY2Wx0W4kGWoflYFTuSplsujUws9_OgDB01ojHIDV7gb88mHq72NqxnRhKMVU7uA_WVYyVW7V62oRuPqRUN1q2aUUXVz' },
+            { id: 'canal', name: 'Canal+', logoUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCwmDVp3KIvRQJINpqlB8rlH47plMN1JowJPjx7s8Zw4zwpfEXGKU1vGyDC9SRl58jBcJEVZZiSbN63J4nP8QyDjRyvmBSqEdyTrFYY4ko0xF9_PZSI1DPpePNuzNK8gYYOpVUA5wIvhHrXzrpYbdJGS9TolQR21PGy0Lr2sHaE56l2u6xMZnnmco-mfajtOSFddH5kmfmmGwmunN60TFW4nMPAW8-BiXmmPl-FFPOhWUEpKThnxn2gHw9U7NXZZAMFYUdhwckp5V6f' },
+            { id: 'paramount', name: 'Paramount+', logoUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDNbGu1y6tgb3BR8z_aRDhn3ssq2or1yMkpGsRCUEhM0CDAi4r0vHfmghWRAaKSpLCGO2COI5utUi3FKaTtv6Sv_I71DYyUg-FhbDYILB-AfjTH9zhj0UIY0-Q-nKcq-7IHk4JetD12vx1uJqH-1BhaXLpKCSJcFYC4usb_NT2sY2ABCy4wckRGl3UMSxaPyFNYlUDyoY0s0PEwB9SyJQfOaE_2dHTyF4dIehNVbQK4jUwcUGZoWHuzcnRZ2EqLjzhTxtdnG4dGF9yk' }
+        ],
 
         async init() {
             this.loadWatchlist();
@@ -18,7 +33,17 @@ document.addEventListener('alpine:init', () => {
             this.$watch('selectedPlatform', () => this.renderMedia());
 
             await this.renderMedia();
-            this.renderPlatformFilters();
+            // renderPlatformFilters n'est plus nécessaire avec la modale, mais on peut le laisser si besoin
+        },
+
+        // NOUVEAU : Sélection depuis la modale
+        selectPlatformFromModal(platform) {
+            if (this.selectedPlatform && this.selectedPlatform.name === platform.name) {
+                this.selectedPlatform = null;
+            } else {
+                this.selectedPlatform = platform;
+            }
+            this.showPlatformModal = false;
         },
 
         loadWatchlist() {
@@ -49,7 +74,8 @@ document.addEventListener('alpine:init', () => {
 
             const promises = watchlistWithMediaData.map(item => {
                 if (!item) return Promise.resolve(null);
-                if (item.type === 'serie' || item.type === 'tv') { // Ensure compatibility
+                // On gère 'serie' et 'tv' pour la compatibilité
+                if (item.type === 'serie' || item.type === 'tv') {
                     return this.fetchFullSeriesDetails(item.id);
                 } else if (item.type === 'movie') {
                     return this.fetchMovieDetails(item.id);
@@ -133,6 +159,7 @@ document.addEventListener('alpine:init', () => {
             }
         },
 
+        // Gardé pour compatibilité ancienne UI, peut être ignoré avec la nouvelle modale
         renderPlatformFilters() {
             const container = document.getElementById('platform-filter');
             if (!container) return;
@@ -220,7 +247,7 @@ document.addEventListener('alpine:init', () => {
                 itemsToRender.sort((a, b) => new Date(b.added_at) - new Date(a.added_at));
             } else if (this.sortOrder === 'release_date') {
                 itemsToRender.sort((a, b) => {
-                    // Gestion sécurisée de l'année
+                    // Gestion sécurisée de l'année (Correction du crash .split)
                     const yearAStr = String(a.year || '');
                     const yearBStr = String(b.year || '');
                     const dateA = new Date(yearAStr.split(' - ')[0]);
@@ -237,11 +264,11 @@ document.addEventListener('alpine:init', () => {
 
             if (itemsToRender.length === 0) {
                 container.innerHTML = '';
-                emptyState.style.display = 'block';
+                if (emptyState) emptyState.style.display = 'block';
                 return;
             }
 
-            emptyState.style.display = 'none';
+            if (emptyState) emptyState.style.display = 'none';
             const mediaHTMLPromises = itemsToRender.map(item => this.createMediaItemHTML(item));
             const mediaHTML = await Promise.all(mediaHTMLPromises);
             container.innerHTML = mediaHTML.join('');
@@ -261,9 +288,8 @@ document.addEventListener('alpine:init', () => {
         createCheckButtonHTML(itemId, isWatched, type, extraAction = '') {
             const action = type === 'movie' 
                 ? `toggleMovieWatched(${itemId})` 
-                : `markEpisodeWatched(${itemId}, ${extraAction})`; // extraAction sera l'ID episode pour TV
+                : `markEpisodeWatched(${itemId}, ${extraAction})`; 
 
-            // Style inspiré du screenshot: rond, fond sombre, bordure légère, check gris si pas vu, check coloré/plein si vu
             const bgClass = isWatched ? 'bg-primary border-primary text-white' : 'bg-black/40 border-gray-600 text-gray-500 hover:text-white hover:border-gray-400';
             
             return `
@@ -272,7 +298,6 @@ document.addEventListener('alpine:init', () => {
             </button>`;
         },
 
-        // Helper pour afficher les plateformes en ligne
         createPlatformIconsHTML(providers) {
             if (!providers || providers.length === 0) return '';
             return providers.map(p => {
@@ -281,7 +306,6 @@ document.addEventListener('alpine:init', () => {
             }).join('');
         },
 
-        // Calcul de la durée formatée
         formatDuration(runtime) {
             if (!runtime) return '';
             const h = Math.floor(runtime / 60);
@@ -294,13 +318,12 @@ document.addEventListener('alpine:init', () => {
             const durationStr = item.duration || (item.apiDetails?.runtime ? this.formatDuration(item.apiDetails.runtime) : 'N/A');
             const genresStr = item.genres && item.genres.length > 0 ? item.genres[0] : 'Genre';
             
-            // Ligne de métadonnées : Année • Genre • Durée
             const metaLine = `${item.year} • ${genresStr} • ${durationStr}`;
             
             const providers = item.apiDetails?.providers || item.availableOn || [];
             const platformsHTML = this.createPlatformIconsHTML(providers);
             
-            // Modification ici : mt-5 pour sauter une ligne visuellement
+            // Layout vertical, saut de ligne (mt-5) pour les plateformes
             const availableLine = platformsHTML 
                 ? `<div class="mt-5 flex items-center gap-2 text-xs text-gray-400">
                      <span>Available on:</span>
@@ -336,9 +359,9 @@ document.addEventListener('alpine:init', () => {
             const seriesWatchedEpisodes = new Set(watchedEpisodes[item.id] || []);
             const watchedCount = seriesWatchedEpisodes.size;
 
+            // Série entièrement vue
             if (item.isWatched || (item.apiDetails && watchedCount > 0 && watchedCount === item.apiDetails.number_of_episodes)) {
-                 // Série entièrement vue
-                 const checkButton = this.createCheckButtonHTML(item.id, true, 'serie', 'all'); // Fake ID for all
+                 const checkButton = this.createCheckButtonHTML(item.id, true, 'serie', 'all'); 
                  return `
                     <div class="relative flex items-center gap-4 p-4 hover:bg-white/5 transition-colors rounded-lg">
                         <a href="serie.html?id=${item.id}" class="w-24 flex-shrink-0">
@@ -379,16 +402,15 @@ document.addEventListener('alpine:init', () => {
             const providers = item.apiDetails?.providers || item.availableOn || [];
             const platformsHTML = this.createPlatformIconsHTML(providers);
             const totalSeasons = item.apiDetails.number_of_seasons;
+            // Correction split year
             const startYear = String(item.year).split(' - ')[0];
 
-            // Ligne unifiée : Saisons • Année • Plateformes
             const infoLine = `<div class="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 mt-1">
                 <span>${totalSeasons} Saisons • ${startYear}</span>
                 ${platformsHTML ? '<span class="text-gray-600">•</span>' : ''}
                 <div class="flex items-center gap-1">${platformsHTML}</div>
             </div>`;
 
-            // Bouton check pour le premier épisode
             const checkButton = this.createCheckButtonHTML(item.id, false, 'tv', firstEpisode.id);
 
             return `
@@ -446,9 +468,9 @@ document.addEventListener('alpine:init', () => {
             const providers = item.apiDetails?.providers || item.availableOn || [];
             const platformsHTML = this.createPlatformIconsHTML(providers);
             const totalSeasons = item.apiDetails.number_of_seasons;
+            // Correction split year
             const startYear = String(item.year).split(' - ')[0];
 
-             // Ligne unifiée : Saisons • Année • Plateformes
              const infoLine = `<div class="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 mt-1">
                 <span>${totalSeasons} Saisons • ${startYear}</span>
                 ${platformsHTML ? '<span class="text-gray-600">•</span>' : ''}
@@ -507,7 +529,7 @@ document.addEventListener('alpine:init', () => {
             }
 
             const item = this.enrichedWatchlist.find(i => i.id === seriesIdNum);
-            // Vérifier si série terminée
+            
             if (item && item.apiDetails && watchedEpisodes[seriesId].length >= item.apiDetails.number_of_episodes) {
                 let watchedSeries = JSON.parse(localStorage.getItem('watchedSeries')) || [];
                 if (!watchedSeries.includes(seriesIdNum)) {
@@ -520,7 +542,6 @@ document.addEventListener('alpine:init', () => {
             await this.renderMedia();
         },
 
-        // Nouvelle fonction pour marquer un film comme vu directement depuis la liste
         async toggleMovieWatched(movieId) {
             let watchedMovies = JSON.parse(localStorage.getItem('watchedMovies')) || [];
             const movieIdNum = parseInt(movieId, 10);
