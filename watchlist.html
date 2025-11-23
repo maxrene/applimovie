@@ -68,7 +68,7 @@
                             : 'border-transparent opacity-60 grayscale hover:grayscale-0 hover:opacity-100'"
                     :title="platform.name">
                 
-                <img :src="platform.logoUrl" class="w-full h-full object-cover bg-gray-800">
+                <img :src="platform.logoUrl" class="w-full h-full object-contain bg-gray-800 p-1">
                 
                 <div x-show="activePlatformFilters.includes(platform.id)" 
                      class="absolute inset-0 bg-primary/30 flex items-center justify-center">
