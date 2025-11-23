@@ -64,6 +64,7 @@ document.addEventListener('alpine:init', () => {
             
             url += `&sort_by=${this.sortOrder}`;
             url += `&watch_region=${this.userRegion}`;
+            url += `&vote_count.gte=100`;
             
             try {
                 const res = await fetch(url);
