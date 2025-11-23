@@ -6,25 +6,18 @@ document.addEventListener('alpine:init', () => {
         isLoadingMore: false,
         showServiceBar: false,
         
-        // Bottom Sheets
-        showSortSheet: false,
-        showFilterSheet: false,
-
         currentPage: 1,
         totalPages: 1,
 
         userRegion: localStorage.getItem('userRegion') || 'FR',
-
-        // Sorting & Filtering State
         sortOrder: 'popularity.desc',
         
-        // Filter Data
-        genres: [],
-        filterGenres: [], // Selected genre IDs
-        filterYearMin: 1950,
-        filterYearMax: new Date().getFullYear(),
-        filterRating: 0,
-        isThisYearSelected: false,
+        // Label pour le tri affiché
+        get sortLabel() {
+            if (this.sortOrder === 'popularity.desc') return 'Popularité';
+            if (this.sortOrder === 'vote_average.desc') return 'Mieux notés';
+            return 'Récents';
+        },
 
         init() {
             const flagImg = document.getElementById('header-flag');
@@ -33,23 +26,8 @@ document.addEventListener('alpine:init', () => {
             this.resetAndFetch();
         },
 
-        async fetchGenres() {
-            const type = this.activeTab === 'movie' ? 'movie' : 'tv';
-            try {
-                const res = await fetch(`https://api.themoviedb.org/3/genre/${type}/list?api_key=${TMDB_API_KEY}&language=fr-FR`);
-                const data = await res.json();
-                if (data.genres) {
-                    this.genres = data.genres;
-                }
-            } catch (e) {
-                console.error("Genre fetch failed", e);
-            }
-        },
-
         switchTab(tab) {
             this.activeTab = tab;
-            this.filterGenres = []; // Reset genres when switching tabs as IDs differ
-            this.fetchGenres();
             this.resetAndFetch();
         },
 
@@ -84,7 +62,6 @@ document.addEventListener('alpine:init', () => {
             const endpoint = this.activeTab === 'movie' ? '/discover/movie' : '/discover/tv';
             let url = `https://api.themoviedb.org/3${endpoint}?api_key=${TMDB_API_KEY}&language=fr-FR&page=${page}`;
             
-            // Basic Params
             url += `&sort_by=${this.sortOrder}`;
             url += `&watch_region=${this.userRegion}`;
             
@@ -104,6 +81,7 @@ document.addEventListener('alpine:init', () => {
                         media_type: this.activeTab
                     }));
 
+                    // Filtrage des doublons pour le chargement infini
                     if (page === 1) {
                         this.items = newItems;
                     } else {
