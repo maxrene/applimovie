@@ -1,13 +1,13 @@
 <!DOCTYPE html>
-
-<html class="dark" lang="en"><head>
+<html class="dark" lang="en">
+<head>
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>Profile Screen</title>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-<link href="https://fonts.googleapis.com/css2?family=Spline+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
-<script id="tailwind-config">
+<link href="https://fonts.googleapis.com/css2?family=Spline+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script>
       tailwind.config = {
         darkMode: "class",
         theme: {
@@ -17,152 +17,110 @@
               "background-light": "#f8f6f6",
               "background-dark": "#211111",
             },
-            fontFamily: {
-              "display": ["Spline Sans"]
-            },
+            fontFamily: { "display": ["Spline Sans"] },
             borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
           },
         },
       }
-    </script>
+</script>
 <style>
-      .material-symbols-outlined {
-        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
-        font-size: 24px;
-      }
-    </style>
-<style>
-    body {
-      min-height: max(884px, 100dvh);
-    }
-  </style>
-  </head>
-<body class="bg-background-light dark:bg-background-dark font-display">
-<div class="relative flex h-auto min-h-screen w-full flex-col bg-background-light dark:bg-background-dark">
-<!-- Top App Bar -->
-<div class="flex items-center p-4 pb-2 justify-between">
-<div class="text-slate-900 dark:text-white flex size-12 shrink-0 items-center">
-<a href="javascript:history.back()"><span class="material-symbols-outlined">arrow_back</span></a>
+    body { min-height: max(884px, 100dvh); }
+    [x-cloak] { display: none !important; }
+</style>
+<script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+<body class="bg-background-light dark:bg-background-dark font-display" x-data="userProfile">
+
+<div class="relative flex h-auto min-h-screen w-full flex-col">
+    <div class="flex items-center p-4 pb-2 justify-between">
+        <div class="text-slate-900 dark:text-white flex size-12 shrink-0 items-center">
+            <a href="index.html"><span class="material-symbols-outlined">arrow_back</span></a>
+        </div>
+        <h2 class="text-slate-900 dark:text-white text-lg font-bold leading-tight flex-1 text-center">Profile</h2>
+        <div class="size-12"></div>
+    </div>
+
+    <div class="flex flex-col items-center mt-4">
+        <div class="bg-center bg-no-repeat bg-cover rounded-full h-32 w-32 shadow-lg" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuCjZKd_FSd2dk2btvPDx_P2v2jX4hU3uU0IusAkKNulead5csuWjGOPxvdiPmyT5Mcqfb4c35ITjI1yN2JhQEhSDHZCGr8zmBpA3sJWMKLEqMhwlFOgLyscNKR9dCrGbGpMFHNwe_QwAu8fNAWVfPShEs43FfI6MZEVhpXjsPXRtPq-AXLquWWb0XhjnUbyaHTiImcxNf4oT4DX8WptDN7L3o6tw-BEoojjVhYJoxDvRDui26EUNy23YHn39izz-kRsn2bGOE-hhfG4");'></div>
+        <p class="text-slate-900 dark:text-white text-[22px] font-bold mt-4">Alex Doe</p>
+        <p class="text-slate-500 dark:text-slate-400 text-base">@alexdoe</p>
+    </div>
+
+    <div class="px-4 flex flex-col gap-8 mt-8">
+        <div class="flex flex-col gap-2">
+            <h3 class="text-slate-900 dark:text-white text-lg font-bold pb-2">Preferences</h3>
+            <div class="flex flex-col gap-1 bg-slate-200/50 dark:bg-slate-800/20 rounded-xl p-2">
+                
+                <button @click="showCountryModal = true" class="flex items-center gap-4 p-3 rounded-lg hover:bg-slate-300/50 dark:hover:bg-slate-700/30 transition-colors w-full text-left">
+                    <div class="flex items-center justify-center rounded-lg bg-slate-300 dark:bg-slate-800 shrink-0 size-10 text-slate-900 dark:text-white">
+                        <span class="material-symbols-outlined">public</span>
+                    </div>
+                    <div class="flex flex-col flex-1">
+                        <p class="text-slate-900 dark:text-white text-base font-normal">Pays (Catalogue)</p>
+                        <p class="text-slate-500 dark:text-slate-400 text-sm" x-text="countryName"></p>
+                    </div>
+                    <span class="material-symbols-outlined text-slate-400">chevron_right</span>
+                </button>
+
+                <a href="platforms.html" class="flex items-center gap-4 p-3 rounded-lg hover:bg-slate-300/50 dark:hover:bg-slate-700/30 transition-colors w-full text-left">
+                    <div class="flex items-center justify-center rounded-lg bg-slate-300 dark:bg-slate-800 shrink-0 size-10 text-slate-900 dark:text-white">
+                        <span class="material-symbols-outlined">filter_list</span>
+                    </div>
+                    <div class="flex flex-col flex-1">
+                        <p class="text-slate-900 dark:text-white text-base font-normal">Mes Plateformes</p>
+                        <p class="text-slate-500 dark:text-slate-400 text-sm"><span x-text="platformCount"></span> sélectionnées</p>
+                    </div>
+                    <span class="material-symbols-outlined text-slate-400">chevron_right</span>
+                </a>
+            </div>
+        </div>
+    </div>
 </div>
-<h2 class="text-slate-900 dark:text-white text-lg font-bold leading-tight tracking-[-0.015em] flex-1 text-center">Profile</h2>
-<div class="flex size-12 shrink-0 items-center"></div>
+
+<div x-show="showCountryModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" x-cloak x-transition.opacity>
+    <div @click.away="showCountryModal = false" class="bg-white dark:bg-[#1a1a1a] w-full max-w-xs rounded-2xl shadow-2xl overflow-hidden p-4">
+        <h3 class="text-lg font-bold text-gray-900 dark:text-white mb-4 text-center">Choisir le pays</h3>
+        <div class="space-y-2">
+            <button @click="setCountry('FR')" class="flex items-center w-full p-3 rounded-xl border transition-all" 
+                :class="country === 'FR' ? 'border-primary bg-primary/10' : 'border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800'">
+                <img src="https://flagcdn.com/w40/fr.png" class="w-8 rounded shadow-sm mr-3">
+                <span class="flex-1 text-left font-medium text-gray-900 dark:text-white">France</span>
+                <span x-show="country === 'FR'" class="material-symbols-outlined text-primary">check_circle</span>
+            </button>
+            
+            <button @click="setCountry('IE')" class="flex items-center w-full p-3 rounded-xl border transition-all" 
+                :class="country === 'IE' ? 'border-primary bg-primary/10' : 'border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800'">
+                <img src="https://flagcdn.com/w40/ie.png" class="w-8 rounded shadow-sm mr-3">
+                <span class="flex-1 text-left font-medium text-gray-900 dark:text-white">Irlande</span>
+                <span x-show="country === 'IE'" class="material-symbols-outlined text-primary">check_circle</span>
+            </button>
+        </div>
+        <button @click="showCountryModal = false" class="mt-4 w-full py-3 text-sm font-medium text-gray-500 hover:text-gray-900 dark:hover:text-gray-300">Annuler</button>
+    </div>
 </div>
-<!-- Profile Header -->
-<div class="flex p-4 @container mt-4">
-<div class="flex w-full flex-col gap-4 items-center">
-<div class="flex gap-4 flex-col items-center">
-<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full min-h-32 w-32" data-alt="User's profile picture" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuCjZKd_FSd2dk2btvPDx_P2v2jX4hU3uU0IusAkKNulead5csuWjGOPxvdiPmyT5Mcqfb4c35ITjI1yN2JhQEhSDHZCGr8zmBpA3sJWMKLEqMhwlFOgLyscNKR9dCrGbGpMFHNwe_QwAu8fNAWVfPShEs43FfI6MZEVhpXjsPXRtPq-AXLquWWb0XhjnUbyaHTiImcxNf4oT4DX8WptDN7L3o6tw-BEoojjVhYJoxDvRDui26EUNy23YHn39izz-kRsn2bGOE-hhfG4");'></div>
-<div class="flex flex-col items-center justify-center">
-<p class="text-slate-900 dark:text-white text-[22px] font-bold leading-tight tracking-[-0.015em] text-center">Alex Doe</p>
-<p class="text-slate-500 dark:text-slate-400 text-base font-normal leading-normal text-center">@alexdoe</p>
-</div>
-</div>
-</div>
-</div>
-<div class="px-4 flex flex-col gap-8 mt-6">
-<!-- Account Section -->
-<div class="flex flex-col gap-2">
-<h3 class="text-slate-900 dark:text-white text-lg font-bold leading-tight tracking-[-0.015em] pb-2">Account</h3>
-<div class="flex flex-col gap-2 bg-slate-200/50 dark:bg-slate-800/20 rounded-xl p-2">
-<div class="flex items-center gap-4 bg-transparent min-h-14 justify-between p-2">
-<div class="flex items-center gap-4">
-<div class="text-slate-900 dark:text-white flex items-center justify-center rounded-lg bg-slate-300 dark:bg-slate-800 shrink-0 size-10">
-<img class="w-6 h-6" data-alt="Google logo" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAcHmGc8X1aF2SI3pY5Pvfp4MwT3g7CqOLtpbovcur71sW6uljuaWsE8OnMQS4MWhQlrwYQFrmiOhQs5P7td2riCn67vAeZYClAVq7vSweFLt4DbWuvWCpxvalRsBrTCBfGiakKaEROmh44XJfdVmN_hTEftrRuN-UcD8qdXI6Fx4eGItLafRLy7oUqLODKKbmKREliz8ahhgvLfIPiRaaWrnsto7-oVEO9vqL6yxSCkZDsOXtdop0qoSZ-Xv7wurd-hO1BMcmyRaS2"/>
-</div>
-<div class="flex flex-col">
-<p class="text-slate-900 dark:text-white text-base font-normal leading-normal flex-1 truncate">Connect Google Account</p>
-<p class="text-green-600 dark:text-green-500 text-sm font-normal leading-normal">Connected</p>
-</div>
-</div>
-<div class="shrink-0">
-<label class="relative flex h-[31px] w-[51px] cursor-pointer items-center rounded-full border-none bg-slate-300 dark:bg-slate-700 p-0.5 has-[:checked]:justify-end has-[:checked]:bg-primary">
-<div class="h-full w-[27px] rounded-full bg-white transition-transform" style="box-shadow: rgba(0, 0, 0, 0.15) 0px 3px 8px, rgba(0, 0, 0, 0.06) 0px 3px 1px;"></div>
-<input checked="" class="invisible absolute" type="checkbox"/>
-</label>
-</div>
-</div>
-</div>
-</div>
-<!-- Preferences Section -->
-<div class="flex flex-col gap-2">
-<h3 class="text-slate-900 dark:text-white text-lg font-bold leading-tight tracking-[-0.015em] pb-2">Preferences</h3>
-<div class="flex flex-col gap-0.5 bg-slate-200/50 dark:bg-slate-800/20 rounded-xl p-2">
-<a class="flex items-center gap-4 bg-transparent min-h-14 justify-between p-2 rounded-lg hover:bg-slate-300/50 dark:hover:bg-slate-700/30 transition-colors" href="platforms.html">
-<div class="flex items-center gap-4">
-<div class="text-slate-900 dark:text-white flex items-center justify-center rounded-lg bg-slate-300 dark:bg-slate-800 shrink-0 size-10">
-<span class="material-symbols-outlined">public</span>
-</div>
-<div class="flex flex-col">
-<p class="text-slate-900 dark:text-white text-base font-normal leading-normal flex-1 truncate">Country (Movie Info)</p>
-<p class="text-slate-500 dark:text-slate-400 text-sm font-normal leading-normal">United Kingdom</p>
-</div>
-</div>
-<div class="text-slate-400 dark:text-slate-500 shrink-0">
-<span class="material-symbols-outlined">chevron_right</span>
-</div>
-</a>
-<a class="flex items-center gap-4 bg-transparent min-h-14 justify-between p-2 rounded-lg hover:bg-slate-300/50 dark:hover:bg-slate-700/30 transition-colors" href="#">
-<div class="flex items-center gap-4">
-<div class="text-slate-900 dark:text-white flex items-center justify-center rounded-lg bg-slate-300 dark:bg-slate-800 shrink-0 size-10">
-<span class="material-symbols-outlined">filter_list</span>
-</div>
-<div class="flex flex-col">
-<p class="text-slate-900 dark:text-white text-base font-normal leading-normal flex-1 truncate">Filter Platforms</p>
-<p class="text-slate-500 dark:text-slate-400 text-sm font-normal leading-normal">3 Platforms Selected</p>
-</div>
-</div>
-<div class="text-slate-400 dark:text-slate-500 shrink-0">
-<span class="material-symbols-outlined">chevron_right</span>
-</div>
-</a>
-</div>
-</div>
-<!-- Application Section -->
-<div class="flex flex-col gap-2">
-<h3 class="text-slate-900 dark:text-white text-lg font-bold leading-tight tracking-[-0.015em] pb-2">Application</h3>
-<div class="flex flex-col gap-0.5 bg-slate-200/50 dark:bg-slate-800/20 rounded-xl p-2">
-<a class="flex items-center gap-4 bg-transparent min-h-14 justify-between p-2 rounded-lg hover:bg-slate-300/50 dark:hover:bg-slate-700/30 transition-colors" href="#">
-<div class="flex items-center gap-4">
-<div class="text-slate-900 dark:text-white flex items-center justify-center rounded-lg bg-slate-300 dark:bg-slate-800 shrink-0 size-10">
-<span class="material-symbols-outlined">settings</span>
-</div>
-<p class="text-slate-900 dark:text-white text-base font-normal leading-normal flex-1 truncate">App Settings</p>
-</div>
-<div class="text-slate-400 dark:text-slate-500 shrink-0">
-<span class="material-symbols-outlined">chevron_right</span>
-</div>
-</a>
-<a class="flex items-center gap-4 bg-transparent min-h-14 justify-between p-2 rounded-lg hover:bg-slate-300/50 dark:hover:bg-slate-700/30 transition-colors" href="#">
-<div class="flex items-center gap-4">
-<div class="text-slate-900 dark:text-white flex items-center justify-center rounded-lg bg-slate-300 dark:bg-slate-800 shrink-0 size-10">
-<span class="material-symbols-outlined">help_outline</span>
-</div>
-<p class="text-slate-900 dark:text-white text-base font-normal leading-normal flex-1 truncate">Help &amp; Support</p>
-</div>
-<div class="text-slate-400 dark:text-slate-500 shrink-0">
-<span class="material-symbols-outlined">chevron_right</span>
-</div>
-</a>
-<a class="flex items-center gap-4 bg-transparent min-h-14 justify-between p-2 rounded-lg hover:bg-slate-300/50 dark:hover:bg-slate-700/30 transition-colors" href="#">
-<div class="flex items-center gap-4">
-<div class="text-red-500 flex items-center justify-center rounded-lg bg-red-500/10 dark:bg-red-500/20 shrink-0 size-10">
-<span class="material-symbols-outlined">logout</span>
-</div>
-<p class="text-red-500 text-base font-normal leading-normal flex-1 truncate">Logout</p>
-</div>
-</a>
-</div>
-</div>
-</div>
-<div class="h-10"></div>
-</div>
-<footer class="sticky bottom-0 bg-background-light/90 dark:bg-background-dark/90 backdrop-blur-sm border-t border-gray-200 dark:border-gray-800">
-        <nav class="flex justify-around items-center h-16">
-            <a class="flex flex-col items-center justify-center gap-1 text-gray-500 dark:text-gray-400 hover:text-primary dark:hover:text-primary transition-colors" href="index.html"><svg fill="currentColor" height="24" viewBox="0 0 256 256" width="24"><path d="M224,115.55V208a16,16,0,0,1-16,16H168a16,16,0,0,1-16-16V168a8,8,0,0,0-8-8H112a8,8,0,0,0-8,8v40a16,16,0,0,1-16,16H48a16,16,0,0,1-16-16V115.55a16,16,0,0,1,5.17-11.78l80-75.48.11-.11a16,16,0,0,1,21.53,0,1.14,1.14,0,0,0,.11.11l80,75.48A16,16,0,0,1,224,115.55Z"></path></svg><span class="text-xs font-medium">Home</span></a>
-            <a class="flex flex-col items-center justify-center gap-1 text-gray-500 dark:text-gray-400 hover:text-primary dark:hover:text-primary transition-colors" href="search.html"><svg fill="currentColor" height="24" viewBox="0 0 256 256" width="24"><path d="M229.66,218.34l-50.07-50.06a88.11,88.11,0,1,0-11.31,11.31l50.06,50.07a8,8,0,0,0,11.32-11.32ZM40,112a72,72,0,1,1,72,72A72.08,72.08,0,0,1,40,112Z"></path></svg><span class="text-xs font-medium">Search</span></a>
-            <a class="flex flex-col items-center justify-center gap-1 text-gray-500 dark:text-gray-400 hover:text-primary dark:hover:text-primary transition-colors" href="watchlist.html"><svg fill="currentColor" height="24" viewBox="0 0 256 256" width="24"><path d="M184,32H72A16,16,0,0,0,56,48V224a8,8,0,0,0,12.24,6.78L128,193.43l59.77,37.35A8,8,0,0,0,200,224V48A16,16,0,0,0,184,32ZM184,179.37l-51.77-32.35a8,8,0,0,0-8.48,0L72,179.37V48H184Z"></path></svg><span class="text-xs font-medium">Watchlist</span></a>
-            <a class="flex flex-col items-center justify-center gap-1 text-primary" href="profile.html"><svg fill="currentColor" height="24" viewBox="0 0 256 256" width="24"><path d="M230.92,212c-15.23-26.33-38.7-45.21-66.09-54.16a72,72,0,1,0-73.66,0C63.78,166.78,40.31,185.66,25.08,212a8,8,0,1,0,13.85,8c18.84-32.56,52.14-52,89.07-52s70.23,19.44,89.07,52a8,8,0,1,0,13.85-8ZM72,96a56,56,0,1,1,56,56A56.06,56.06,0,0,1,72,96Z"></path></svg><span class="text-xs font-medium">Profile</span></a>
-        </nav>
-    </footer>
-<script src="profile.js"></script>
-</body></html>
+
+<script>
+    document.addEventListener('alpine:init', () => {
+        Alpine.data('userProfile', () => ({
+            showCountryModal: false,
+            country: localStorage.getItem('userRegion') || 'FR',
+            
+            get countryName() {
+                return this.country === 'FR' ? 'France' : 'Irlande';
+            },
+            
+            get platformCount() {
+                const saved = localStorage.getItem('selectedPlatforms');
+                return saved ? JSON.parse(saved).length : 0;
+            },
+
+            setCountry(code) {
+                this.country = code;
+                localStorage.setItem('userRegion', code);
+                this.showCountryModal = false;
+            }
+        }));
+    });
+</script>
+</body>
+</html>
