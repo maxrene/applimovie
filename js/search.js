@@ -7,6 +7,12 @@ document.addEventListener('alpine:init', () => {
         errorMessage: '',
 
         init() {
+            const userRegion = localStorage.getItem('userRegion') || 'FR';
+            const flagImg = document.getElementById('header-flag');
+            if (flagImg) {
+                flagImg.src = `https://flagcdn.com/w40/${userRegion.toLowerCase()}.png`;
+                flagImg.alt = userRegion;
+            }
             // Vérification de la clé API au démarrage
             if (!window.TMDB_API_KEY) {
                 console.error("ERREUR CRITIQUE : TMDB_API_KEY est introuvable ! Vérifiez que config.js est bien chargé.");
