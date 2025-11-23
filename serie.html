@@ -3,7 +3,6 @@
 <head>
     <meta charset="utf-8"/>
     <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport"/>
-    
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#121212">
     <link rel="apple-touch-icon" href="icons/icon-192.png">
@@ -35,8 +34,8 @@
         .season-card.open .episodes-container { display: block; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .material-symbols-outlined.filled { font-variation-settings: 'FILL' 1; }
         
-        /* Checkbox Custom */
         input[type="checkbox"] {
             appearance: none; width: 1.5rem; height: 1.5rem; border-radius: 0.375rem;
             border: 1px solid #4A5568; background-color: rgba(17, 24, 39, 0.5);
@@ -80,6 +79,12 @@
                 <span id="media-year"></span>
                 <span class="text-gray-500">•</span>
                 <span id="media-seasons"></span>
+                
+                <span class="text-gray-500">•</span>
+                <div class="flex items-center gap-1 text-yellow-500">
+                    <span class="material-symbols-outlined text-sm filled">star</span>
+                    <span id="media-rating" class="text-gray-200 font-bold"></span>
+                </div>
             </div>
 
             <div id="media-genres" class="flex flex-wrap items-center gap-2 mb-6"></div>
@@ -89,13 +94,6 @@
                     <span class="material-symbols-outlined filled">add</span>
                     <span>Ma Liste</span>
                 </button>
-                <div class="flex flex-col items-center justify-center bg-gray-800/50 rounded-xl px-4 py-2 border border-gray-700">
-                    <div class="flex items-center gap-1">
-                        <span class="material-symbols-outlined text-yellow-500 text-sm filled">star</span>
-                        <span id="media-imdb" class="text-lg font-bold text-white"></span>
-                    </div>
-                    <span class="text-[10px] text-gray-400">IMDb</span>
-                </div>
             </div>
 
             <div class="mb-8">
