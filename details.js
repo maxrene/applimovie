@@ -17,6 +17,22 @@ const CUSTOM_PLATFORMS = {
     39: { name: 'Now', url: 'https://logo.clearbit.com/nowtv.com' }
 };
 
+const PLATFORM_ID_MAP = {
+    'netflix': 8,
+    'prime': 119,
+    'disney': 337,
+    'apple': 350,
+    'canal': 392,
+    'paramount': 531,
+    'max': 1899,
+    'skygo': 29,
+    'now': 39,
+    'rakuten': 35,
+    'pluto': 300,
+    'crunchyroll': 283,
+    'arte': 234
+};
+
 let currentCastData = [];
 let isCastExpanded = false;
 const userRegion = localStorage.getItem('userRegion') || 'FR';
@@ -231,6 +247,17 @@ function updateStreamingUI(allProvidersData) {
     if (!container) return;
     container.innerHTML = '';
 
+    const saved = localStorage.getItem('selectedPlatforms');
+    const selectedPlatforms = saved ? JSON.parse(saved) : [];
+
+    // If no platforms are selected, show nothing/message as per user request (strict filtering)
+    if (selectedPlatforms.length === 0) {
+        container.innerHTML = '<span class="text-gray-500 text-sm">Aucune plateforme sélectionnée</span>';
+        return;
+    }
+
+    const allowedIds = new Set(selectedPlatforms.map(id => PLATFORM_ID_MAP[id]).filter(Boolean));
+
     let providers = [];
     if (Array.isArray(allProvidersData)) {
         providers = allProvidersData;
@@ -238,7 +265,8 @@ function updateStreamingUI(allProvidersData) {
         if (allProvidersData[userRegion] && allProvidersData[userRegion].flatrate) {
             providers = [...allProvidersData[userRegion].flatrate];
         }
-        if (userRegion !== 'FR' && myPlatformIds.includes('canal')) {
+        // Special case for Canal+ in non-FR regions if selected
+        if (userRegion !== 'FR' && selectedPlatforms.includes('canal')) {
             if (allProvidersData['FR'] && allProvidersData['FR'].flatrate) {
                 const canal = allProvidersData['FR'].flatrate.find(p => p.provider_id === 392 || p.provider_name.includes('Canal'));
                 if (canal && !providers.some(p => p.provider_id === canal.provider_id)) {
@@ -248,12 +276,17 @@ function updateStreamingUI(allProvidersData) {
         }
     }
 
+    // Filter by allowed IDs and Deduplicate
     const uniqueProviders = [];
     const seen = new Set();
-    for(const p of providers) {
-        if(!seen.has(p.provider_id)) {
-            uniqueProviders.push(p);
-            seen.add(p.provider_id);
+
+    for (const p of providers) {
+        // Strict filtering: only show if the provider ID is in the user's allowed list
+        if (allowedIds.has(p.provider_id)) {
+            if (!seen.has(p.provider_id)) {
+                uniqueProviders.push(p);
+                seen.add(p.provider_id);
+            }
         }
     }
 
@@ -275,7 +308,7 @@ function updateStreamingUI(allProvidersData) {
             `;
         });
     } else {
-        container.innerHTML = '<span class="text-gray-500 text-sm">Non disponible en streaming</span>';
+        container.innerHTML = '<span class="text-gray-500 text-sm">Non disponible sur vos plateformes</span>';
     }
 }
 
