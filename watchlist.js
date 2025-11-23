@@ -398,7 +398,6 @@ document.addEventListener('alpine:init', () => {
                             <a href="serie.html?id=${item.id}">
                                 <img class="w-full rounded-lg" src="${item.posterUrl}" alt="${item.title}">
                             </a>
-                            <p class="absolute bottom-1 right-1 left-auto text-xs font-semibold text-white bg-black/50 px-1.5 py-0.5 rounded-sm backdrop-blur-sm">${remainingInSeason} restants</p>
                         </div>
                         <div class="flex-1">
                              <a href="serie.html?id=${item.id}">
@@ -412,8 +411,11 @@ document.addEventListener('alpine:init', () => {
                             <svg fill="currentColor" height="20" viewBox="0 0 20 20" width="20"><path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"></path></svg>
                         </button>
                     </div>
-                    <div class="mt-3 h-1 w-full rounded-full bg-gray-700">
-                        <div class="h-1 rounded-full bg-green-500" style="width: ${totalProgress}%"></div>
+                    <div class="mt-3 flex items-center gap-2">
+                        <div class="h-1 flex-1 rounded-full bg-gray-700">
+                            <div class="h-1 rounded-full bg-green-500" style="width: ${totalProgress}%"></div>
+                        </div>
+                        <p class="text-xs text-gray-400">${remainingInSeason} restants</p>
                     </div>
                 </div>`;
         },
