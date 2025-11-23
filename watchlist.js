@@ -6,7 +6,7 @@ document.addEventListener('alpine:init', () => {
         sortOrder: 'popularity',
         selectedPlatform: null,
         platforms: [],
-        watchStatusFilter: 'all', // 'all', 'watched', 'unwatched'
+        watchStatusFilter: 'unwatched',
 
         async init() {
             this.loadWatchlist();
