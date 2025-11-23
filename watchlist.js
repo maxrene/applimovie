@@ -5,9 +5,18 @@ document.addEventListener('alpine:init', () => {
         activeTab: 'movie',
         sortOrder: 'popularity',
         
-        // INITIALISÉ PLUS TARD AVEC TOUT
+        // Bottom Sheets
+        showSortSheet: false,
+        showFilterSheet: false,
+
+        // Filter State
         activePlatformFilters: [], 
-        
+        filterGenres: [], // Array of genre IDs
+        filterYearMin: 1950,
+        filterYearMax: new Date().getFullYear(),
+        filterRating: 0,
+        isThisYearSelected: false,
+
         watchStatusFilter: 'unwatched',
         showServiceBar: false,
         userRegion: localStorage.getItem('userRegion') || 'FR',
@@ -26,6 +35,44 @@ document.addEventListener('alpine:init', () => {
             { id: 'now', logoUrl: 'https://logo.clearbit.com/nowtv.com' }
         ],
 
+        get sortLabel() {
+            if (this.sortOrder === 'popularity') return 'Popularité';
+            if (this.sortOrder === 'release_date') return 'Date de sortie';
+            if (this.sortOrder === 'recently_added') return 'Date d\'ajout';
+            return 'Tri';
+        },
+
+        get activeFiltersCount() {
+            let count = 0;
+            if (this.filterGenres.length > 0) count++;
+            if (this.filterRating > 0) count++;
+            if (this.filterYearMin > 1950 || this.filterYearMax < new Date().getFullYear()) count++;
+            if (this.isThisYearSelected) count++;
+            return count;
+        },
+
+        // Dynamically get all genres available in the current enriched watchlist
+        get availableGenres() {
+            const genres = new Map();
+            const type = this.activeTab === 'movie' ? 'movie' : 'serie';
+
+            this.enrichedWatchlist.forEach(item => {
+                let itemType = item.type;
+                if (!itemType && item.title) itemType = 'movie';
+                if (!itemType && item.name) itemType = 'serie';
+                if (itemType === 'tv') itemType = 'serie';
+
+                if (itemType === type && item.apiDetails && item.apiDetails.genres) {
+                    item.apiDetails.genres.forEach(g => {
+                        if (!genres.has(g.id)) {
+                            genres.set(g.id, g);
+                        }
+                    });
+                }
+            });
+            return Array.from(genres.values()).sort((a, b) => a.name.localeCompare(b.name));
+        },
+
         async init() {
             this.loadWatchlist();
             const flagImg = document.getElementById('header-flag');
@@ -43,7 +90,7 @@ document.addEventListener('alpine:init', () => {
 
             await this.fetchAndEnrichWatchlist();
             
-            this.$watch('activeTab', () => this.renderMedia());
+            this.$watch('activeTab', () => { this.filterGenres = []; this.renderMedia(); });
             this.$watch('watchStatusFilter', () => this.renderMedia());
             this.$watch('activePlatformFilters', () => this.renderMedia());
 
@@ -114,17 +161,40 @@ document.addEventListener('alpine:init', () => {
             // Modification: On ne filtre PLUS les items. On montre tout.
             // Les filtres servent uniquement à afficher/masquer les icones sur les cartes.
 
-            if (this.watchStatusFilter === 'watched') {
-                filtered = filtered.filter(item => item.isWatched);
-            } else if (this.watchStatusFilter === 'unwatched') {
-                filtered = filtered.filter(item => !item.isWatched);
+            // 3. FILTER: GENRES
+            if (this.filterGenres.length > 0) {
+                filtered = filtered.filter(item => {
+                    if (!item.apiDetails || !item.apiDetails.genres) return false;
+                    // Check if item has ANY of the selected genres
+                    return item.apiDetails.genres.some(g => this.filterGenres.includes(g.id));
+                });
+            }
+
+            // 4. FILTER: YEAR RANGE
+            // Only apply if it differs from default
+            const currentYear = new Date().getFullYear();
+            if (this.filterYearMin > 1950 || this.filterYearMax < currentYear) {
+                filtered = filtered.filter(item => {
+                    const yearStr = item.year || (item.apiDetails ? (item.apiDetails.release_date || item.apiDetails.first_air_date) : '');
+                    if (!yearStr) return false;
+                    const year = parseInt(yearStr.split('-')[0] || yearStr.split(' ')[0]);
+                    return year >= this.filterYearMin && year <= this.filterYearMax;
+                });
+            }
+
+            // 5. FILTER: RATING
+            if (this.filterRating > 0) {
+                filtered = filtered.filter(item => {
+                    const rating = item.vote_average || (item.apiDetails ? item.apiDetails.vote_average : 0);
+                    // Also handle IMDb from data.js if needed, but consistency suggests TMDB rating
+                    return parseFloat(rating) >= this.filterRating;
+                });
             }
 
             return filtered;
         },
 
         setSort(order) { this.sortOrder = order; this.renderMedia(); },
-        get sortLabel() { if (this.sortOrder === 'popularity') return 'Popularité'; if (this.sortOrder === 'release_date') return 'Date de sortie'; return 'Date d\'ajout'; },
         async renderMedia() { const container = document.getElementById('media-list'); const emptyState = document.getElementById('empty-state'); if (!container) return; let itemsToRender = [...this.filteredMedia]; if (this.sortOrder === 'recently_added') { itemsToRender.sort((a, b) => new Date(b.added_at) - new Date(a.added_at)); } else if (this.sortOrder === 'release_date') { itemsToRender.sort((a, b) => { const yearAStr = String(a.year || ''); const yearBStr = String(b.year || ''); const dateA = new Date(yearAStr.split(' - ')[0]); const dateB = new Date(yearBStr.split(' - ')[0]); return dateB - dateA; }); } else { itemsToRender.sort((a, b) => { const imdbA = a.imdb === 'xx' || !a.imdb ? 0 : parseFloat(a.imdb); const imdbB = b.imdb === 'xx' || !b.imdb ? 0 : parseFloat(b.imdb); return imdbB - imdbA; }); } if (itemsToRender.length === 0) { container.innerHTML = ''; if (emptyState) emptyState.classList.remove('hidden'); return; } if (emptyState) emptyState.classList.add('hidden'); const mediaHTMLPromises = itemsToRender.map(item => this.createMediaItemHTML(item)); const mediaHTML = await Promise.all(mediaHTMLPromises); container.innerHTML = mediaHTML.join(''); },
         async createMediaItemHTML(item) { if (item.type === 'movie') return this.createMovieItemHTML(item); if (item.type === 'serie') return this.createTVItemHTML(item); return ''; },
         createCheckButtonHTML(itemId, isWatched, type, extraAction = '') { const action = type === 'movie' ? `toggleMovieWatched(${itemId})` : `markEpisodeWatched(${itemId}, ${extraAction})`; const bgClass = isWatched ? 'bg-primary border-primary text-white' : 'bg-black/40 border-gray-600 text-gray-500 hover:text-white hover:border-gray-400'; return ` <button @click.prevent.stop="${action}" class="flex h-8 w-8 items-center justify-center rounded-full border transition-all ${bgClass} z-10 shrink-0 ml-2"> <span class="material-symbols-outlined text-[20px]">check</span> </button>`; },
