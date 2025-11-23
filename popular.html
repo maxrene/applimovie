@@ -72,7 +72,7 @@
             </div>
 
             <div class="flex-1 text-center">
-                <span class="text-xs text-gray-500 dark:text-gray-400 font-medium" x-text="isLoading ? 'Chargement...' : items.length + ' titres'"></span>
+                <span class="text-xs text-gray-500 dark:text-gray-400 font-medium" x-text="items.length > 0 ? items.length + ' titres' : ''"></span>
             </div>
 
             <div class="flex items-center gap-1 flex-shrink-0">
@@ -104,7 +104,7 @@
         </div>
     </header>
 
-    <main class="flex-1 overflow-y-auto p-3 scroll-smooth">
+    <main class="flex-1 overflow-y-auto p-3 scroll-smooth" @scroll="handleScroll">
         
         <div x-show="isLoading" class="flex justify-center py-20">
             <svg class="animate-spin h-10 w-10 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -117,15 +117,10 @@
             <template x-for="item in items" :key="item.id">
                 <a :href="(item.media_type === 'movie' ? 'film.html' : 'serie.html') + '?id=' + item.id" class="relative aspect-[2/3] rounded-lg overflow-hidden bg-gray-800 group block shadow-lg">
                     <img :src="item.poster_path" :alt="item.title" class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" loading="lazy">
-                    
                     <template x-if="item.media_type === 'tv'">
-                        <div class="absolute top-2 left-2 bg-black/70 backdrop-blur-sm px-1.5 py-0.5 rounded text-[10px] font-bold text-white uppercase tracking-wider border border-white/10">
-                            TV
-                        </div>
+                        <div class="absolute top-2 left-2 bg-black/70 backdrop-blur-sm px-1.5 py-0.5 rounded text-[10px] font-bold text-white uppercase tracking-wider border border-white/10">TV</div>
                     </template>
-
                     <div class="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-transparent opacity-60 group-hover:opacity-80 transition-opacity"></div>
-                    
                     <div class="absolute bottom-0 left-0 right-0 p-3">
                         <div class="flex items-center gap-1 mb-1">
                             <img src="https://upload.wikimedia.org/wikipedia/commons/6/69/IMDB_Logo_2016.svg" class="h-3 w-auto rounded-sm">
@@ -138,9 +133,16 @@
             </template>
         </div>
 
+        <div x-show="isLoadingMore" class="flex justify-center py-6">
+            <svg class="animate-spin h-6 w-6 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+        </div>
+
         <div x-show="!isLoading && items.length === 0" class="text-center py-20" x-cloak>
             <span class="material-symbols-outlined text-5xl text-gray-700 mb-3">block</span>
-            <p class="text-gray-500">Aucun contenu trouvé pour ces filtres.</p>
+            <p class="text-gray-500">Aucun contenu trouvé.</p>
         </div>
         
         <div class="h-10"></div>
