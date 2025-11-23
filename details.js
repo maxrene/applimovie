@@ -76,9 +76,7 @@ async function fetchFullFromTMDB(id, type) {
         const formattedData = formatTMDBData(data, type);
         updateUI(formattedData, type, false);
 
-        if(data['watch/providers']?.results) {
-            updateStreamingUI(data['watch/providers'].results);
-        }
+        updateStreamingUI(data['watch/providers']?.results || {});
 
         if (type === 'tv' && data.seasons) {
             updateSeasonsUI(data.seasons, id, data.number_of_episodes);
@@ -244,7 +242,8 @@ function updateSimilarMoviesUI(similarMovies) {
 
 function updateStreamingUI(allProvidersData) {
     const container = document.getElementById('available-on-container');
-    if (!container) return;
+    const section = document.getElementById('streaming-section');
+    if (!container || !section) return;
     container.innerHTML = '';
 
     const saved = localStorage.getItem('selectedPlatforms');
@@ -252,6 +251,7 @@ function updateStreamingUI(allProvidersData) {
 
     // If no platforms are selected, show nothing/message as per user request (strict filtering)
     if (selectedPlatforms.length === 0) {
+        section.style.display = 'block';
         container.innerHTML = '<span class="text-gray-500 text-sm">Aucune plateforme sélectionnée</span>';
         return;
     }
@@ -291,6 +291,7 @@ function updateStreamingUI(allProvidersData) {
     }
 
     if (uniqueProviders.length > 0) {
+        section.style.display = 'block';
         uniqueProviders.forEach(p => {
             let logoUrl = p.logo_path ? IMG_BASE_PROFILE + p.logo_path : 'https://placehold.co/64x64';
             let cssClass = "object-cover"; 
@@ -308,6 +309,7 @@ function updateStreamingUI(allProvidersData) {
             `;
         });
     } else {
+        section.style.display = 'block';
         container.innerHTML = '<span class="text-gray-500 text-sm">Non disponible sur vos plateformes</span>';
     }
 }
