@@ -384,38 +384,45 @@ document.addEventListener('alpine:init', () => {
             const totalProgress = (seriesWatchedEpisodes.size / item.apiDetails.number_of_episodes) * 100;
 
             const providers = item.apiDetails?.providers;
-            const platformHTML = providers && providers.length > 0
-                ? `<div class="flex items-center gap-2 mt-2">
-                       ${providers.slice(0, 3).map(p => `<img src="https://image.tmdb.org/t/p/w500${p.logo_path}" alt="${p.provider_name}" class="h-5 w-5 rounded-sm">`).join('')}
-                   </div>`
+            const platformLogo = providers && providers.length > 0
+                ? `<img src="https://image.tmdb.org/t/p/w500${providers[0].logo_path}" alt="${providers[0].provider_name}" class="h-4 w-4 rounded-sm">`
                 : '';
 
+            const totalSeasons = item.apiDetails.number_of_seasons;
+            const startYear = item.year.split(' - ')[0];
 
             return `
-                <div class="p-4">
-                    <div class="flex items-start gap-4">
-                        <div class="w-24 flex-shrink-0 relative">
+                <div class="relative overflow-hidden p-4">
+                    <div class="flex gap-4">
+                        <div class="w-24 flex-shrink-0">
                             <a href="serie.html?id=${item.id}">
-                                <img class="w-full rounded-lg" src="${item.posterUrl}" alt="${item.title}">
+                                <img alt="${item.title} cover" class="w-full rounded-md object-cover aspect-[2/3]" src="${item.posterUrl}">
                             </a>
                         </div>
-                        <div class="flex-1">
-                             <a href="serie.html?id=${item.id}">
-                                <h3 class="text-lg font-bold text-white">${item.title}</h3>
-                                <p class="text-sm text-gray-300">S${this.formatEpisodeNumber(nextEpisode.season_number)} E${this.formatEpisodeNumber(nextEpisode.episode_number)}</p>
-                                <p class="text-xs text-gray-400 mt-1">${nextEpisode.name}</p>
-                            </a>
-                            ${platformHTML}
+                        <div class="flex min-w-0 flex-1 flex-col justify-between py-1">
+                            <div>
+                                <a href="serie.html?id=${item.id}">
+                                    <h3 class="font-bold text-base text-gray-900 dark:text-white truncate">${item.title}</h3>
+                                </a>
+                                <div class="flex items-center gap-2 mt-0.5">
+                                    <p class="text-xs text-gray-500 dark:text-gray-400">${totalSeasons} Seasons • ${startYear}</p>
+                                    ${platformLogo}
+                                </div>
+                            </div>
+                            <div class="mt-2 space-y-1">
+                                <p class="text-xs font-medium text-gray-500 dark:text-gray-400">S${this.formatEpisodeNumber(nextEpisode.season_number)}E${this.formatEpisodeNumber(nextEpisode.episode_number)}</p>
+                                <div class="flex items-center justify-between gap-2">
+                                    <p class="truncate text-sm text-gray-700 dark:text-gray-300">${nextEpisode.name}</p>
+                                    <button @click="markEpisodeWatched(${item.id}, ${nextEpisode.id})" class="flex-shrink-0 p-1 text-gray-400 hover:text-green-500 dark:hover:text-green-400 -mr-1">
+                                        <span class="material-symbols-outlined" style="font-size: 20px; font-variation-settings: 'FILL' 0, 'wght' 300;">check_circle</span>
+                                    </button>
+                                </div>
+                            </div>
                         </div>
-                        <button aria-label="Mark episode as watched" @click="markEpisodeWatched(${item.id}, ${nextEpisode.id})" class="h-8 w-8 rounded-full border-2 border-gray-500 text-gray-500 flex items-center justify-center flex-shrink-0 hover:border-green-500 hover:text-green-500 transition-colors">
-                            <svg fill="currentColor" height="20" viewBox="0 0 20 20" width="20"><path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"></path></svg>
-                        </button>
                     </div>
-                    <div class="mt-3 flex items-center gap-2">
-                        <div class="h-1 flex-1 rounded-full bg-gray-700">
-                            <div class="h-1 rounded-full bg-green-500" style="width: ${totalProgress}%"></div>
-                        </div>
-                        <p class="text-xs text-gray-400">${remainingInSeason} restants</p>
+                    <div class="absolute bottom-4 right-4 text-xs font-medium text-gray-500 dark:text-gray-400">${remainingInSeason} remaining</div>
+                    <div class="absolute bottom-0 left-0 right-0 h-1 bg-green-500/20 dark:bg-green-500/10">
+                        <div class="h-1 bg-green-500" style="width: ${totalProgress}%"></div>
                     </div>
                 </div>`;
         },
