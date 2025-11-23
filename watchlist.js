@@ -11,7 +11,7 @@ document.addEventListener('alpine:init', () => {
         showPlatformModal: false,
         userRegion: localStorage.getItem('userRegion') || 'FR',
         myPlatformIds: [], // IDs des plateformes cochées dans le profil
-        
+        userSelectedPlatforms: [],
         // Liste pour la pop-up de filtre (Header) - calculée dynamiquement
         availableHeaderPlatforms: [],
 
@@ -34,7 +34,9 @@ document.addEventListener('alpine:init', () => {
             // Charger les préférences de plateformes
             const savedPlatforms = localStorage.getItem('selectedPlatforms');
             this.myPlatformIds = savedPlatforms ? JSON.parse(savedPlatforms) : [];
-
+            this.userSelectedPlatforms = this.availablePlatforms.filter(p => 
+                this.myPlatformIds.includes(p.id)
+            );
             await this.fetchAndEnrichWatchlist();
             
             // Construire la liste des filtres disponibles (basé sur le contenu ET mes plateformes)
