@@ -57,36 +57,30 @@
             <div class="flex items-center justify-between gap-4">
                 <div id="platform-filter" class="flex items-center -space-x-2">
                 </div>
-                <div class="flex items-center space-x-2">
-                    <button @click="toggleSort()" class="flex items-center space-x-1 rounded-full bg-black/30 p-2 text-xs text-gray-400 hover:text-white transition-colors" data-testid="sort-button">
-                        <span class="material-symbols-outlined text-base">swap_vert</span>
-                        <span x-text="`Trier: ${sortLabel}`"></span>
-                    </button>
+                <div class="flex items-center space-x-2" x-data="{ sortMenuOpen: false }">
+                    <div class="relative">
+                        <button @click="sortMenuOpen = !sortMenuOpen" class="flex items-center space-x-1 rounded-full bg-black/30 p-2 text-xs text-gray-400 hover:text-white transition-colors" data-testid="sort-button">
+                            <span class="material-symbols-outlined text-base">swap_vert</span>
+                            <span x-text="`Trier: ${sortLabel}`"></span>
+                        </button>
+                        <div x-show="sortMenuOpen" @click.away="sortMenuOpen = false" class="absolute right-0 mt-2 w-48 bg-gray-800 rounded-md shadow-lg z-20">
+                            <a href="#" @click.prevent="setSort('popularity'); sortMenuOpen = false" class="block px-4 py-2 text-sm text-gray-300 hover:bg-gray-700">Popularité</a>
+                            <a href="#" @click.prevent="setSort('release_date'); sortMenuOpen = false" class="block px-4 py-2 text-sm text-gray-300 hover:bg-gray-700">Date de sortie</a>
+                            <a href="#" @click.prevent="setSort('recently_added'); sortMenuOpen = false" class="block px-4 py-2 text-sm text-gray-300 hover:bg-gray-700">Date d'ajout</a>
+                        </div>
+                    </div>
                     <button class="flex items-center space-x-1 rounded-full bg-black/30 p-2 text-xs text-gray-600 cursor-not-allowed" disabled>
                         <span class="material-symbols-outlined text-base">filter_list</span>
                         <span>Filtrer</span>
                     </button>
                 </div>
             </div>
-            <div class="flex items-center justify-end" x-show="activeTab === 'tv'">
-                <label class="flex cursor-pointer items-center gap-2" for="hide-completed">
-                    <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Hide Completed TV Shows</span>
-                    <div class="relative">
-                        <input class="sr-only peer" id="hide-completed" type="checkbox" x-model="hideCompleted"/>
-                        <div class="w-11 h-6 bg-gray-200 rounded-full dark:bg-gray-700 peer-checked:bg-primary"></div>
-                        <div class="absolute left-1 top-1 h-4 w-4 rounded-full bg-white transition-all peer-checked:translate-x-full"></div>
-                    </div>
-                </label>
-            </div>
-            <div class="flex items-center justify-end" x-show="activeTab === 'movie'">
-                <label class="flex cursor-pointer items-center gap-2" for="hide-watched">
-                    <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Hide Watched Movies</span>
-                    <div class="relative">
-                        <input class="sr-only peer" id="hide-watched" type="checkbox" x-model="hideWatched"/>
-                        <div class="w-11 h-6 bg-gray-200 rounded-full dark:bg-gray-700 peer-checked:bg-primary"></div>
-                        <div class="absolute left-1 top-1 h-4 w-4 rounded-full bg-white transition-all peer-checked:translate-x-full"></div>
-                    </div>
-                </label>
+            <div class="flex items-center justify-center">
+                <div class="flex items-center space-x-2 rounded-full bg-black/30 p-1">
+                    <button @click="watchStatusFilter = 'all'" :class="{'bg-primary text-white': watchStatusFilter === 'all', 'text-gray-400': watchStatusFilter !== 'all'}" class="rounded-full py-2 px-4 text-center text-sm font-semibold transition-colors duration-300">Tout</button>
+                    <button @click="watchStatusFilter = 'watched'" :class="{'bg-primary text-white': watchStatusFilter === 'watched', 'text-gray-400': watchStatusFilter !== 'watched'}" class="rounded-full py-2 px-4 text-center text-sm font-semibold transition-colors duration-300">Vu</button>
+                    <button @click="watchStatusFilter = 'unwatched'" :class="{'bg-primary text-white': watchStatusFilter === 'unwatched', 'text-gray-400': watchStatusFilter !== 'unwatched'}" class="rounded-full py-2 px-4 text-center text-sm font-semibold transition-colors duration-300">Pas encore vu</button>
+                </div>
             </div>
         </div>
     </header>

@@ -3,18 +3,16 @@ document.addEventListener('alpine:init', () => {
     Alpine.data('myListPage', () => ({
         watchlist: [],
         activeTab: 'tv', // 'movie' or 'tv'
-        hideCompleted: false,
-        hideWatched: false,
         sortOrder: 'popularity',
         selectedPlatform: null,
         platforms: [],
+        watchStatusFilter: 'all', // 'all', 'watched', 'unwatched'
 
         init() {
             this.loadWatchlist();
             this.extractPlatforms();
             this.$watch('activeTab', () => this.renderMedia());
-            this.$watch('hideCompleted', () => this.renderMedia());
-            this.$watch('hideWatched', () => this.renderMedia());
+            this.$watch('watchStatusFilter', () => this.renderMedia());
             this.$watch('selectedPlatform', () => this.renderMedia());
             this.renderMedia();
             this.renderPlatformFilters();
@@ -86,24 +84,24 @@ document.addEventListener('alpine:init', () => {
                 );
             }
 
-            if (this.activeTab === 'tv' && this.hideCompleted) {
-                filtered = filtered.filter(item => !item.isWatched);
-            }
-
-            if (this.activeTab === 'movie' && this.hideWatched) {
+            if (this.watchStatusFilter === 'watched') {
+                filtered = filtered.filter(item => item.isWatched);
+            } else if (this.watchStatusFilter === 'unwatched') {
                 filtered = filtered.filter(item => !item.isWatched);
             }
 
             return filtered;
         },
 
-        toggleSort() {
-            this.sortOrder = this.sortOrder === 'popularity' ? 'recently_added' : 'popularity';
+        setSort(order) {
+            this.sortOrder = order;
             this.renderMedia();
         },
 
         get sortLabel() {
-            return this.sortOrder === 'popularity' ? 'Popularity' : 'Recently Added';
+            if (this.sortOrder === 'popularity') return 'Popularité';
+            if (this.sortOrder === 'release_date') return 'Date de sortie';
+            return 'Date d\'ajout';
         },
 
         renderMedia() {
@@ -115,6 +113,12 @@ document.addEventListener('alpine:init', () => {
 
             if (this.sortOrder === 'recently_added') {
                 itemsToRender.sort((a, b) => new Date(b.added_at) - new Date(a.added_at));
+            } else if (this.sortOrder === 'release_date') {
+                itemsToRender.sort((a, b) => {
+                    const dateA = new Date(a.year.split(' - ')[0]);
+                    const dateB = new Date(b.year.split(' - ')[0]);
+                    return dateB - dateA;
+                });
             } else { // Popularity (default)
                  itemsToRender.sort((a, b) => {
                     const imdbA = a.imdb === 'xx' ? 0 : parseFloat(a.imdb);
