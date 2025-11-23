@@ -9,7 +9,7 @@ async def main():
 
         # Clear local storage before starting
         await page.goto('http://localhost:8080/film.html?id=693134')
-        await page.evaluate('localStorage.clear()')
+        #await page.evaluate('localStorage.clear()')
 
         # --- Test Unified Button ---
         await page.goto('http://localhost:8080/film.html?id=693134')
