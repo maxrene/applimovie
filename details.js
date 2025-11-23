@@ -423,6 +423,13 @@ function toggleEpisodeWatchedStatus(seriesId, episodeId, totalEpisodes) {
         watchedEpisodes[seriesId].push(episodeId);
     }
 
+    // Automatically add to watchlist if it's the first watched episode
+    let watchlist = JSON.parse(localStorage.getItem('watchlist')) || [];
+    if (!watchlist.some(item => item.id === seriesIdNum)) {
+        watchlist.push({ id: seriesIdNum, added_at: new Date().toISOString() });
+        localStorage.setItem('watchlist', JSON.stringify(watchlist));
+    }
+
     localStorage.setItem('watchedEpisodes', JSON.stringify(watchedEpisodes));
 
     const watchedCount = watchedEpisodes[seriesId].length;
@@ -431,12 +438,6 @@ function toggleEpisodeWatchedStatus(seriesId, episodeId, totalEpisodes) {
         if (!watchedList.includes(seriesIdNum)) {
             watchedList.push(seriesIdNum);
             localStorage.setItem('watchedSeries', JSON.stringify(watchedList));
-
-            let watchlist = JSON.parse(localStorage.getItem('watchlist')) || [];
-            if (!watchlist.some(item => item.id === seriesIdNum)) {
-                 watchlist.push({ id: seriesIdNum, added_at: new Date().toISOString() });
-                 localStorage.setItem('watchlist', JSON.stringify(watchlist));
-            }
             updateWatchlistButton(seriesId);
         }
     } else {
