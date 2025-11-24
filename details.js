@@ -385,6 +385,27 @@ function updatePersonUI(person, type) {
     if (roleText) roleText.textContent = role;
 }
 
+function updateSeasonWatchedStatus(seasonCard) {
+    if (!seasonCard) return;
+
+    const iconContainer = seasonCard.querySelector('.season-status-icon');
+    if (!iconContainer) return;
+
+    const episodesContainer = seasonCard.querySelector('.episodes-container');
+    const episodeIcons = episodesContainer.querySelectorAll('.episode-tick-icon');
+
+    if (episodeIcons.length === 0) return;
+
+    const allWatched = Array.from(episodeIcons).every(icon => icon.textContent.trim() === 'check_circle');
+
+    if (allWatched) {
+        iconContainer.innerHTML = `<span class="material-symbols-outlined !text-xl text-green-400">check_circle</span>`;
+    } else {
+        const seasonNumber = seasonCard.dataset.seasonNumber;
+        iconContainer.innerHTML = `<div class="bg-gray-700 h-full w-full rounded-lg flex items-center justify-center text-sm font-bold text-white">${seasonNumber}</div>`;
+    }
+}
+
 function updateSeasonsUI(seasons, seriesId, totalEpisodes) {
     const container = document.getElementById('seasons-episodes-container');
     if (!container) return;
@@ -398,7 +419,9 @@ function updateSeasonsUI(seasons, seriesId, totalEpisodes) {
             <div class="season-card rounded-xl bg-gray-800/50 border border-white/5 overflow-hidden" data-season-number="${season.season_number}">
                 <div class="flex items-center justify-between p-4 cursor-pointer hover:bg-white/5 transition-colors">
                     <div class="flex items-center gap-3">
-                        <div class="bg-gray-700 h-8 w-8 rounded-lg flex items-center justify-center text-sm font-bold text-white">${season.season_number}</div>
+                        <div class="season-status-icon h-8 w-8 rounded-lg">
+                           <div class="bg-gray-700 h-full w-full rounded-lg flex items-center justify-center text-sm font-bold text-white">${season.season_number}</div>
+                        </div>
                         <div>
                             <h3 class="font-bold text-white text-sm">${season.name}</h3>
                             <span class="text-xs text-gray-400">${season.episode_count} Épisodes</span>
@@ -452,20 +475,21 @@ function updateSeasonsUI(seasons, seriesId, totalEpisodes) {
                                             <p class="text-sm font-medium text-white truncate">${episode.name}</p>
                                             <p class="text-[10px] text-gray-500">${episode.runtime ? episode.runtime + 'm' : ''}</p>
                                         </div>
-                                        <input type="checkbox" data-episode-id="${episode.id}" class="h-5 w-5 rounded border-gray-600 text-primary focus:ring-offset-0 focus:ring-0 bg-gray-700/50" ${isChecked ? 'checked' : ''}>
+                                        <span class="material-symbols-outlined !text-xl cursor-pointer episode-tick-icon ${isChecked ? 'text-green-400' : 'text-gray-500'}" data-episode-id="${episode.id}">${isChecked ? 'check_circle' : 'radio_button_unchecked'}</span>
                                     </div>`;
                             }).join('');
 
                             episodesContainer.innerHTML = `<div class="">${episodesListHTML}</div>`;
 
-                            episodesContainer.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
-                                checkbox.addEventListener('change', () => {
-                                    const episodeId = parseInt(checkbox.dataset.episodeId, 10);
-                                    toggleEpisodeWatchedStatus(seriesId, episodeId, totalEpisodes);
+                            episodesContainer.querySelectorAll('.episode-tick-icon').forEach(icon => {
+                                icon.addEventListener('click', () => {
+                                    const episodeId = parseInt(icon.dataset.episodeId, 10);
+                                    toggleEpisodeWatchedStatus(seriesId, episodeId, totalEpisodes, icon);
                                 });
                             });
                         }
                         episodesContainer.dataset.loaded = 'true';
+                        updateSeasonWatchedStatus(card);
                     } catch (e) {
                         episodesContainer.innerHTML = '<div class="p-4 text-red-500 text-sm">Erreur chargement.</div>';
                     }
@@ -475,7 +499,7 @@ function updateSeasonsUI(seasons, seriesId, totalEpisodes) {
     });
 }
 
-function toggleEpisodeWatchedStatus(seriesId, episodeId, totalEpisodes) {
+function toggleEpisodeWatchedStatus(seriesId, episodeId, totalEpisodes, icon) {
     let watchedEpisodes = JSON.parse(localStorage.getItem('watchedEpisodes')) || {};
     if (!watchedEpisodes[seriesId]) watchedEpisodes[seriesId] = [];
 
@@ -484,17 +508,27 @@ function toggleEpisodeWatchedStatus(seriesId, episodeId, totalEpisodes) {
 
     if (episodeIndex > -1) {
         watchedEpisodes[seriesId].splice(episodeIndex, 1);
+        icon.textContent = 'radio_button_unchecked';
+        icon.classList.remove('text-green-400');
+        icon.classList.add('text-gray-500');
     } else {
         watchedEpisodes[seriesId].push(episodeId);
+        icon.textContent = 'check_circle';
+        icon.classList.remove('text-gray-500');
+        icon.classList.add('text-green-400');
     }
 
     let watchlist = JSON.parse(localStorage.getItem('watchlist')) || [];
     if (!watchlist.some(item => item.id === seriesIdNum)) {
-        watchlist.push({ id: seriesIdNum, added_at: new Date().toISOString() });
+        watchlist.push({ id: seriesIdNum, type: 'serie', added_at: new Date().toISOString() });
         localStorage.setItem('watchlist', JSON.stringify(watchlist));
+        updateWatchlistButton(seriesId);
     }
 
     localStorage.setItem('watchedEpisodes', JSON.stringify(watchedEpisodes));
+
+    const seasonCard = icon.closest('.season-card');
+    updateSeasonWatchedStatus(seasonCard);
 
     const watchedCount = watchedEpisodes[seriesId].length;
     let watchedList = JSON.parse(localStorage.getItem('watchedSeries')) || [];
