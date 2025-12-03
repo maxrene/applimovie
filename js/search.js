@@ -107,6 +107,37 @@ document.addEventListener('alpine:init', () => {
             }
         },
 
+        getMediaStatus(item) {
+             const id = item.id;
+             let type = item.media_type;
+             if (!type) {
+                if (item.title) type = 'movie';
+                else if (item.name) type = 'tv';
+             }
+
+             // Normalize tv -> serie for local storage check if needed, but here we just need movie vs tv/serie logic
+
+             // Watchlist
+             const watchlist = JSON.parse(localStorage.getItem('watchlist')) || [];
+             const isInWatchlist = watchlist.some(w => w.id == id);
+             if (isInWatchlist) return 'watchlist';
+
+             // Watched
+             const watchedMovies = JSON.parse(localStorage.getItem('watchedMovies')) || [];
+             const watchedSeries = JSON.parse(localStorage.getItem('watchedSeries')) || [];
+
+             // Check based on type
+             const isMovie = type === 'movie';
+             const isSerie = type === 'tv' || type === 'serie';
+
+             const isWatched = (isMovie && watchedMovies.includes(Number(id))) ||
+                               (isSerie && watchedSeries.includes(Number(id)));
+
+             if (isWatched) return 'watched';
+
+             return null;
+        },
+
         clearHistory() {
             this.previousSearches = [];
             localStorage.removeItem('previousSearches');

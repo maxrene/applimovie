@@ -19,6 +19,27 @@ document.addEventListener('alpine:init', () => {
             return 'Récents';
         },
 
+        getMediaStatus(item) {
+             const id = item.id;
+             const type = item.media_type === 'tv' ? 'serie' : 'movie';
+
+             // Watchlist
+             const watchlist = JSON.parse(localStorage.getItem('watchlist')) || [];
+             const isInWatchlist = watchlist.some(w => w.id == id);
+             if (isInWatchlist) return 'watchlist';
+
+             // Watched
+             const watchedMovies = JSON.parse(localStorage.getItem('watchedMovies')) || [];
+             const watchedSeries = JSON.parse(localStorage.getItem('watchedSeries')) || [];
+
+             const isWatched = (type === 'movie' && watchedMovies.includes(Number(id))) ||
+                               (type === 'serie' && watchedSeries.includes(Number(id)));
+
+             if (isWatched) return 'watched';
+
+             return null;
+        },
+
         init() {
             const flagImg = document.getElementById('header-flag');
             if (flagImg) flagImg.src = `https://flagcdn.com/w40/${this.userRegion.toLowerCase()}.png`;
