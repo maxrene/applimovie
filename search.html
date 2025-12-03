@@ -20,13 +20,14 @@
         }
     </script>
     <style> 
-        body { min-height: max(884px, 100dvh); } 
+        body { height: 100dvh; overflow: hidden; overscroll-behavior: none; }
         .material-symbols-outlined.filled { font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .material-symbols-outlined.thick { font-variation-settings: 'FILL' 1, 'wght' 700, 'GRAD' 0, 'opsz' 24; }
     </style>
 </head>
 <body x-data="search" class="bg-background-light dark:bg-background-dark font-display text-gray-800 dark:text-gray-200">
-<div class="min-h-screen flex flex-col">
-    <header class="sticky top-0 z-10 bg-background-light/80 dark:bg-background-dark/80 backdrop-blur-sm">
+<div class="flex flex-col h-screen">
+    <header class="flex-shrink-0 sticky top-0 z-10 bg-background-light/80 dark:bg-background-dark/80 backdrop-blur-sm">
         <div class="flex items-center p-4 justify-between">
             <div class="flex items-center">
                 <button @click="window.history.back()" class="p-2 -ml-2 text-gray-600 dark:text-gray-400">
@@ -51,7 +52,7 @@
         </div>
     </header>
 
-    <main class="flex-grow p-4">
+    <main class="flex-1 overflow-y-auto p-4 pb-24 scroll-smooth">
         <!-- Recent Searches Carousel -->
         <div x-show="searchQuery.length === 0 && previousSearches.length > 0" class="mb-8" x-cloak>
             <div class="flex items-center justify-between mb-4">
@@ -87,23 +88,23 @@
         </div>
         </main>
 
-    <footer class="sticky bottom-0 bg-background-light/90 dark:bg-background-dark/90 backdrop-blur-sm border-t border-gray-200 dark:border-gray-800">
-        <nav class="flex justify-around items-center h-16">
-            <a class="flex flex-col items-center justify-center gap-1 text-gray-500 dark:text-gray-400 hover:text-primary dark:hover:text-primary transition-colors" href="index.html">
-                <span class="material-symbols-outlined">home</span>
-                <span class="text-[10px] font-medium">Home</span>
+    <footer class="flex-shrink-0 bg-background-light/90 dark:bg-background-dark/90 backdrop-blur-md border-t border-gray-200 dark:border-gray-800 z-30 h-20 pb-2">
+        <nav class="flex justify-around items-center h-full">
+            <a class="flex flex-col items-center justify-center gap-1 text-gray-500 dark:text-gray-400 hover:text-primary transition-colors w-16" href="index.html">
+                <span class="material-symbols-outlined text-2xl">home</span>
+                <span class="text-[10px] font-medium">Accueil</span>
             </a>
-            <a class="flex flex-col items-center justify-center gap-1 text-gray-500 dark:text-gray-400 hover:text-primary dark:hover:text-primary transition-colors" href="#">
-                <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1, 'wght' 700;">local_fire_department</span>
-                <span class="text-[10px] font-medium">Popular</span>
+            <a class="flex flex-col items-center justify-center gap-1 text-gray-500 dark:text-gray-400 hover:text-primary transition-colors w-16" href="popular.html">
+                <span class="material-symbols-outlined thick text-2xl">local_fire_department</span>
+                <span class="text-[10px] font-medium">Populaire</span>
             </a>
-            <a class="flex flex-col items-center justify-center gap-1 text-primary" href="search.html">
-                <span class="material-symbols-outlined filled">search</span>
-                <span class="text-[10px] font-bold">Search</span>
+            <a class="flex flex-col items-center justify-center gap-1 text-primary transition-colors w-16" href="search.html">
+                <span class="material-symbols-outlined filled text-2xl">search</span>
+                <span class="text-[10px] font-bold">Recherche</span>
             </a>
-            <a class="flex flex-col items-center justify-center gap-1 text-gray-500 dark:text-gray-400 hover:text-primary dark:hover:text-primary transition-colors" href="watchlist.html">
-                <span class="material-symbols-outlined">bookmark</span>
-                <span class="text-[10px] font-medium">My List</span>
+            <a class="flex flex-col items-center justify-center gap-1 text-gray-500 dark:text-gray-400 hover:text-primary transition-colors w-16" href="watchlist.html">
+                <span class="material-symbols-outlined text-2xl">bookmark</span>
+                <span class="text-[10px] font-medium">Ma Liste</span>
             </a>
         </nav>
     </footer>
