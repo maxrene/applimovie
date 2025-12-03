@@ -94,7 +94,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (status === 'watchlist') {
              statusIconHTML = `<span class="material-symbols-outlined text-primary text-base">bookmark</span>`;
         } else if (status === 'watched') {
-             statusIconHTML = `<span class="material-symbols-outlined text-gray-500 text-base">visibility</span>`;
+             statusIconHTML = `<span class="material-symbols-outlined text-green-500 text-base">visibility</span>`;
         }
 
         return `

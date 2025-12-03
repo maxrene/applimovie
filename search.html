@@ -74,7 +74,7 @@
                                   <span class="material-symbols-outlined text-primary text-[16px]">bookmark</span>
                              </template>
                              <template x-if="getMediaStatus(item) === 'watched'">
-                                  <span class="material-symbols-outlined text-gray-500 text-[16px]">visibility</span>
+                                  <span class="material-symbols-outlined text-green-500 text-[16px]">visibility</span>
                              </template>
                         </div>
                         <p class="text-[10px] text-gray-500 dark:text-gray-400 truncate" x-text="getItemType(item)"></p>
@@ -94,7 +94,7 @@
                                  <span class="material-symbols-outlined text-primary text-base">bookmark</span>
                             </template>
                             <template x-if="getMediaStatus(item) === 'watched'">
-                                 <span class="material-symbols-outlined text-gray-500 text-base">visibility</span>
+                                 <span class="material-symbols-outlined text-green-500 text-base">visibility</span>
                             </template>
                         </div>
                         <p class="text-sm text-gray-500 dark:text-gray-400" x-text="item.media_type === 'movie' ? 'Film' : 'Série TV'"></p>
