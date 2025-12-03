@@ -53,9 +53,9 @@
             <button @click="showServiceBar = !showServiceBar" class="flex items-center group">
                 <div class="flex -space-x-6 transition-all duration-200" :class="showServiceBar ? 'opacity-50' : 'opacity-100'">
                     <template x-for="(platform, index) in userSelectedPlatforms.slice(0, 3)" :key="platform.id">
-                        <img :src="platform.logoUrl" class="w-9 h-9 rounded-full border-2 border-background-light dark:border-background-dark bg-gray-800 object-cover z-10">
+                        <img :src="platform.logoUrl" class="w-9 h-9 rounded-full border-2 border-background-light dark:border-background-dark bg-gray-800 object-cover relative" :style="'z-index: ' + (30 - index * 10)">
                     </template>
-                    <div x-show="userSelectedPlatforms.length > 3" class="w-9 h-9 rounded-full border-2 border-background-light dark:border-background-dark bg-gray-700 flex items-center justify-center text-[10px] text-white font-bold z-0">+<span x-text="userSelectedPlatforms.length - 3"></span></div>
+                    <div x-show="userSelectedPlatforms.length > 3" class="w-9 h-9 rounded-full border-2 border-background-light dark:border-background-dark bg-gray-700 flex items-center justify-center text-[10px] text-white font-bold relative z-0">+<span x-text="userSelectedPlatforms.length - 3"></span></div>
                     <div x-show="userSelectedPlatforms.length === 0" class="w-9 h-9 rounded-full border-2 border-background-light dark:border-background-dark bg-gray-800 flex items-center justify-center text-gray-400"><span class="material-symbols-outlined text-sm">add</span></div>
                 </div>
                 <span class="material-symbols-outlined text-gray-400 text-xl ml-1 transition-transform duration-200" :class="showServiceBar ? 'rotate-180 text-primary' : ''">expand_more</span>
@@ -64,14 +64,15 @@
         <div class="flex-1 flex justify-center max-w-[280px]">
             <div class="relative flex w-full items-center bg-gray-200 dark:bg-gray-800 rounded-lg p-1 h-9 cursor-pointer shadow-inner">
                 <div class="absolute inset-y-1 w-[calc(50%-4px)] bg-white dark:bg-gray-600 rounded-md shadow-sm transition-all duration-300 ease-out" :class="watchStatusFilter === 'watched' ? 'translate-x-[100%] left-1' : 'translate-x-0 left-1'"></div>
-                <button @click="watchStatusFilter = 'unwatched'" class="relative z-10 flex-1 text-[11px] font-bold uppercase tracking-wider text-center h-full flex items-center justify-center transition-colors" :class="watchStatusFilter === 'unwatched' ? 'text-gray-900 dark:text-white' : 'text-gray-500 dark:text-gray-400'">Watchlist</button>
-                <button @click="watchStatusFilter = 'watched'" class="relative z-10 flex-1 text-[11px] font-bold uppercase tracking-wider text-center h-full flex items-center justify-center transition-colors" :class="watchStatusFilter === 'watched' ? 'text-gray-900 dark:text-white' : 'text-gray-500 dark:text-gray-400'">Vu</button>
+                <button @click="watchStatusFilter = 'unwatched'" class="relative z-10 flex-1 text-[10px] font-bold uppercase text-center h-full flex items-center justify-center transition-colors" :class="watchStatusFilter === 'unwatched' ? 'text-gray-900 dark:text-white' : 'text-gray-500 dark:text-gray-400'">Watchlist</button>
+                <button @click="watchStatusFilter = 'watched'" class="relative z-10 flex-1 text-[10px] font-bold uppercase text-center h-full flex items-center justify-center transition-colors" :class="watchStatusFilter === 'watched' ? 'text-gray-900 dark:text-white' : 'text-gray-500 dark:text-gray-400'">Vu</button>
             </div>
         </div>
         <div class="flex items-center gap-1 flex-shrink-0">
             <div class="relative" x-data="{ open: false }">
-                <button @click="open = !open" class="flex items-center gap-0.5 p-2 text-gray-500 dark:text-gray-400 hover:text-primary transition-colors rounded-full hover:bg-gray-100 dark:hover:bg-white/5">
+                <button @click="open = !open" class="flex items-center gap-0.5 px-2 py-2 text-gray-500 dark:text-gray-400 hover:text-primary transition-colors rounded-full hover:bg-gray-100 dark:hover:bg-white/5">
                     <span class="material-symbols-outlined">sort</span>
+                    <span class="text-[10px] font-bold ml-0.5 hidden sm:inline">Trier</span>
                     <span class="material-symbols-outlined text-lg">expand_more</span>
                 </button>
                 <div x-show="open" @click.away="open = false" class="absolute right-0 top-full mt-2 w-48 bg-gray-800 rounded-xl shadow-xl z-50 border border-gray-700 py-2" x-transition x-cloak>
@@ -80,10 +81,13 @@
                     <a href="#" @click.prevent="setSort('recently_added'); open = false" class="block px-4 py-3 text-sm text-gray-300 hover:bg-gray-700 hover:text-white">Date d'ajout</a>
                 </div>
             </div>
-            <button class="p-2 text-gray-500 dark:text-gray-400 hover:text-primary transition-colors rounded-full hover:bg-gray-100 dark:hover:bg-white/5"><span class="material-symbols-outlined">filter_list</span></button>
+            <button class="flex items-center gap-0.5 px-2 py-2 text-gray-500 dark:text-gray-400 hover:text-primary transition-colors rounded-full hover:bg-gray-100 dark:hover:bg-white/5">
+                <span class="material-symbols-outlined">filter_list</span>
+                <span class="text-[10px] font-bold ml-0.5 hidden sm:inline">Filtrer</span>
+            </button>
         </div>
     </div>
-    <div x-show="showServiceBar" x-transition class="bg-gray-50 dark:bg-[#151515] border-b border-gray-200 dark:border-gray-800 py-3 px-4 flex items-center gap-3 overflow-x-auto no-scrollbar shadow-inner" x-cloak>
+    <div x-show="showServiceBar" x-transition class="bg-gray-50 dark:bg-[#151515] border-b border-gray-200 dark:border-gray-800 py-3 px-4 flex flex-wrap w-full items-center gap-3 shadow-inner" x-cloak>
         <a href="platforms.html" class="flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-xl bg-gray-200 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-500 hover:text-primary hover:border-primary transition-all"><span class="material-symbols-outlined text-lg">edit</span></a>
         <div class="w-px h-6 bg-gray-300 dark:bg-gray-700 flex-shrink-0 mx-1"></div>
         <button @click="togglePlatformFilter('all')" class="flex-shrink-0 w-10 h-10 rounded-xl transition-all duration-200 border flex items-center justify-center font-bold text-xs" :class="activePlatformFilters.length === 0 ? 'bg-primary text-white border-primary shadow-md scale-105' : 'bg-gray-200 dark:bg-gray-800 text-gray-500 border-gray-300 dark:border-gray-700 hover:text-primary'">
