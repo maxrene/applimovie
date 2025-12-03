@@ -68,7 +68,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 async function fetchFullFromTMDB(id, type) {
     try {
-        const url = `${BASE_URL}/${type}/${id}?api_key=${TMDB_API_KEY}&append_to_response=credits,watch/providers,similar,external_ids`;
+        const url = `${BASE_URL}/${type}/${id}?api_key=${TMDB_API_KEY}&append_to_response=credits,watch/providers,similar,external_ids,videos`;
         const res = await fetch(url);
         if (!res.ok) throw new Error("Erreur TMDB");
         const data = await res.json();
@@ -88,13 +88,16 @@ async function fetchFullFromTMDB(id, type) {
 
 async function fetchUpdates(id, type) {
     try {
-        const streamingUrl = `${BASE_URL}/${type}/${id}/watch/providers?api_key=${TMDB_API_KEY}`;
-        const streamingRes = await fetch(streamingUrl);
+        // Fetch streaming, credits, and videos in parallel
+        const urls = [
+            `${BASE_URL}/${type}/${id}/watch/providers?api_key=${TMDB_API_KEY}`,
+            `${BASE_URL}/${type}/${id}/credits?api_key=${TMDB_API_KEY}`
+        ];
+        const [streamingRes, creditsRes] = await Promise.all(urls.map(url => fetch(url)));
+
         const streamingData = await streamingRes.json();
         updateStreamingUI(streamingData.results || {});
 
-        const creditsUrl = `${BASE_URL}/${type}/${id}/credits?api_key=${TMDB_API_KEY}`;
-        const creditsRes = await fetch(creditsUrl);
         const creditsData = await creditsRes.json();
 
         const cast = creditsData.cast?.map(c => ({
@@ -216,6 +219,10 @@ function updateUI(data, type, isLocal) {
 
     if (type === 'movie' && data.similarMovies) {
         updateSimilarMoviesUI(data.similarMovies);
+    }
+
+    if (data.videos) {
+        updateVideosUI(data.videos);
     }
 }
 
@@ -499,6 +506,42 @@ function updateSeasonsUI(seasons, seriesId, totalEpisodes) {
     });
 }
 
+function updateVideosUI(videos) {
+    const section = document.getElementById('trailers-section');
+    const container = document.getElementById('trailers-container');
+    if (!section || !container) return;
+
+    const filteredVideos = videos.filter(v => v.site === 'YouTube' && ['Trailer', 'Teaser', 'Featurette', 'Clip'].includes(v.type));
+
+    if (filteredVideos.length === 0) {
+        section.style.display = 'none';
+        return;
+    }
+
+    section.style.display = 'block';
+    container.innerHTML = '';
+
+    filteredVideos.slice(0, 5).forEach(video => {
+        const thumbnailUrl = `https://i.ytimg.com/vi/${video.key}/hqdefault.jpg`;
+        const videoUrl = `https://www.youtube.com/watch?v=${video.key}`;
+
+        container.innerHTML += `
+            <a href="${videoUrl}" target="_blank" class="flex-shrink-0 snap-start group">
+                <div class="relative h-24 w-40 overflow-hidden rounded-lg">
+                    <img alt="${video.name}" class="h-full w-full object-cover transition-transform group-hover:scale-105" src="${thumbnailUrl}"/>
+                    <div class="absolute inset-0 bg-black/40"></div>
+                    <div class="absolute inset-0 flex items-center justify-center">
+                        <span class="material-symbols-outlined text-4xl text-white">play_circle</span>
+                    </div>
+                </div>
+                <p class="mt-1 text-sm font-semibold text-white truncate w-40 group-hover:text-primary">${video.name}</p>
+                <p class="text-xs text-gray-400">${video.type}</p>
+            </a>
+        `;
+    });
+}
+
+
 function toggleEpisodeWatchedStatus(seriesId, episodeId, totalEpisodes, icon) {
     let watchedEpisodes = JSON.parse(localStorage.getItem('watchedEpisodes')) || {};
     if (!watchedEpisodes[seriesId]) watchedEpisodes[seriesId] = [];
@@ -565,6 +608,8 @@ function formatTMDBData(data, type) {
         imageUrl: c.profile_path ? IMG_BASE_PROFILE + c.profile_path : 'https://placehold.co/64x64'
     })) || [];
 
+    const videos = data.videos?.results || [];
+
     const similar = data.similar?.results?.map(s => ({
         id: s.id,
         title: s.title,
@@ -603,7 +648,8 @@ function formatTMDBData(data, type) {
         bannerUrl: data.backdrop_path ? IMG_BASE_BANNER + data.backdrop_path : '',
         director: dir,
         cast: cast,
-        similarMovies: similar
+        similarMovies: similar,
+        videos: videos
     };
 }
 
