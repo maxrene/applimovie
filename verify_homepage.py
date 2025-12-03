@@ -1,25 +1,21 @@
+from playwright.sync_api import sync_playwright
 
-import asyncio
-from playwright.async_api import async_playwright
+def verify_homepage():
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page(viewport={'width': 400, 'height': 800}) # Mobile view as per user context
 
-async def main():
-    async with async_playwright() as p:
-        browser = await p.chromium.launch()
-        page = await browser.new_page()
+        # Navigate to homepage
+        page.goto('http://localhost:8080/index.html')
 
-        await page.goto('http://localhost:8080/index.html')
+        # Wait for content to load
+        page.wait_for_selector('#popular-container a')
+        page.wait_for_timeout(2000) # wait for images to render
 
-        # Wait for the popular container to have at least one media card
-        await page.wait_for_selector('#popular-container .snap-start', timeout=10000)
-        print("✅ Popular content loaded.")
+        # Take a screenshot of the top part of the page
+        page.screenshot(path='homepage_verification.png', full_page=False)
 
-        # Wait for the Netflix container to have at least one media card
-        await page.wait_for_selector('#netflix-container .snap-start', timeout=10000)
-        print("✅ Netflix content loaded.")
+        browser.close()
 
-        await page.screenshot(path='homepage_verification.png')
-        print("📸 Screenshot saved as homepage_verification.png")
-
-        await browser.close()
-
-asyncio.run(main())
+if __name__ == "__main__":
+    verify_homepage()
