@@ -51,7 +51,7 @@
     <div class="flex items-center justify-between px-4 py-3 gap-2">
         <div class="flex-shrink-0">
             <button @click="showServiceBar = !showServiceBar" class="flex items-center group">
-                <div class="flex -space-x-3 transition-all duration-200" :class="showServiceBar ? 'opacity-50' : 'opacity-100'">
+                <div class="flex -space-x-6 transition-all duration-200" :class="showServiceBar ? 'opacity-50' : 'opacity-100'">
                     <template x-for="(platform, index) in userSelectedPlatforms.slice(0, 3)" :key="platform.id">
                         <img :src="platform.logoUrl" class="w-9 h-9 rounded-full border-2 border-background-light dark:border-background-dark bg-gray-800 object-cover z-10">
                     </template>
@@ -61,7 +61,7 @@
                 <span class="material-symbols-outlined text-gray-400 text-xl ml-1 transition-transform duration-200" :class="showServiceBar ? 'rotate-180 text-primary' : ''">expand_more</span>
             </button>
         </div>
-        <div class="flex-1 flex justify-center max-w-[200px]">
+        <div class="flex-1 flex justify-center max-w-[280px]">
             <div class="relative flex w-full items-center bg-gray-200 dark:bg-gray-800 rounded-lg p-1 h-9 cursor-pointer shadow-inner">
                 <div class="absolute inset-y-1 w-[calc(50%-4px)] bg-white dark:bg-gray-600 rounded-md shadow-sm transition-all duration-300 ease-out" :class="watchStatusFilter === 'watched' ? 'translate-x-[100%] left-1' : 'translate-x-0 left-1'"></div>
                 <button @click="watchStatusFilter = 'unwatched'" class="relative z-10 flex-1 text-[11px] font-bold uppercase tracking-wider text-center h-full flex items-center justify-center transition-colors" :class="watchStatusFilter === 'unwatched' ? 'text-gray-900 dark:text-white' : 'text-gray-500 dark:text-gray-400'">Watchlist</button>
