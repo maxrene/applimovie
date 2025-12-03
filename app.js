@@ -47,6 +47,26 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function getMediaStatus(id, type) {
+        // Watchlist
+        const watchlist = JSON.parse(localStorage.getItem('watchlist')) || [];
+        // Check ID equality loosely (string vs number)
+        const isInWatchlist = watchlist.some(item => item.id == id);
+        if (isInWatchlist) return 'watchlist';
+
+        // Watched
+        const watchedMovies = JSON.parse(localStorage.getItem('watchedMovies')) || [];
+        const watchedSeries = JSON.parse(localStorage.getItem('watchedSeries')) || [];
+
+        const isWatched = (type === 'movie' && watchedMovies.includes(Number(id))) ||
+                          (type === 'tv' && watchedSeries.includes(Number(id))) ||
+                          (type === 'serie' && watchedSeries.includes(Number(id)));
+
+        if (isWatched) return 'watched';
+
+        return null;
+    }
+
    function createMediaCard(media, cardType = 'platform') {
         const cardWidth = cardType === 'popular' ? 'w-36' : 'w-32'; // Un peu plus petit pour en mettre plus
         const posterRadius = 'rounded-lg';
@@ -69,6 +89,14 @@ document.addEventListener('DOMContentLoaded', () => {
             ? `<div class="absolute top-1 left-1 z-10 bg-black/70 backdrop-blur-sm px-1.5 py-0.5 rounded text-[8px] font-bold text-white uppercase tracking-wider border border-white/10">TV</div>`
             : '';
 
+        const status = getMediaStatus(id, isMovie ? 'movie' : 'tv');
+        let statusIconHTML = '';
+        if (status === 'watchlist') {
+             statusIconHTML = `<span class="material-symbols-outlined text-primary text-base">bookmark</span>`;
+        } else if (status === 'watched') {
+             statusIconHTML = `<span class="material-symbols-outlined text-gray-500 text-base">visibility</span>`;
+        }
+
         return `
             <a href="${link}" class="flex-shrink-0 ${cardWidth} snap-start group flex flex-col">
                 <div class="relative w-full aspect-[2/3] ${posterRadius} overflow-hidden bg-gray-800 shadow-md">
@@ -77,7 +105,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors"></div>
                 </div>
                 
-                <p class="mt-2 text-xs font-bold text-gray-900 dark:text-white truncate leading-tight">${title}</p>
+                <div class="flex justify-between items-start mt-2">
+                    <p class="text-xs font-bold text-gray-900 dark:text-white truncate leading-tight flex-1 pr-1">${title}</p>
+                    ${statusIconHTML}
+                </div>
                 
                 <div class="flex items-center gap-1 mt-0.5 text-[10px] text-gray-500 dark:text-gray-400">
                     <span>${year}</span>

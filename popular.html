@@ -88,7 +88,15 @@
                         </template>
                     </div>
                     
-                    <p class="mt-2 text-xs font-bold text-gray-900 dark:text-white truncate leading-tight" x-text="item.title"></p>
+                    <div class="flex justify-between items-start mt-2">
+                        <p class="text-xs font-bold text-gray-900 dark:text-white truncate leading-tight flex-1 pr-1" x-text="item.title"></p>
+                        <template x-if="getMediaStatus(item) === 'watchlist'">
+                             <span class="material-symbols-outlined text-primary text-[16px]">bookmark</span>
+                        </template>
+                        <template x-if="getMediaStatus(item) === 'watched'">
+                             <span class="material-symbols-outlined text-gray-500 text-[16px]">visibility</span>
+                        </template>
+                    </div>
                     
                     <div class="flex items-center gap-1 mt-0.5 text-[10px] text-gray-500 dark:text-gray-400">
                         <span x-text="item.year"></span>

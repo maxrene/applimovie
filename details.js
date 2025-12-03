@@ -723,6 +723,10 @@ async function toggleWatchlist(mediaId) {
              showConfirmationModal(mediaId, 99); 
              return;
         }
+        // Remove from watchlist when marking as watched
+        watchlist = watchlist.filter(item => item.id !== mediaIdNum);
+        localStorage.setItem('watchlist', JSON.stringify(watchlist));
+
         watchedList.push(mediaIdNum);
         localStorage.setItem(watchedListKey, JSON.stringify(watchedList));
         updateWatchlistButton(mediaId);
@@ -746,6 +750,12 @@ function showConfirmationModal(seriesId, total) {
             watchedList.push(seriesIdNum);
             localStorage.setItem('watchedSeries', JSON.stringify(watchedList));
         }
+
+        // Remove from watchlist
+        let watchlist = JSON.parse(localStorage.getItem('watchlist')) || [];
+        watchlist = watchlist.filter(item => item.id !== seriesIdNum);
+        localStorage.setItem('watchlist', JSON.stringify(watchlist));
+
         modal.style.display = 'none';
         updateWatchlistButton(seriesId);
     };
