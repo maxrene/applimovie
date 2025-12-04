@@ -46,7 +46,7 @@
         <path d="M15 19l-7-7 7-7" stroke-linecap="round" stroke-linejoin="round"></path>
       </svg>
     </button>
-    <button class="rounded-full bg-black/50 p-2 text-white">
+    <button @click="toggleFavorite()" class="rounded-full bg-black/50 p-2 transition-colors duration-300" :class="isFavorite ? 'text-primary' : 'text-white'">
       <svg class="h-6 w-6" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
         <path d="M5 4a2 2 0 012-2h6a2 2 0 012 2v12l-5-3-5 3V4z"></path>
       </svg>

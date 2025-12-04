@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html class="dark" lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport"/>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#121212">
+<title>Favorite Actors</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Spline+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script>
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: { "primary": "#ea2a33", "background-light": "#f8f6f6", "background-dark": "#211111" },
+            fontFamily: { "display": ["Spline Sans"] },
+          },
+        },
+      }
+</script>
+<style>
+    body { height: 100dvh; overflow: hidden; }
+    [x-cloak] { display: none !important; }
+</style>
+<script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+<body class="bg-background-light dark:bg-background-dark font-display text-gray-900 dark:text-white" x-data="favoriteActors()">
+
+<div class="flex flex-col h-screen">
+
+    <header class="flex-shrink-0 flex items-center p-4 pb-2 justify-between sticky top-0 bg-background-light dark:bg-background-dark z-10">
+        <button onclick="history.back()" class="text-slate-900 dark:text-white flex size-12 shrink-0 items-center"><span class="material-symbols-outlined">arrow_back</span></button>
+        <h2 class="text-lg font-bold leading-tight flex-1 text-center">Vos acteurs préférés</h2>
+        <div class="size-12"></div>
+    </header>
+
+    <main class="flex-1 overflow-y-auto scroll-smooth p-4">
+        <div class="grid grid-cols-2 gap-4" x-cloak>
+            <template x-for="actor in actors" :key="actor.id">
+                <a :href="`person.html?id=${actor.id}`" class="flex flex-col items-center gap-2 p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
+                    <div class="relative w-24 h-24 rounded-full overflow-hidden shadow-lg border-2 border-transparent hover:border-primary transition-colors">
+                        <img :src="getProfileUrl(actor.profile_path)" :alt="actor.name" class="w-full h-full object-cover">
+                    </div>
+                    <p class="text-center font-semibold text-sm truncate w-full px-2" x-text="actor.name"></p>
+                </a>
+            </template>
+        </div>
+
+        <div x-show="actors.length === 0" class="flex flex-col items-center justify-center h-full text-gray-500" x-cloak>
+            <span class="material-symbols-outlined text-6xl mb-4">person_off</span>
+            <p>Aucun acteur favori.</p>
+        </div>
+    </main>
+</div>
+
+<script>
+    document.addEventListener('alpine:init', () => {
+        Alpine.data('favoriteActors', () => ({
+            actors: [],
+            init() {
+                const saved = localStorage.getItem('favoriteActors');
+                if (saved) {
+                    this.actors = JSON.parse(saved);
+                }
+            },
+            getProfileUrl(path) {
+                return path ? `https://image.tmdb.org/t/p/w185${path}` : 'https://placehold.co/185x185';
+            }
+        }));
+    });
+</script>
+</body>
+</html>
