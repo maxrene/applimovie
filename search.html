@@ -2,12 +2,15 @@
 <!DOCTYPE html>
 <html class="dark" lang="fr">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport"/>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#121212">
+    <link rel="apple-touch-icon" href="icons/icon-192.png">
     <title>Recherche</title>
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' https://image.tmdb.org https://placehold.co http://googleusercontent.com https://flagcdn.com data:; connect-src 'self' https://api.themoviedb.org;">
-    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400..700,0..1,0" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Spline+Sans:wght@400;500;700&display=swap" rel="stylesheet"/>
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400..700,0..1,0" rel="stylesheet" />
     <script>
         tailwind.config = {
             darkMode: "class",
@@ -25,7 +28,7 @@
         .material-symbols-outlined.thick { font-variation-settings: 'FILL' 1, 'wght' 700, 'GRAD' 0, 'opsz' 24; }
     </style>
 </head>
-<body x-data="search" class="bg-background-light dark:bg-background-dark font-display text-gray-800 dark:text-gray-200">
+<body x-data="search" class="bg-background-light dark:bg-background-dark font-display text-gray-900 dark:text-gray-100">
 <div class="flex flex-col h-screen">
     <header class="flex-shrink-0 sticky top-0 z-10 bg-background-light/80 dark:bg-background-dark/80 backdrop-blur-sm">
         <div class="flex items-center p-4 justify-between">
