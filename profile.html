@@ -37,7 +37,7 @@
     
     <header class="flex-shrink-0 flex items-center p-4 pb-2 justify-between sticky top-0 bg-background-light dark:bg-background-dark z-10">
         <button onclick="history.back()" class="text-slate-900 dark:text-white flex size-12 shrink-0 items-center"><span class="material-symbols-outlined">arrow_back</span></button>
-        <h2 class="text-lg font-bold leading-tight flex-1 text-center">Profile</h2>
+        <h2 class="text-lg font-bold leading-tight flex-1 text-center">Profil</h2>
         <div class="size-12"></div>
     </header>
 
@@ -50,7 +50,7 @@
 
         <div class="px-4 flex flex-col gap-8 mt-8 pb-8">
             <div class="flex flex-col gap-2">
-                <h3 class="text-lg font-bold pb-2">Preferences</h3>
+                <h3 class="text-lg font-bold pb-2">Préférences</h3>
                 <div class="flex flex-col gap-1 bg-slate-200/50 dark:bg-slate-800/20 rounded-xl p-2">
                     <button @click="showCountryModal = true" class="flex items-center gap-4 p-3 rounded-lg hover:bg-slate-300/50 dark:hover:bg-slate-700/30 transition-colors w-full text-left">
                         <div class="flex items-center justify-center rounded-lg bg-slate-300 dark:bg-slate-800 shrink-0 size-10 text-slate-900 dark:text-white"><span class="material-symbols-outlined">public</span></div>
@@ -65,6 +65,14 @@
                         <div class="flex flex-col flex-1">
                             <p class="text-base font-normal">Mes Plateformes</p>
                             <p class="text-slate-500 dark:text-slate-400 text-sm"><span x-text="platformCount"></span> sélectionnées</p>
+                        </div>
+                        <span class="material-symbols-outlined text-slate-400">chevron_right</span>
+                    </a>
+                    <a href="favorite_actors.html" id="link-favorite-actors" class="flex items-center gap-4 p-3 rounded-lg hover:bg-slate-300/50 dark:hover:bg-slate-700/30 transition-colors w-full text-left">
+                        <div class="flex items-center justify-center rounded-lg bg-slate-300 dark:bg-slate-800 shrink-0 size-10 text-slate-900 dark:text-white"><span class="material-symbols-outlined">person</span></div>
+                        <div class="flex flex-col flex-1">
+                            <p class="text-base font-normal">Vos acteurs préférés</p>
+                            <p class="text-slate-500 dark:text-slate-400 text-sm"><span x-text="actorCount"></span> ajoutés</p>
                         </div>
                         <span class="material-symbols-outlined text-slate-400">chevron_right</span>
                     </a>
@@ -112,7 +120,18 @@
             showCountryModal: false,
             country: localStorage.getItem('userRegion') || 'FR',
             get countryName() { return this.country === 'FR' ? 'France' : 'Irlande'; },
-            get platformCount() { const saved = localStorage.getItem('selectedPlatforms'); return saved ? JSON.parse(saved).length : 0; },
+            get platformCount() {
+                try {
+                    const saved = localStorage.getItem('selectedPlatforms');
+                    return saved ? JSON.parse(saved).length : 0;
+                } catch(e) { return 0; }
+            },
+            get actorCount() {
+                try {
+                    const saved = localStorage.getItem('favoriteActors');
+                    return saved ? JSON.parse(saved).length : 0;
+                } catch(e) { return 0; }
+            },
             setCountry(code) { this.country = code; localStorage.setItem('userRegion', code); this.showCountryModal = false; }
         }));
     });

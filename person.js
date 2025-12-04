@@ -16,6 +16,7 @@ function personProfile() {
         sortBy: 'popularity', // 'popularity', 'date'
         isBioExpanded: false,
         isLoading: true,
+        isFavorite: false,
 
         async init() {
             try {
@@ -28,10 +29,63 @@ function personProfile() {
                     return;
                 }
 
+                // Check favorite status immediately using URL ID
+                this.checkIfFavorite(personId);
+
                 await this.fetchPersonDetails(personId);
             } catch (error) {
                 console.error("Initialization error:", error);
                 this.isLoading = false;
+            }
+        },
+
+        checkIfFavorite(id) {
+            try {
+                const favorites = JSON.parse(localStorage.getItem('favoriteActors')) || [];
+                // Use loose equality (==) to handle string/number differences
+                this.isFavorite = favorites.some(actor => actor.id == id);
+            } catch (e) {
+                console.error("Error reading favorites:", e);
+                this.isFavorite = false;
+            }
+        },
+
+        toggleFavorite() {
+            let id = this.person.id;
+            let name = this.person.name;
+            let profile_path = this.person.profile_path;
+
+            // Fallback: if data not loaded, try to get ID from URL
+            if (!id) {
+                const urlParams = new URLSearchParams(window.location.search);
+                id = urlParams.get('id');
+            }
+
+            if (!id) {
+                console.error("Cannot toggle favorite: No Person ID found.");
+                return;
+            }
+
+            try {
+                const favorites = JSON.parse(localStorage.getItem('favoriteActors')) || [];
+                const index = favorites.findIndex(actor => actor.id == id);
+
+                if (index > -1) {
+                    // Remove
+                    favorites.splice(index, 1);
+                    this.isFavorite = false;
+                } else {
+                    // Add
+                    favorites.push({
+                        id: id,
+                        name: name || 'Unknown',
+                        profile_path: profile_path
+                    });
+                    this.isFavorite = true;
+                }
+                localStorage.setItem('favoriteActors', JSON.stringify(favorites));
+            } catch (e) {
+                console.error("Error updating favorites:", e);
             }
         },
 
@@ -42,7 +96,7 @@ function personProfile() {
                 return;
             }
 
-            const url = `${BASE_URL}/person/${personId}?api_key=${TMDB_API_KEY}&language=en-US&append_to_response=movie_credits,tv_credits`;
+            const url = `${BASE_URL}/person/${personId}?api_key=${TMDB_API_KEY}&language=fr-FR&append_to_response=movie_credits,tv_credits`;
 
             try {
                 const response = await fetch(url);
@@ -51,6 +105,10 @@ function personProfile() {
                 }
                 const data = await response.json();
                 this.processData(data);
+
+                // Re-check favorite in case name/profile_path needs updating (optional)
+                // But mainly to ensure isFavorite is consistent
+                this.checkIfFavorite(data.id);
             } catch (error) {
                 console.error(error);
             } finally {
@@ -92,7 +150,7 @@ function personProfile() {
         },
 
         get bioText() {
-            const fullBio = this.person.biography || "No biography available.";
+            const fullBio = this.person.biography || "Biographie non disponible.";
             const bioMaxLength = 300;
 
             if (this.isBioExpanded || fullBio.length <= bioMaxLength) {
