@@ -66,7 +66,29 @@ document.addEventListener('alpine:init', () => {
             }
         },
 
-        loadWatchlist() { const savedList = localStorage.getItem('watchlist'); this.watchlist = savedList ? JSON.parse(savedList) : []; },
+        loadWatchlist() {
+            const savedList = localStorage.getItem('watchlist');
+            const watchlist = savedList ? JSON.parse(savedList) : [];
+
+            const watchedMovies = JSON.parse(localStorage.getItem('watchedMovies')) || [];
+            const watchedSeries = JSON.parse(localStorage.getItem('watchedSeries')) || [];
+
+            // Add watched items if not already in watchlist
+            // We use a fake added_at date for sorting if needed, or just let it be null
+            watchedMovies.forEach(id => {
+                if (!watchlist.some(item => item.id === id)) {
+                    watchlist.push({ id: id, type: 'movie', isWatched: true, added_at: new Date(0).toISOString() });
+                }
+            });
+
+            watchedSeries.forEach(id => {
+                if (!watchlist.some(item => item.id === id)) {
+                    watchlist.push({ id: id, type: 'serie', isWatched: true, added_at: new Date(0).toISOString() });
+                }
+            });
+
+            this.watchlist = watchlist;
+        },
         getInternalPlatformId(tmdbName) { const lower = tmdbName.toLowerCase(); if (lower.includes('netflix')) return 'netflix'; if (lower.includes('amazon') || lower.includes('prime')) return 'prime'; if (lower.includes('disney')) return 'disney'; if (lower.includes('apple')) return 'apple'; if (lower.includes('canal')) return 'canal'; if (lower.includes('paramount')) return 'paramount'; if (lower.includes('max') || lower.includes('hbo')) return 'max'; if (lower.includes('sky')) return 'skygo'; if (lower.includes('now')) return 'now'; return 'other'; },
 
         getProvidersForItem(item) {
