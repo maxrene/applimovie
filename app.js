@@ -98,7 +98,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         return `
-            <a href="${link}" class="flex-shrink-0 ${cardWidth} snap-start group flex flex-col">
+            <a href="${link}" data-id="${id}" data-type="${isMovie ? 'movie' : 'tv'}" class="flex-shrink-0 ${cardWidth} snap-start group flex flex-col media-card-link">
                 <div class="relative w-full aspect-[2/3] ${posterRadius} overflow-hidden bg-gray-800 shadow-md">
                     <img src="${posterUrl}" loading="lazy" class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105">
                     ${badgeHTML}
@@ -107,7 +107,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 <div class="flex justify-between items-start mt-2">
                     <p class="text-xs font-bold text-gray-900 dark:text-white truncate leading-tight flex-1 pr-1">${title}</p>
-                    ${statusIconHTML}
+                    <div class="status-container">${statusIconHTML}</div>
                 </div>
                 
                 <div class="flex items-center gap-1 mt-0.5 text-[10px] text-gray-500 dark:text-gray-400">
@@ -155,10 +155,65 @@ document.addEventListener('DOMContentLoaded', () => {
                     platform.section.style.display = combined.length > 0 ? 'block' : 'none';
                 }
             }
+            // Save timestamp of successful fetch
+            localStorage.setItem('lastHomeFetch', Date.now());
         } finally {
             loadingSpinner.style.display = 'none';
         }
     }
+
+    function updateMediaStatuses() {
+        const watchlist = JSON.parse(localStorage.getItem('watchlist')) || [];
+        const watchedMovies = JSON.parse(localStorage.getItem('watchedMovies')) || [];
+        const watchedSeries = JSON.parse(localStorage.getItem('watchedSeries')) || [];
+
+        const watchlistIds = new Set(watchlist.map(item => Number(item.id)));
+        const watchedMoviesIds = new Set(watchedMovies.map(id => Number(id)));
+        const watchedSeriesIds = new Set(watchedSeries.map(id => Number(id)));
+
+        document.querySelectorAll('.media-card-link').forEach(card => {
+            const id = Number(card.dataset.id);
+            const type = card.dataset.type; // 'movie' or 'tv'
+            const statusContainer = card.querySelector('.status-container');
+
+            if (!statusContainer) return;
+
+            let statusIconHTML = '';
+
+            // Logic must match getMediaStatus
+            let status = null;
+            if (watchlistIds.has(id)) {
+                status = 'watchlist';
+            } else {
+                const isWatched = (type === 'movie' && watchedMoviesIds.has(id)) ||
+                                  (type === 'tv' && watchedSeriesIds.has(id)) ||
+                                  (type === 'serie' && watchedSeriesIds.has(id));
+                if (isWatched) status = 'watched';
+            }
+
+            if (status === 'watchlist') {
+                 statusIconHTML = `<span class="material-symbols-outlined text-primary text-base">bookmark</span>`;
+            } else if (status === 'watched') {
+                 statusIconHTML = `<span class="material-symbols-outlined text-green-500 text-base">visibility</span>`;
+            }
+
+            statusContainer.innerHTML = statusIconHTML;
+        });
+    }
+
+    window.addEventListener('pageshow', (event) => {
+        // Always update icons immediately
+        updateMediaStatuses();
+
+        // Check if content is stale (> 12 hours)
+        const lastFetch = localStorage.getItem('lastHomeFetch');
+        const now = Date.now();
+        const twelveHours = 12 * 60 * 60 * 1000;
+
+        if (!lastFetch || (now - parseInt(lastFetch) > twelveHours)) {
+            fetchAndDisplayContent();
+        }
+    });
 
     // Initial Load
     fetchAndDisplayContent();
