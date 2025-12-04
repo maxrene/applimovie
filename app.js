@@ -20,6 +20,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const disneyPlusContainer = document.getElementById('disney-plus-container');
     const canalPlusContainer = document.getElementById('canal-plus-container');
     const paramountContainer = document.getElementById('paramount-container');
+    const favoriteActorsContainer = document.getElementById('favorite-actors-container');
+    const favoriteActorsSection = document.getElementById('favorite-actors-section');
 
     const loadingSpinner = document.getElementById('loading-spinner');
 
@@ -133,6 +135,25 @@ document.addEventListener('DOMContentLoaded', () => {
             // 1. Fetch Popular (Mixte)
             const popularContent = await fetchAPI('trending/all/week?language=fr-FR');
             renderContent(popularContainer, popularContent, 'popular');
+
+            // 1b. Fetch Favorite Actors
+            const favoriteActors = JSON.parse(localStorage.getItem('favoriteActors')) || [];
+            if (favoriteActors.length > 0) {
+                // Construct query with OR logic
+                const actorIds = favoriteActors.map(a => a.id).join('|');
+                // Fetch recent movies with these actors
+                // Note: with_people with OR (|) works in discover/movie
+                const favoriteMovies = await fetchAPI(`discover/movie?with_people=${actorIds}&sort_by=release_date.desc&vote_count.gte=10`);
+
+                if (favoriteMovies && favoriteMovies.length > 0) {
+                    renderContent(favoriteActorsContainer, favoriteMovies, 'platform');
+                    favoriteActorsSection.style.display = 'block';
+                } else {
+                    favoriteActorsSection.style.display = 'none';
+                }
+            } else {
+                favoriteActorsSection.style.display = 'none';
+            }
 
             // 2. Fetch par plateforme (Mixte Films/Séries triés par popularité)
             // Pour avoir un mix, on fait 2 requêtes (movie + tv) et on fusionne

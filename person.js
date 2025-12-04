@@ -16,6 +16,7 @@ function personProfile() {
         sortBy: 'popularity', // 'popularity', 'date'
         isBioExpanded: false,
         isLoading: true,
+        isFavorite: false,
 
         async init() {
             try {
@@ -28,11 +29,37 @@ function personProfile() {
                     return;
                 }
 
+                this.checkIfFavorite(personId);
                 await this.fetchPersonDetails(personId);
             } catch (error) {
                 console.error("Initialization error:", error);
                 this.isLoading = false;
             }
+        },
+
+        checkIfFavorite(id) {
+            const favorites = JSON.parse(localStorage.getItem('favoriteActors')) || [];
+            this.isFavorite = favorites.some(actor => actor.id == id);
+        },
+
+        toggleFavorite() {
+            const favorites = JSON.parse(localStorage.getItem('favoriteActors')) || [];
+            const index = favorites.findIndex(actor => actor.id == this.person.id);
+
+            if (index > -1) {
+                // Remove
+                favorites.splice(index, 1);
+                this.isFavorite = false;
+            } else {
+                // Add
+                favorites.push({
+                    id: this.person.id,
+                    name: this.person.name,
+                    profile_path: this.person.profile_path
+                });
+                this.isFavorite = true;
+            }
+            localStorage.setItem('favoriteActors', JSON.stringify(favorites));
         },
 
         async fetchPersonDetails(personId) {
