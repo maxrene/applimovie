@@ -29,9 +29,7 @@ function personProfile() {
                     return;
                 }
 
-                // Check favorite status immediately using URL ID
                 this.checkIfFavorite(personId);
-
                 await this.fetchPersonDetails(personId);
             } catch (error) {
                 console.error("Initialization error:", error);
@@ -40,53 +38,28 @@ function personProfile() {
         },
 
         checkIfFavorite(id) {
-            try {
-                const favorites = JSON.parse(localStorage.getItem('favoriteActors')) || [];
-                // Use loose equality (==) to handle string/number differences
-                this.isFavorite = favorites.some(actor => actor.id == id);
-            } catch (e) {
-                console.error("Error reading favorites:", e);
-                this.isFavorite = false;
-            }
+            const favorites = JSON.parse(localStorage.getItem('favoriteActors')) || [];
+            this.isFavorite = favorites.some(actor => actor.id == id);
         },
 
         toggleFavorite() {
-            let id = this.person.id;
-            let name = this.person.name;
-            let profile_path = this.person.profile_path;
+            const favorites = JSON.parse(localStorage.getItem('favoriteActors')) || [];
+            const index = favorites.findIndex(actor => actor.id == this.person.id);
 
-            // Fallback: if data not loaded, try to get ID from URL
-            if (!id) {
-                const urlParams = new URLSearchParams(window.location.search);
-                id = urlParams.get('id');
+            if (index > -1) {
+                // Remove
+                favorites.splice(index, 1);
+                this.isFavorite = false;
+            } else {
+                // Add
+                favorites.push({
+                    id: this.person.id,
+                    name: this.person.name,
+                    profile_path: this.person.profile_path
+                });
+                this.isFavorite = true;
             }
-
-            if (!id) {
-                console.error("Cannot toggle favorite: No Person ID found.");
-                return;
-            }
-
-            try {
-                const favorites = JSON.parse(localStorage.getItem('favoriteActors')) || [];
-                const index = favorites.findIndex(actor => actor.id == id);
-
-                if (index > -1) {
-                    // Remove
-                    favorites.splice(index, 1);
-                    this.isFavorite = false;
-                } else {
-                    // Add
-                    favorites.push({
-                        id: id,
-                        name: name || 'Unknown',
-                        profile_path: profile_path
-                    });
-                    this.isFavorite = true;
-                }
-                localStorage.setItem('favoriteActors', JSON.stringify(favorites));
-            } catch (e) {
-                console.error("Error updating favorites:", e);
-            }
+            localStorage.setItem('favoriteActors', JSON.stringify(favorites));
         },
 
         async fetchPersonDetails(personId) {

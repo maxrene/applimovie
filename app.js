@@ -137,15 +137,7 @@ document.addEventListener('DOMContentLoaded', () => {
             renderContent(popularContainer, popularContent, 'popular');
 
             // 1b. Fetch Favorite Actors
-            let favoriteActors = [];
-            try {
-                const saved = localStorage.getItem('favoriteActors');
-                favoriteActors = saved ? JSON.parse(saved) : [];
-            } catch (e) {
-                console.error("Error parsing favorite actors:", e);
-                favoriteActors = [];
-            }
-
+            const favoriteActors = JSON.parse(localStorage.getItem('favoriteActors')) || [];
             if (favoriteActors.length > 0) {
                 // Construct query with OR logic
                 const actorIds = favoriteActors.map(a => a.id).join('|');
