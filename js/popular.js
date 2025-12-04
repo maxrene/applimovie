@@ -11,6 +11,7 @@ document.addEventListener('alpine:init', () => {
 
         userRegion: localStorage.getItem('userRegion') || 'FR',
         sortOrder: 'popularity.desc',
+        lastUpdate: Date.now(),
         
         // Label pour le tri affiché
         get sortLabel() {
@@ -20,6 +21,9 @@ document.addEventListener('alpine:init', () => {
         },
 
         getMediaStatus(item) {
+             // Dependency on lastUpdate to trigger re-render
+             this.lastUpdate;
+
              const id = item.id;
              const type = item.media_type === 'tv' ? 'serie' : 'movie';
 
@@ -43,6 +47,10 @@ document.addEventListener('alpine:init', () => {
         init() {
             const flagImg = document.getElementById('header-flag');
             if (flagImg) flagImg.src = `https://flagcdn.com/w40/${this.userRegion.toLowerCase()}.png`;
+
+            window.addEventListener('pageshow', () => {
+                this.lastUpdate = Date.now();
+            });
 
             this.resetAndFetch();
         },

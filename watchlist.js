@@ -46,6 +46,13 @@ document.addEventListener('alpine:init', () => {
             this.$watch('watchStatusFilter', () => this.renderMedia());
             this.$watch('activePlatformFilters', () => this.renderMedia());
 
+            window.addEventListener('pageshow', async () => {
+                // Reload data from localStorage and re-enrich/re-render
+                this.loadWatchlist();
+                await this.fetchAndEnrichWatchlist();
+                await this.renderMedia();
+            });
+
             await this.renderMedia();
         },
 

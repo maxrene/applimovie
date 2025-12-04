@@ -5,6 +5,7 @@ document.addEventListener('alpine:init', () => {
         previousSearches: [],
         popularSearches: [],
         errorMessage: '',
+        lastUpdate: Date.now(),
 
         init() {
             const userRegion = localStorage.getItem('userRegion') || 'FR';
@@ -28,6 +29,12 @@ document.addEventListener('alpine:init', () => {
                 } else {
                     this.searchResults = [];
                 }
+            });
+
+            window.addEventListener('pageshow', () => {
+                this.lastUpdate = Date.now();
+                // Refresh previous searches as well since they are stored in localStorage
+                this.previousSearches = JSON.parse(localStorage.getItem('previousSearches')) || [];
             });
         },
 
@@ -108,6 +115,9 @@ document.addEventListener('alpine:init', () => {
         },
 
         getMediaStatus(item) {
+             // Dependency on lastUpdate to trigger re-render
+             this.lastUpdate;
+
              const id = item.id;
              let type = item.media_type;
              if (!type) {
