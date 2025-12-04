@@ -43,7 +43,7 @@
     </div>
     <div class="px-4 mt-3">
         <div class="flex items-end justify-between border-b border-gray-200 dark:border-gray-800">
-            <div class="relative flex w-1/2 max-w-[200px]">
+            <div class="relative flex flex-1 mr-4">
                 <div class="absolute bottom-0 h-0.5 bg-primary transition-all duration-300 ease-out w-1/2" :style="activeTab === 'movie' ? 'left: 0%' : 'left: 50%'"></div>
                 <button @click="activeTab = 'movie'" class="flex-1 py-3 text-center text-sm font-bold uppercase tracking-wide transition-colors" :class="activeTab === 'movie' ? 'text-primary' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'">Films</button>
                 <button @click="activeTab = 'tv'" class="flex-1 py-3 text-center text-sm font-bold uppercase tracking-wide transition-colors" :class="activeTab === 'tv' ? 'text-primary' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'">Séries</button>
@@ -58,24 +58,23 @@
         </div>
     </div>
     <div class="flex items-center justify-between px-4 py-3 gap-2">
-        <div class="flex-shrink-0">
+        <div class="flex-1 flex justify-start pl-1">
             <button @click="showServiceBar = !showServiceBar" class="flex items-center group">
-                <div class="flex -space-x-6 transition-all duration-200" :class="showServiceBar ? 'opacity-50' : 'opacity-100'">
-                    <template x-for="(platform, index) in userSelectedPlatforms.slice(0, 3)" :key="platform.id">
-                        <img :src="platform.logoUrl" class="w-9 h-9 rounded-full border-2 border-background-light dark:border-background-dark bg-gray-800 object-cover relative" :style="'z-index: ' + (30 - index * 10)">
+                <div class="flex -space-x-3 transition-all duration-200" :class="showServiceBar ? 'opacity-50' : 'opacity-100'">
+                    <template x-for="(platform, index) in userSelectedPlatforms.slice(0, 4)" :key="platform.id">
+                        <img :src="platform.logoUrl" class="w-9 h-9 rounded-full border-2 border-background-light dark:border-background-dark bg-gray-800 object-cover relative" :style="'z-index: ' + (40 - index * 10)">
                     </template>
-                    <div x-show="userSelectedPlatforms.length > 3" class="w-9 h-9 rounded-full border-2 border-background-light dark:border-background-dark bg-gray-700 flex items-center justify-center text-[10px] text-white font-bold relative z-0">+<span x-text="userSelectedPlatforms.length - 3"></span></div>
+                    <div x-show="userSelectedPlatforms.length > 4" class="w-9 h-9 rounded-full border-2 border-background-light dark:border-background-dark bg-gray-700 flex items-center justify-center text-[10px] text-white font-bold relative z-0">+<span x-text="userSelectedPlatforms.length - 4"></span></div>
                     <div x-show="userSelectedPlatforms.length === 0" class="w-9 h-9 rounded-full border-2 border-background-light dark:border-background-dark bg-gray-800 flex items-center justify-center text-gray-400"><span class="material-symbols-outlined text-sm">add</span></div>
                 </div>
-                <span class="material-symbols-outlined text-gray-400 text-xl ml-1 transition-transform duration-200" :class="showServiceBar ? 'rotate-180 text-primary' : ''">expand_more</span>
+                <span class="material-symbols-outlined text-gray-400 text-xl ml-2 transition-transform duration-200" :class="showServiceBar ? 'rotate-180 text-primary' : ''">expand_more</span>
             </button>
         </div>
-        <div class="flex items-center gap-1 flex-shrink-0">
+        <div class="flex items-center gap-2 flex-shrink-0">
             <div class="relative" x-data="{ open: false }">
-                <button @click="open = !open" class="flex items-center gap-0.5 px-2 py-2 text-gray-500 dark:text-gray-400 hover:text-primary transition-colors rounded-full hover:bg-gray-100 dark:hover:bg-white/5">
-                    <span class="material-symbols-outlined">sort</span>
-                    <span class="text-[10px] font-bold ml-0.5 hidden sm:inline">Trier</span>
-                    <span class="material-symbols-outlined text-lg">expand_more</span>
+                <button @click="open = !open" class="flex items-center space-x-1 rounded-full bg-gray-200 dark:bg-gray-800 p-2 px-3 text-xs text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors">
+                    <span class="material-symbols-outlined text-base">swap_vert</span>
+                    <span x-text="'Trier: ' + sortLabel"></span>
                 </button>
                 <div x-show="open" @click.away="open = false" class="absolute right-0 top-full mt-2 w-48 bg-gray-800 rounded-xl shadow-xl z-50 border border-gray-700 py-2" x-transition x-cloak>
                     <a href="#" @click.prevent="setSort('popularity'); open = false" class="block px-4 py-3 text-sm text-gray-300 hover:bg-gray-700 hover:text-white border-b border-gray-700/50">Popularité</a>
@@ -83,9 +82,9 @@
                     <a href="#" @click.prevent="setSort('recently_added'); open = false" class="block px-4 py-3 text-sm text-gray-300 hover:bg-gray-700 hover:text-white">Date d'ajout</a>
                 </div>
             </div>
-            <button class="flex items-center gap-0.5 px-2 py-2 text-gray-500 dark:text-gray-400 hover:text-primary transition-colors rounded-full hover:bg-gray-100 dark:hover:bg-white/5">
-                <span class="material-symbols-outlined">filter_list</span>
-                <span class="text-[10px] font-bold ml-0.5 hidden sm:inline">Filtrer</span>
+            <button class="flex items-center space-x-1 rounded-full bg-gray-200 dark:bg-gray-800 p-2 px-3 text-xs text-gray-500 dark:text-gray-500 cursor-not-allowed opacity-50">
+                <span class="material-symbols-outlined text-base">filter_list</span>
+                <span>Filtrer</span>
             </button>
         </div>
     </div>
