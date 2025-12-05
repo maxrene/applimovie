@@ -1,5 +1,5 @@
 // sw.js
-const CACHE_NAME = 'cinematch-v3'; // Version V3
+const CACHE_NAME = 'cinematch-v5'; // V5 pour forcer la mise à jour
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -25,9 +25,8 @@ const ASSETS_TO_CACHE = [
   'https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400..700,0..1,0'
 ];
 
-// Installation : Force l'activation immédiate
 self.addEventListener('install', (event) => {
-  self.skipWaiting(); // FORCE L'INSTALLATION IMMEDIATE
+  self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
@@ -36,7 +35,6 @@ self.addEventListener('install', (event) => {
   );
 });
 
-// Activation : Nettoyage et prise de contrôle
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((cacheNames) => {
@@ -47,7 +45,7 @@ self.addEventListener('activate', (event) => {
           }
         })
       );
-    }).then(() => self.clients.claim()) // PREND LE CONTROLE DES PAGES IMMEDIATEMENT
+    }).then(() => self.clients.claim())
   );
 });
 
