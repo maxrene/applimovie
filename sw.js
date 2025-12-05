@@ -1,5 +1,5 @@
 // sw.js
-const CACHE_NAME = 'cinematch-v3'; // Nouvelle version v3
+const CACHE_NAME = 'cinematch-v3'; // Version V3
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
