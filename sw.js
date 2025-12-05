@@ -1,4 +1,4 @@
-const CACHE_NAME = 'cinematch-v1';
+const CACHE_NAME = 'cinematch-v2';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
