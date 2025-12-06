@@ -1,5 +1,5 @@
 // sw.js
-const CACHE_NAME = 'cinematch-v5'; // V5 pour forcer la mise à jour
+const CACHE_NAME = 'cinematch-v6'; // CHANGEMENT VERS V6
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -26,7 +26,7 @@ const ASSETS_TO_CACHE = [
 ];
 
 self.addEventListener('install', (event) => {
-  self.skipWaiting();
+  self.skipWaiting(); // FORCE L'INSTALLATION
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
@@ -45,7 +45,7 @@ self.addEventListener('activate', (event) => {
           }
         })
       );
-    }).then(() => self.clients.claim())
+    }).then(() => self.clients.claim()) // PREND LE CONTRÔLE IMMEDIATEMENT
   );
 });
 
