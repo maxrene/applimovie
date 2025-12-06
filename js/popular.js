@@ -27,11 +27,6 @@ document.addEventListener('alpine:init', () => {
              const id = item.id;
              const type = item.media_type === 'tv' ? 'serie' : 'movie';
 
-             // Watchlist
-             const watchlist = JSON.parse(localStorage.getItem('watchlist')) || [];
-             const isInWatchlist = watchlist.some(w => w.id == id);
-             if (isInWatchlist) return 'watchlist';
-
              // Watched
              const watchedMovies = JSON.parse(localStorage.getItem('watchedMovies')) || [];
              const watchedSeries = JSON.parse(localStorage.getItem('watchedSeries')) || [];
@@ -40,6 +35,11 @@ document.addEventListener('alpine:init', () => {
                                (type === 'serie' && watchedSeries.includes(Number(id)));
 
              if (isWatched) return 'watched';
+
+             // Watchlist
+             const watchlist = JSON.parse(localStorage.getItem('watchlist')) || [];
+             const isInWatchlist = watchlist.some(w => w.id == id);
+             if (isInWatchlist) return 'watchlist';
 
              return null;
         },
