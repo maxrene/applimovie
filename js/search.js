@@ -127,11 +127,6 @@ document.addEventListener('alpine:init', () => {
 
              // Normalize tv -> serie for local storage check if needed, but here we just need movie vs tv/serie logic
 
-             // Watchlist
-             const watchlist = JSON.parse(localStorage.getItem('watchlist')) || [];
-             const isInWatchlist = watchlist.some(w => w.id == id);
-             if (isInWatchlist) return 'watchlist';
-
              // Watched
              const watchedMovies = JSON.parse(localStorage.getItem('watchedMovies')) || [];
              const watchedSeries = JSON.parse(localStorage.getItem('watchedSeries')) || [];
@@ -144,6 +139,11 @@ document.addEventListener('alpine:init', () => {
                                (isSerie && watchedSeries.includes(Number(id)));
 
              if (isWatched) return 'watched';
+
+             // Watchlist
+             const watchlist = JSON.parse(localStorage.getItem('watchlist')) || [];
+             const isInWatchlist = watchlist.some(w => w.id == id);
+             if (isInWatchlist) return 'watchlist';
 
              return null;
         },

@@ -50,12 +50,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function getMediaStatus(id, type) {
-        // Watchlist
-        const watchlist = JSON.parse(localStorage.getItem('watchlist')) || [];
-        // Check ID equality loosely (string vs number)
-        const isInWatchlist = watchlist.some(item => item.id == id);
-        if (isInWatchlist) return 'watchlist';
-
         // Watched
         const watchedMovies = JSON.parse(localStorage.getItem('watchedMovies')) || [];
         const watchedSeries = JSON.parse(localStorage.getItem('watchedSeries')) || [];
@@ -65,6 +59,12 @@ document.addEventListener('DOMContentLoaded', () => {
                           (type === 'serie' && watchedSeries.includes(Number(id)));
 
         if (isWatched) return 'watched';
+
+        // Watchlist
+        const watchlist = JSON.parse(localStorage.getItem('watchlist')) || [];
+        // Check ID equality loosely (string vs number)
+        const isInWatchlist = watchlist.some(item => item.id == id);
+        if (isInWatchlist) return 'watchlist';
 
         return null;
     }
