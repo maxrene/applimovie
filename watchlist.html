@@ -60,11 +60,11 @@
     <div class="flex items-center justify-between px-4 py-3 gap-2">
         <div class="flex-shrink-0">
             <button @click="showServiceBar = !showServiceBar" class="flex items-center group">
-                <div class="flex -space-x-5 transition-all duration-200" :class="showServiceBar ? 'opacity-50' : 'opacity-100'">
-                    <template x-for="(platform, index) in userSelectedPlatforms.slice(0, 3)" :key="platform.id">
+            <div class="flex -space-x-3 transition-all duration-200" :class="showServiceBar ? 'opacity-50' : 'opacity-100'">
+                <template x-for="(platform, index) in userSelectedPlatforms.slice(0, 4)" :key="platform.id">
                         <img :src="platform.logoUrl" class="w-9 h-9 rounded-full border-2 border-background-light dark:border-background-dark bg-gray-800 object-cover relative" :style="'z-index: ' + (30 - index * 10)">
                     </template>
-                    <div x-show="userSelectedPlatforms.length > 3" class="w-9 h-9 rounded-full border-2 border-background-light dark:border-background-dark bg-gray-700 flex items-center justify-center text-[10px] text-white font-bold relative z-0">+<span x-text="userSelectedPlatforms.length - 3"></span></div>
+                <div x-show="userSelectedPlatforms.length > 4" class="w-9 h-9 rounded-full border-2 border-background-light dark:border-background-dark bg-gray-700 flex items-center justify-center text-[10px] text-white font-bold relative z-0">+<span x-text="userSelectedPlatforms.length - 4"></span></div>
                     <div x-show="userSelectedPlatforms.length === 0" class="w-9 h-9 rounded-full border-2 border-background-light dark:border-background-dark bg-gray-800 flex items-center justify-center text-gray-400"><span class="material-symbols-outlined text-sm">add</span></div>
                 </div>
                 <span class="material-symbols-outlined text-gray-400 text-xl ml-1 transition-transform duration-200" :class="showServiceBar ? 'rotate-180 text-primary' : ''">expand_more</span>
