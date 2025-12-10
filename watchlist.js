@@ -1,3 +1,61 @@
+// Queue de requête pour éviter les limites de l'API (429 Too Many Requests)
+class RequestQueue {
+    constructor(concurrency = 3, delay = 150) {
+        this.concurrency = concurrency;
+        this.delay = delay;
+        this.queue = [];
+        this.activeCount = 0;
+    }
+
+    add(fn) {
+        return new Promise((resolve, reject) => {
+            this.queue.push({ fn, resolve, reject });
+            this.process();
+        });
+    }
+
+    async process() {
+        if (this.activeCount >= this.concurrency || this.queue.length === 0) return;
+
+        this.activeCount++;
+        const { fn, resolve, reject } = this.queue.shift();
+
+        try {
+            await new Promise(r => setTimeout(r, this.delay));
+            const result = await this.retry(fn);
+            resolve(result);
+        } catch (e) {
+            reject(e);
+        } finally {
+            this.activeCount--;
+            this.process();
+        }
+    }
+
+    async retry(fn, retries = 3, backoff = 1000) {
+        try {
+            const result = await fn();
+            // Si c'est une réponse Fetch, on vérifie le status 429
+            if (result instanceof Response) {
+                 if (result.status === 429) {
+                     throw new Error('429');
+                 }
+            }
+            return result;
+        } catch (e) {
+            if (e.message === '429' || e.name === 'TypeError') { // TypeError est souvent une erreur réseau
+                if (retries > 0) {
+                    await new Promise(r => setTimeout(r, backoff));
+                    return this.retry(fn, retries - 1, backoff * 2);
+                }
+            }
+            throw e;
+        }
+    }
+}
+
+const apiQueue = new RequestQueue();
+
 document.addEventListener('alpine:init', () => {
     Alpine.data('watchlistPage', () => ({
         watchlist: [],
@@ -186,10 +244,74 @@ document.addEventListener('alpine:init', () => {
                 return item;
             }).filter(Boolean);
         },
-        getCachedData(key) { const cached = localStorage.getItem(key); if (!cached) return null; const { timestamp, data } = JSON.parse(cached); const isExpired = (new Date().getTime() - timestamp) > 24 * 60 * 60 * 1000; return isExpired ? null : data; },
+        getCachedData(key, ignoreExpiration = false) {
+            const cached = localStorage.getItem(key);
+            if (!cached) return null;
+            const { timestamp, data } = JSON.parse(cached);
+            const isExpired = (new Date().getTime() - timestamp) > 24 * 60 * 60 * 1000;
+            return (isExpired && !ignoreExpiration) ? null : data;
+        },
         setCachedData(key, data) { const item = { timestamp: new Date().getTime(), data: data }; localStorage.setItem(key, JSON.stringify(item)); },
-        async fetchMovieDetails(movieId) { const cacheKey = `movie-details-${movieId}`; const cachedData = this.getCachedData(cacheKey); if (cachedData) return cachedData; try { const res = await fetch(`https://api.themoviedb.org/3/movie/${movieId}?api_key=${TMDB_API_KEY}&append_to_response=watch/providers`); if (!res.ok) return null; const data = await res.json(); this.setCachedData(cacheKey, data); return data; } catch (e) { return null; } },
-        async fetchFullSeriesDetails(seriesId) { const cacheKey = `series-details-${seriesId}`; const cachedData = this.getCachedData(cacheKey); if (cachedData) return cachedData; try { const seriesRes = await fetch(`https://api.themoviedb.org/3/tv/${seriesId}?api_key=${TMDB_API_KEY}&append_to_response=watch/providers`); if (!seriesRes.ok) return null; const seriesData = await seriesRes.json(); const seasonPromises = seriesData.seasons.filter(s => s.season_number > 0).map(season => fetch(`https://api.themoviedb.org/3/tv/${seriesId}/season/${season.season_number}?api_key=${TMDB_API_KEY}`).then(res => res.ok ? res.json() : null)); const seasonsWithEpisodes = await Promise.all(seasonPromises); seriesData.seasons = seasonsWithEpisodes.filter(s => s); this.setCachedData(cacheKey, seriesData); return seriesData; } catch (e) { return null; } },
+
+        async fetchMovieDetails(movieId) {
+            const cacheKey = `movie-details-${movieId}`;
+            const cachedData = this.getCachedData(cacheKey);
+            if (cachedData) return cachedData;
+            try {
+                const res = await apiQueue.add(() =>
+                    fetch(`https://api.themoviedb.org/3/movie/${movieId}?api_key=${TMDB_API_KEY}&append_to_response=watch/providers`)
+                );
+                if (!res.ok) {
+                    // Try to return stale data if available
+                    return this.getCachedData(cacheKey, true) || null;
+                }
+                const data = await res.json();
+                this.setCachedData(cacheKey, data);
+                return data;
+            } catch (e) {
+                return this.getCachedData(cacheKey, true) || null;
+            }
+        },
+
+        async fetchFullSeriesDetails(seriesId) {
+            const cacheKey = `series-details-${seriesId}`;
+            const cachedData = this.getCachedData(cacheKey);
+            if (cachedData) return cachedData;
+            try {
+                const seriesRes = await apiQueue.add(() =>
+                    fetch(`https://api.themoviedb.org/3/tv/${seriesId}?api_key=${TMDB_API_KEY}&append_to_response=watch/providers`)
+                );
+                if (!seriesRes.ok) return this.getCachedData(cacheKey, true) || null;
+
+                const seriesData = await seriesRes.json();
+
+                // OPTIMIZATION: Check watched episodes to determine what to fetch
+                const watchedEpisodes = JSON.parse(localStorage.getItem('watchedEpisodes')) || {};
+                const seriesWatched = watchedEpisodes[seriesId] || [];
+
+                let seasonsToFetch = seriesData.seasons.filter(s => s.season_number > 0);
+
+                // If NO episodes watched, only fetch Season 1
+                if (seriesWatched.length === 0) {
+                    seasonsToFetch = seasonsToFetch.filter(s => s.season_number === 1);
+                }
+
+                const seasonPromises = seasonsToFetch.map(season =>
+                    apiQueue.add(() =>
+                        fetch(`https://api.themoviedb.org/3/tv/${seriesId}/season/${season.season_number}?api_key=${TMDB_API_KEY}`)
+                            .then(res => res.ok ? res.json() : null)
+                    )
+                );
+
+                const seasonsWithEpisodes = await Promise.all(seasonPromises);
+                seriesData.seasons = seasonsWithEpisodes.filter(s => s);
+
+                this.setCachedData(cacheKey, seriesData);
+                return seriesData;
+            } catch (e) {
+                return this.getCachedData(cacheKey, true) || null;
+            }
+        },
 
         get filteredMedia() {
             const type = this.activeTab === 'movie' ? 'movie' : 'serie';
