@@ -82,11 +82,18 @@ document.addEventListener('alpine:init', () => {
         },
 
         handleItemClick(item) {
-            let history = JSON.parse(localStorage.getItem('previousSearches')) || [];
-            history = history.filter(i => i.id !== item.id);
-            history.unshift(item);
-            history = history.slice(0, 10);
-            localStorage.setItem('previousSearches', JSON.stringify(history));
+            try {
+                let history = JSON.parse(localStorage.getItem('previousSearches')) || [];
+                history = history.filter(i => i.id !== item.id);
+                // Use Alpine.raw if available to strip proxy, otherwise use item directly
+                const rawItem = (typeof Alpine !== 'undefined' && Alpine.raw) ? Alpine.raw(item) : item;
+                history.unshift(rawItem);
+                history = history.slice(0, 10);
+                localStorage.setItem('previousSearches', JSON.stringify(history));
+            } catch (e) {
+                console.error("Error updating search history:", e);
+                // Continue navigation even if history update fails
+            }
 
             let url = '';
             // Ensure media_type is present for routing
