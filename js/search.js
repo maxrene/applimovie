@@ -2,6 +2,7 @@ document.addEventListener('alpine:init', () => {
     Alpine.data('search', () => ({
         searchQuery: '',
         searchResults: [],
+        peopleResults: [],
         previousSearches: [],
         popularSearches: [],
         errorMessage: '',
@@ -28,6 +29,7 @@ document.addEventListener('alpine:init', () => {
                     this.fetchResults();
                 } else {
                     this.searchResults = [];
+                    this.peopleResults = [];
                 }
             });
 
@@ -71,9 +73,11 @@ document.addEventListener('alpine:init', () => {
                 
                 // Vérification de sécurité avant d'utiliser .filter
                 if (data.results) {
+                    this.peopleResults = data.results.filter(item => item.media_type === 'person');
                     this.searchResults = data.results.filter(item => ['movie', 'tv'].includes(item.media_type));
                 } else {
                     this.searchResults = [];
+                    this.peopleResults = [];
                 }
 
             } catch (error) {
@@ -116,9 +120,17 @@ document.addEventListener('alpine:init', () => {
             switch (mediaType) {
                 case 'movie': return 'Film';
                 case 'tv': return 'Série TV';
-                case 'person': return 'Acteur';
+                case 'person': return this.getPersonJob(item);
                 default: return 'Inconnu';
             }
+        },
+
+        getPersonJob(item) {
+            if (!item.known_for_department) return 'Artiste';
+            const dept = item.known_for_department;
+            if (dept === 'Acting') return 'Acteur';
+            if (dept === 'Directing') return 'Réalisateur';
+            return dept;
         },
 
         getMediaStatus(item) {
