@@ -66,7 +66,7 @@
                 <template x-for="item in previousSearches" :key="item.id">
                     <a @click.prevent="handleItemClick(item)" href="#" class="flex-shrink-0 w-28 group">
                         <div class="relative aspect-[2/3] rounded-lg overflow-hidden bg-gray-200 dark:bg-gray-800 shadow-md mb-2">
-                            <img :src="item.poster_path ? `https://image.tmdb.org/t/p/w200${item.poster_path}` : 'https://placehold.co/200x300?text=No+Image'"
+                            <img :src="(item.poster_path || item.profile_path) ? `https://image.tmdb.org/t/p/w200${item.poster_path || item.profile_path}` : 'https://placehold.co/200x300?text=No+Image'"
                                  class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                                  loading="lazy">
                             <div class="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors"></div>
@@ -86,24 +86,46 @@
             </div>
         </div>
 
-        <div x-show="searchQuery.length > 1 && searchResults.length > 0" class="space-y-4" x-cloak>
-            <template x-for="item in searchResults" :key="item.id">
-                <a @click.prevent="handleItemClick(item)" href="#" class="flex items-center gap-4 p-2 -m-2 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 transition-colors">
-                    <img :src="item.poster_path ? `https://image.tmdb.org/t/p/w200${item.poster_path}` : 'https://via.placeholder.com/200x300.png?text=No+Image'" class="w-12 h-16 object-cover rounded-md">
-                    <div class="flex-1">
-                        <div class="flex justify-between items-start">
-                            <p class="font-semibold text-gray-900 dark:text-white" x-text="item.title || item.name"></p>
-                            <template x-if="getMediaStatus(item) === 'watchlist'">
-                                 <span class="material-symbols-outlined text-primary text-base">bookmark</span>
-                            </template>
-                            <template x-if="getMediaStatus(item) === 'watched'">
-                                 <span class="material-symbols-outlined text-green-500 text-base">visibility</span>
-                            </template>
-                        </div>
-                        <p class="text-sm text-gray-500 dark:text-gray-400" x-text="item.media_type === 'movie' ? 'Film' : 'Série TV'"></p>
-                    </div>
-                </a>
-            </template>
+        <div x-show="searchQuery.length > 1" class="space-y-6" x-cloak>
+            <!-- People Results -->
+            <div x-show="peopleResults.length > 0" class="space-y-2">
+                <h3 class="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Personnalités</h3>
+                <div class="space-y-2">
+                    <template x-for="item in peopleResults" :key="item.id">
+                        <a @click.prevent="handleItemClick(item)" href="#" class="flex items-center gap-4 p-2 -m-2 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 transition-colors">
+                            <img :src="item.profile_path ? `https://image.tmdb.org/t/p/w200${item.profile_path}` : 'https://placehold.co/200x200?text=No+Image'" class="w-12 h-12 object-cover rounded-full">
+                            <div class="flex-1">
+                                <p class="font-semibold text-gray-900 dark:text-white" x-text="item.name"></p>
+                                <p class="text-sm text-gray-500 dark:text-gray-400" x-text="getPersonJob(item)"></p>
+                            </div>
+                        </a>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Media Results -->
+            <div x-show="searchResults.length > 0" class="space-y-2">
+                 <h3 x-show="peopleResults.length > 0" class="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Films & Séries</h3>
+                 <div class="space-y-2">
+                    <template x-for="item in searchResults" :key="item.id">
+                        <a @click.prevent="handleItemClick(item)" href="#" class="flex items-center gap-4 p-2 -m-2 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 transition-colors">
+                            <img :src="item.poster_path ? `https://image.tmdb.org/t/p/w200${item.poster_path}` : 'https://via.placeholder.com/200x300.png?text=No+Image'" class="w-12 h-16 object-cover rounded-md">
+                            <div class="flex-1">
+                                <div class="flex justify-between items-start">
+                                    <p class="font-semibold text-gray-900 dark:text-white" x-text="item.title || item.name"></p>
+                                    <template x-if="getMediaStatus(item) === 'watchlist'">
+                                         <span class="material-symbols-outlined text-primary text-base">bookmark</span>
+                                    </template>
+                                    <template x-if="getMediaStatus(item) === 'watched'">
+                                         <span class="material-symbols-outlined text-green-500 text-base">visibility</span>
+                                    </template>
+                                </div>
+                                <p class="text-sm text-gray-500 dark:text-gray-400" x-text="item.media_type === 'movie' ? 'Film' : 'Série TV'"></p>
+                            </div>
+                        </a>
+                    </template>
+                 </div>
+            </div>
         </div>
         </main>
 
