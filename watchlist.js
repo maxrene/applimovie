@@ -356,9 +356,40 @@ document.addEventListener('alpine:init', () => {
             const emptyState = document.getElementById('empty-state');
             if (!container) return;
             let itemsToRender = [...this.filteredMedia];
-            if (this.sortOrder === 'recently_added') { itemsToRender.sort((a, b) => new Date(b.added_at) - new Date(a.added_at)); }
-            else if (this.sortOrder === 'release_date') { itemsToRender.sort((a, b) => { const yearAStr = String(a.year || ''); const yearBStr = String(b.year || ''); const dateA = new Date(yearAStr.split(' - ')[0]); const dateB = new Date(yearBStr.split(' - ')[0]); return dateB - dateA; }); }
-            else { itemsToRender.sort((a, b) => { const imdbA = a.imdb === 'xx' || !a.imdb ? 0 : parseFloat(a.imdb); const imdbB = b.imdb === 'xx' || !b.imdb ? 0 : parseFloat(b.imdb); return imdbB - imdbA; }); }
+
+            // Calculate "In Progress" status for sorting
+            if (this.activeTab === 'serie') {
+                const watchedEpisodes = JSON.parse(localStorage.getItem('watchedEpisodes')) || {};
+                itemsToRender.forEach(item => {
+                    const seriesWatched = watchedEpisodes[item.id] || [];
+                    item._hasStarted = seriesWatched.length > 0;
+                });
+            }
+
+            itemsToRender.sort((a, b) => {
+                // 1. Primary Sort: Started Series First (Only for Series tab)
+                if (this.activeTab === 'serie') {
+                    const aStarted = a._hasStarted || false;
+                    const bStarted = b._hasStarted || false;
+                    if (aStarted && !bStarted) return -1;
+                    if (!aStarted && bStarted) return 1;
+                }
+
+                // 2. Secondary Sort: User Selection
+                if (this.sortOrder === 'recently_added') {
+                    return new Date(b.added_at) - new Date(a.added_at);
+                } else if (this.sortOrder === 'release_date') {
+                    const yearAStr = String(a.year || '');
+                    const yearBStr = String(b.year || '');
+                    const dateA = new Date(yearAStr.split(' - ')[0]);
+                    const dateB = new Date(yearBStr.split(' - ')[0]);
+                    return dateB - dateA;
+                } else {
+                    const imdbA = a.imdb === 'xx' || !a.imdb ? 0 : parseFloat(a.imdb);
+                    const imdbB = b.imdb === 'xx' || !b.imdb ? 0 : parseFloat(b.imdb);
+                    return imdbB - imdbA;
+                }
+            });
 
             if (itemsToRender.length === 0) { container.innerHTML = ''; if (emptyState) emptyState.classList.remove('hidden'); return; }
             if (emptyState) emptyState.classList.add('hidden');
