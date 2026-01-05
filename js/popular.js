@@ -1,6 +1,6 @@
 document.addEventListener('alpine:init', () => {
     Alpine.data('popularPage', () => ({
-        activeTab: 'movie',
+        subTab: 'movie', // Use subTab to avoid conflict with global activeTab
         items: [],
         isLoading: true,
         isLoadingMore: false,
@@ -76,6 +76,12 @@ document.addEventListener('alpine:init', () => {
             const flagImg = document.getElementById('header-flag');
             if (flagImg) flagImg.src = `https://flagcdn.com/w40/${this.userRegion.toLowerCase()}.png`;
 
+            // SPA specific logic: Listen to global view change
+            window.addEventListener('view-changed', () => {
+                 this.lastUpdate = Date.now();
+            });
+
+            // Keep pageshow for initial load or back/forward cache
             window.addEventListener('pageshow', () => {
                 this.lastUpdate = Date.now();
             });
@@ -85,10 +91,10 @@ document.addEventListener('alpine:init', () => {
             this.resetAndFetch();
         },
 
-        switchTab(tab) {
-            this.activeTab = tab;
+        setSubTab(tab) {
+            this.subTab = tab;
             this.resetFilters();
-            this.fetchGenres(); // Fetch genres for new type
+            this.fetchGenres();
             this.resetAndFetch();
         },
 
@@ -104,7 +110,7 @@ document.addEventListener('alpine:init', () => {
         },
 
         async fetchGenres() {
-            const type = this.activeTab === 'movie' ? 'movie' : 'tv';
+            const type = this.subTab === 'movie' ? 'movie' : 'tv';
             try {
                 const res = await fetch(`https://api.themoviedb.org/3/genre/${type}/list?api_key=${TMDB_API_KEY}&language=fr-FR`);
                 const data = await res.json();
@@ -200,7 +206,7 @@ document.addEventListener('alpine:init', () => {
             if (page === 1) this.isLoading = true;
             else this.isLoadingMore = true;
 
-            const endpoint = this.activeTab === 'movie' ? '/discover/movie' : '/discover/tv';
+            const endpoint = this.subTab === 'movie' ? '/discover/movie' : '/discover/tv';
             let url = `https://api.themoviedb.org/3${endpoint}?api_key=${TMDB_API_KEY}&language=fr-FR&page=${page}`;
             
             url += `&sort_by=${this.sortOrder}`;
@@ -209,7 +215,7 @@ document.addEventListener('alpine:init', () => {
 
             // Apply Year Filter
             if (this.yearStart > 1900 || this.yearEnd < new Date().getFullYear()) {
-                if (this.activeTab === 'movie') {
+                if (this.subTab === 'movie') {
                     url += `&primary_release_date.gte=${this.yearStart}-01-01`;
                     url += `&primary_release_date.lte=${this.yearEnd}-12-31`;
                 } else {
@@ -230,13 +236,13 @@ document.addEventListener('alpine:init', () => {
                 if (data.results) {
                     const newItems = data.results.map(item => ({
                         id: item.id,
-                        title: this.activeTab === 'movie' ? item.title : item.name,
+                        title: this.subTab === 'movie' ? item.title : item.name,
                         poster_path: item.poster_path 
                             ? `https://image.tmdb.org/t/p/w500${item.poster_path}` 
                             : 'https://placehold.co/300x450?text=No+Image',
                         vote_average: item.vote_average ? item.vote_average.toFixed(1) : 'N/A',
                         year: (item.release_date || item.first_air_date || '').split('-')[0],
-                        media_type: this.activeTab
+                        media_type: this.subTab
                     }));
 
                     if (page === 1) {
