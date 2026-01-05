@@ -60,7 +60,7 @@ document.addEventListener('alpine:init', () => {
     Alpine.data('watchlistPage', () => ({
         watchlist: [],
         enrichedWatchlist: [],
-        activeTab: 'movie',
+        subTab: 'movie', // Using subTab to avoid conflict with global app activeTab
         sortOrder: 'popularity',
         
         activePlatformFilters: [], 
@@ -100,7 +100,7 @@ document.addEventListener('alpine:init', () => {
 
             await this.fetchAndEnrichWatchlist();
             
-            this.$watch('activeTab', () => this.renderMedia());
+            this.$watch('subTab', () => this.renderMedia());
             this.$watch('watchStatusFilter', () => this.renderMedia());
             this.$watch('activePlatformFilters', () => this.renderMedia());
 
@@ -314,7 +314,7 @@ document.addEventListener('alpine:init', () => {
         },
 
         get filteredMedia() {
-            const type = this.activeTab === 'movie' ? 'movie' : 'serie';
+            const type = this.subTab === 'movie' ? 'movie' : 'serie';
             const watchedMovies = JSON.parse(localStorage.getItem('watchedMovies')) || [];
             const watchedSeries = JSON.parse(localStorage.getItem('watchedSeries')) || [];
 
@@ -358,7 +358,7 @@ document.addEventListener('alpine:init', () => {
             let itemsToRender = [...this.filteredMedia];
 
             // Calculate "In Progress" status for sorting
-            if (this.activeTab === 'serie') {
+            if (this.subTab === 'serie') {
                 const watchedEpisodes = JSON.parse(localStorage.getItem('watchedEpisodes')) || {};
                 itemsToRender.forEach(item => {
                     const seriesWatched = watchedEpisodes[item.id] || [];
@@ -368,7 +368,7 @@ document.addEventListener('alpine:init', () => {
 
             itemsToRender.sort((a, b) => {
                 // 1. Primary Sort: Started Series First (Only for Series tab)
-                if (this.activeTab === 'serie') {
+                if (this.subTab === 'serie') {
                     const aStarted = a._hasStarted || false;
                     const bStarted = b._hasStarted || false;
                     if (aStarted && !bStarted) return -1;
@@ -397,6 +397,11 @@ document.addEventListener('alpine:init', () => {
             const mediaHTMLPromises = itemsToRender.map(item => this.createMediaItemHTML(item));
             const mediaHTML = await Promise.all(mediaHTMLPromises);
             container.innerHTML = mediaHTML.join('');
+
+            // INITIALIZE ALPINE ON NEW CONTENT
+            if (typeof Alpine !== 'undefined') {
+                Alpine.initTree(container);
+            }
         },
         async createMediaItemHTML(item) { if (item.type === 'movie') return this.createMovieItemHTML(item); if (item.type === 'serie') return this.createTVItemHTML(item); return ''; },
         createCheckButtonHTML(itemId, isWatched, type, extraAction = '') { const action = type === 'movie' ? `toggleMovieWatched(${itemId})` : `markEpisodeWatched(${itemId}, ${extraAction})`; const bgClass = isWatched ? 'bg-primary border-primary text-white' : 'bg-black/40 border-gray-600 text-gray-500 hover:text-white hover:border-gray-400'; return ` <button @click.prevent.stop="${action}" class="flex h-8 w-8 items-center justify-center rounded-full border transition-all ${bgClass} z-10 shrink-0 ml-2"> <span class="material-symbols-outlined text-[20px]">check</span> </button>`; },

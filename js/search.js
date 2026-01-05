@@ -33,6 +33,12 @@ document.addEventListener('alpine:init', () => {
                 }
             });
 
+            // Handle SPA tab switching
+            window.addEventListener('view-changed', () => {
+                this.lastUpdate = Date.now();
+                this.previousSearches = JSON.parse(localStorage.getItem('previousSearches')) || [];
+            });
+
             window.addEventListener('pageshow', () => {
                 this.lastUpdate = Date.now();
                 // Refresh previous searches as well since they are stored in localStorage
