@@ -85,8 +85,7 @@ document.addEventListener('alpine:init', () => {
 
         async init() {
             this.loadWatchlist();
-            const flagImg = document.getElementById('header-flag');
-            if (flagImg) flagImg.src = `https://flagcdn.com/w40/${this.userRegion.toLowerCase()}.png`;
+            // Flag logic moved to data binding in HTML
 
             const savedPlatforms = localStorage.getItem('selectedPlatforms');
             this.myPlatformIds = savedPlatforms ? JSON.parse(savedPlatforms) : [];

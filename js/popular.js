@@ -73,9 +73,6 @@ document.addEventListener('alpine:init', () => {
         },
 
         init() {
-            const flagImg = document.getElementById('header-flag');
-            if (flagImg) flagImg.src = `https://flagcdn.com/w40/${this.userRegion.toLowerCase()}.png`;
-
             // SPA specific logic: Listen to global view change
             window.addEventListener('view-changed', () => {
                  this.lastUpdate = Date.now();
