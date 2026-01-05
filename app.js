@@ -32,10 +32,7 @@ document.addEventListener('alpine:init', () => {
         init() {
             // Restore tab from history state if needed or default to home
             // For now, simpler is better.
-            const flagImg = document.getElementById('header-flag');
-            if (flagImg) {
-                flagImg.src = `https://flagcdn.com/w40/${this.userRegion.toLowerCase()}.png`;
-            }
+            // Flag logic moved to data binding in HTML
         },
 
         switchTab(tab) {
