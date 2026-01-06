@@ -65,6 +65,7 @@ document.addEventListener('alpine:init', () => {
 
             window.addEventListener('pageshow', () => {
                 this.updateMediaStatuses();
+                this.loadContinueWatching();
 
                 // Check if content is stale (> 12 hours)
                 const lastFetch = localStorage.getItem('lastHomeFetch');
@@ -77,18 +78,42 @@ document.addEventListener('alpine:init', () => {
             });
         },
 
-        async fetchAPI(endpoint) {
+        async fetchAPI(endpoint, returnsList = true) {
             try {
                 const separator = endpoint.includes('?') ? '&' : '?';
                 const url = `${BASE_URL}/${endpoint}${separator}api_key=${TMDB_API_KEY}&watch_region=${this.userRegion || 'FR'}`;
                 const response = await fetch(url);
                 if (!response.ok) throw new Error(`API error: ${response.statusText}`);
                 const data = await response.json();
-                return data.results;
+                return returnsList ? data.results : data;
             } catch (error) {
                 console.error(`Failed to fetch from ${endpoint}:`, error);
-                return [];
+                return returnsList ? [] : null;
             }
+        },
+
+        createContinueWatchingCard(series, nextEpisode, progress) {
+            const posterUrl = IMG_BASE_POSTER + series.poster_path;
+            const link = `serie.html?id=${series.id}`;
+
+            const seasonCode = String(nextEpisode.season_number).padStart(2, '0');
+            const episodeCode = String(nextEpisode.episode_number).padStart(2, '0');
+            const nextEpisodeString = `S${seasonCode}E${episodeCode} - ${nextEpisode.name}`;
+
+            return `
+                <a href="${link}" data-id="${series.id}" data-type="tv" class="flex-shrink-0 w-32 snap-start group flex flex-col media-card-link">
+                    <div class="relative w-full aspect-[2/3] rounded-lg overflow-hidden bg-gray-800 shadow-md">
+                        <img src="${posterUrl}" loading="lazy" class="w-full h-full object-cover">
+                        <div class="absolute bottom-0 left-0 right-0 h-1 bg-gray-700/50 backdrop-blur-sm">
+                            <div class="h-full bg-primary" style="width: ${progress}%"></div>
+                        </div>
+                    </div>
+                    <div class="mt-2">
+                        <p class="text-xs font-bold text-gray-900 dark:text-white truncate leading-tight">${series.name}</p>
+                        <p class="text-[10px] font-semibold text-primary truncate leading-tight mt-0.5">${nextEpisodeString}</p>
+                    </div>
+                </a>
+            `;
         },
 
         createMediaCard(media, cardType = 'platform') {
@@ -151,9 +176,90 @@ document.addEventListener('alpine:init', () => {
             container.innerHTML = content.map(media => this.createMediaCard(media, cardType)).join('');
         },
 
+        async loadContinueWatching() {
+            const watchedEpisodes = JSON.parse(localStorage.getItem('watchedEpisodes')) || {};
+            const seriesInProgress = {};
+
+            // 1. Group watched episodes by series ID
+            for (const episodeId in watchedEpisodes) {
+                const [seriesId] = episodeId.split('-');
+                if (!seriesInProgress[seriesId]) {
+                    seriesInProgress[seriesId] = true;
+                }
+            }
+            const seriesIds = Object.keys(seriesInProgress);
+
+            if (seriesIds.length === 0) {
+                document.getElementById('continue-watching-section').style.display = 'none';
+                return;
+            }
+
+            // 2. Fetch all series data concurrently
+            const MAX_SEASONS_TO_APPEND = 20;
+            const seasonsToAppend = Array.from({ length: MAX_SEASONS_TO_APPEND }, (_, i) => `season/${i + 1}`).join(',');
+
+            const promises = seriesIds.map(id =>
+                this.fetchAPI(`tv/${id}?language=fr-FR&append_to_response=${seasonsToAppend}`, false)
+            );
+            const results = await Promise.all(promises);
+
+            const seriesToDisplay = [];
+
+            // 3. Process each fetched series
+            for (const seriesDetails of results) {
+                if (!seriesDetails) continue;
+
+                let totalEpisodes = 0;
+                let watchedCount = 0;
+                let nextEpisode = null;
+                let foundNext = false;
+
+                const seasons = seriesDetails.seasons.sort((a, b) => a.season_number - b.season_number);
+
+                for (const season of seasons) {
+                    if (season.season_number === 0) continue;
+
+                    const seasonDetail = seriesDetails[`season/${season.season_number}`];
+                    if (!seasonDetail || !seasonDetail.episodes) continue;
+
+                    totalEpisodes += seasonDetail.episodes.length;
+
+                    for (const episode of seasonDetail.episodes) {
+                        const isWatched = watchedEpisodes.hasOwnProperty(`${seriesDetails.id}-${season.season_number}-${episode.episode_number}`);
+                        if (isWatched) {
+                            watchedCount++;
+                        } else if (!foundNext) {
+                            nextEpisode = episode;
+                            foundNext = true;
+                        }
+                    }
+                }
+
+                if (nextEpisode) {
+                    const progress = totalEpisodes > 0 ? (watchedCount / totalEpisodes) * 100 : 0;
+                    seriesToDisplay.push({ series: seriesDetails, nextEpisode, progress });
+                }
+            }
+
+            // 4. Render
+            const container = document.getElementById('continue-watching-container');
+            const section = document.getElementById('continue-watching-section');
+
+            if (seriesToDisplay.length > 0) {
+                seriesToDisplay.sort((a, b) => b.progress - a.progress);
+                container.innerHTML = seriesToDisplay.map(item => this.createContinueWatchingCard(item.series, item.nextEpisode, item.progress)).join('');
+                section.style.display = 'block';
+            } else {
+                section.style.display = 'none';
+            }
+        },
+
         async fetchAndDisplayContent() {
             this.isLoading = true;
             try {
+                // 0. Continue Watching
+                this.loadContinueWatching();
+
                 // 1. Fetch Popular
                 const popularContent = await this.fetchAPI('trending/all/week?language=fr-FR');
                 this.renderContent('popular-container', popularContent, 'popular');
