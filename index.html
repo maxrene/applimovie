@@ -14,6 +14,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400..700,0..1,0" rel="stylesheet" />
 
     <!-- Alpine.js -->
+    <script src="https://unpkg.com/@alpinejs/anchor@3.x.x/dist/cdn.min.js" defer></script>
     <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
 
     <script>
@@ -196,15 +197,15 @@
 
             <!-- Filters Row -->
             <div class="flex items-center gap-2 px-4 py-3 overflow-x-auto no-scrollbar">
-                <button @click="openSort = true" class="flex-1 min-w-[100px] flex items-center justify-center gap-2 border border-primary/30 px-3 py-2 rounded-md transition-colors hover:bg-primary/5 touch-feedback">
+                <button x-ref="btnSort" @click="openSort = !openSort; openYear = false; openGenre = false" class="flex-1 min-w-[100px] flex items-center justify-center gap-2 border border-primary/30 px-3 py-2 rounded-md transition-colors hover:bg-primary/5 touch-feedback" :class="openSort ? 'bg-primary/10' : ''">
                     <span class="text-xs font-semibold text-primary uppercase tracking-wider truncate" x-text="sortLabel"></span>
                     <span class="material-symbols-outlined text-primary text-sm">sort</span>
                 </button>
-                <button @click="openYearModal()" class="flex-1 min-w-[100px] flex items-center justify-center gap-2 border border-primary/30 px-3 py-2 rounded-md transition-colors hover:bg-primary/5 touch-feedback">
+                <button x-ref="btnYear" @click="openYearModal(); openSort = false; openGenre = false" class="flex-1 min-w-[100px] flex items-center justify-center gap-2 border border-primary/30 px-3 py-2 rounded-md transition-colors hover:bg-primary/5 touch-feedback" :class="openYear ? 'bg-primary/10' : ''">
                     <span class="text-xs font-semibold text-primary uppercase tracking-wider truncate" x-text="yearLabel"></span>
                     <span class="material-symbols-outlined text-primary text-sm">calendar_today</span>
                 </button>
-                <button @click="openGenreModal()" class="flex-1 min-w-[100px] flex items-center justify-center gap-2 border border-primary/30 px-3 py-2 rounded-md transition-colors hover:bg-primary/5 touch-feedback">
+                <button x-ref="btnGenre" @click="openGenreModal(); openSort = false; openYear = false" class="flex-1 min-w-[100px] flex items-center justify-center gap-2 border border-primary/30 px-3 py-2 rounded-md transition-colors hover:bg-primary/5 touch-feedback" :class="openGenre ? 'bg-primary/10' : ''">
                     <span class="text-xs font-semibold text-primary uppercase tracking-wider truncate" x-text="genreLabel"></span>
                     <span class="material-symbols-outlined text-primary text-sm">category</span>
                 </button>
@@ -246,73 +247,67 @@
             <div x-show="isLoadingMore" class="flex justify-center py-6"><svg class="animate-spin h-6 w-6 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg></div>
         </main>
 
-        <!-- Modals for Popular Page -->
-        <div x-show="openSort || openYear || openGenre" class="fixed inset-0 z-50 flex items-end justify-center sm:items-center bg-black/60 backdrop-blur-sm" x-transition.opacity x-cloak>
-             <!-- Sort Modal -->
-            <div x-show="openSort" @click.away="openSort = false" class="w-full max-w-md bg-gray-900 rounded-t-2xl sm:rounded-2xl shadow-xl border border-gray-800 p-6 space-y-4" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="transform translate-y-full sm:translate-y-10 opacity-0" x-transition:enter-end="transform translate-y-0 opacity-100" x-transition:leave="transition ease-in duration-200" x-transition:leave-start="transform translate-y-0 opacity-100" x-transition:leave-end="transform translate-y-full sm:translate-y-10 opacity-0">
-                <div class="flex justify-between items-center mb-2">
-                    <h3 class="text-lg font-bold text-white">Trier par</h3>
-                    <button @click="openSort = false" class="text-gray-400 hover:text-white"><span class="material-symbols-outlined">close</span></button>
+        <!-- Popovers for Popular Page -->
+        <!-- Sort Popover -->
+        <div x-show="openSort" x-anchor.bottom-start.offset.4="$refs.btnSort" @click.away="openSort = false" class="z-50 w-48 bg-gray-900 rounded-xl shadow-xl border border-gray-800 p-2 space-y-1" x-transition x-cloak>
+            <button @click="setSort('popularity.desc')" class="w-full text-left px-3 py-2 rounded-lg transition-colors flex items-center justify-between text-sm" :class="sortOrder === 'popularity.desc' ? 'bg-primary/20 text-primary' : 'text-gray-300 hover:bg-gray-800'">
+                <span>Popularité</span><span x-show="sortOrder === 'popularity.desc'" class="material-symbols-outlined text-base">check</span>
+            </button>
+            <button @click="setSort('vote_average.desc')" class="w-full text-left px-3 py-2 rounded-lg transition-colors flex items-center justify-between text-sm" :class="sortOrder === 'vote_average.desc' ? 'bg-primary/20 text-primary' : 'text-gray-300 hover:bg-gray-800'">
+                <span>Mieux notés</span><span x-show="sortOrder === 'vote_average.desc'" class="material-symbols-outlined text-base">check</span>
+            </button>
+            <button @click="setSort('primary_release_date.desc')" class="w-full text-left px-3 py-2 rounded-lg transition-colors flex items-center justify-between text-sm" :class="sortOrder === 'primary_release_date.desc' ? 'bg-primary/20 text-primary' : 'text-gray-300 hover:bg-gray-800'">
+                <span>Récents</span><span x-show="sortOrder === 'primary_release_date.desc'" class="material-symbols-outlined text-base">check</span>
+            </button>
+        </div>
+
+        <!-- Year Popover -->
+        <div x-show="openYear" x-anchor.bottom-start.offset.4="$refs.btnYear" @click.away="openYear = false" class="z-50 w-72 bg-gray-900 rounded-xl shadow-xl border border-gray-800 p-4 space-y-4" x-transition x-cloak>
+             <div class="flex justify-between items-center">
+                <h3 class="text-sm font-bold text-white">Année</h3>
+                <button @click="clearYearFilter(); openYear=false; resetAndFetch()" class="text-[10px] text-gray-400 hover:text-white uppercase tracking-wider">Réinitialiser</button>
+            </div>
+            <div class="flex gap-2">
+                <button @click="setYearPreset('this_year')" class="flex-1 py-1.5 rounded-md text-xs font-medium transition-colors bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-white border border-gray-700">Cette année</button>
+                <button @click="setYearPreset('last_year')" class="flex-1 py-1.5 rounded-md text-xs font-medium transition-colors bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-white border border-gray-700">L'an dernier</button>
+            </div>
+            <div class="py-2 px-1">
+                <div class="flex justify-between text-white font-bold text-sm mb-3">
+                    <span x-text="tempYearStart"></span><span x-text="tempYearEnd"></span>
                 </div>
-                <div class="space-y-1">
-                    <button @click="setSort('popularity.desc')" class="w-full text-left px-4 py-3 rounded-xl transition-colors flex items-center justify-between" :class="sortOrder === 'popularity.desc' ? 'bg-primary/20 text-primary border border-primary/50' : 'text-gray-300 hover:bg-gray-800'">
-                        <span>Popularité</span><span x-show="sortOrder === 'popularity.desc'" class="material-symbols-outlined">check</span>
-                    </button>
-                    <button @click="setSort('vote_average.desc')" class="w-full text-left px-4 py-3 rounded-xl transition-colors flex items-center justify-between" :class="sortOrder === 'vote_average.desc' ? 'bg-primary/20 text-primary border border-primary/50' : 'text-gray-300 hover:bg-gray-800'">
-                        <span>Mieux notés</span><span x-show="sortOrder === 'vote_average.desc'" class="material-symbols-outlined">check</span>
-                    </button>
-                    <button @click="setSort('primary_release_date.desc')" class="w-full text-left px-4 py-3 rounded-xl transition-colors flex items-center justify-between" :class="sortOrder === 'primary_release_date.desc' ? 'bg-primary/20 text-primary border border-primary/50' : 'text-gray-300 hover:bg-gray-800'">
-                        <span>Récents</span><span x-show="sortOrder === 'primary_release_date.desc'" class="material-symbols-outlined">check</span>
-                    </button>
+                <div class="relative w-full h-1.5 rounded-full bg-gray-700 range-slider">
+                    <div class="absolute top-0 bottom-0 bg-primary rounded-full opacity-60"
+                        :style="`left: ${((tempYearStart - 1900) / (new Date().getFullYear() - 1900)) * 100}%; right: ${100 - ((tempYearEnd - 1900) / (new Date().getFullYear() - 1900)) * 100}%`"></div>
+                    <input type="range" min="1900" :max="new Date().getFullYear()" step="1" x-model="tempYearStart"
+                        @input="if(parseInt(tempYearStart) > parseInt(tempYearEnd)) tempYearStart = tempYearEnd" class="h-full">
+                    <input type="range" min="1900" :max="new Date().getFullYear()" step="1" x-model="tempYearEnd"
+                        @input="if(parseInt(tempYearEnd) < parseInt(tempYearStart)) tempYearEnd = tempYearStart" class="h-full">
                 </div>
             </div>
-            <!-- Year Modal -->
-            <div x-show="openYear" @click.away="openYear = false" class="w-full max-w-md bg-gray-900 rounded-t-2xl sm:rounded-2xl shadow-xl border border-gray-800 p-6 space-y-6" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="transform translate-y-full sm:translate-y-10 opacity-0" x-transition:enter-end="transform translate-y-0 opacity-100" x-transition:leave="transition ease-in duration-200" x-transition:leave-start="transform translate-y-0 opacity-100" x-transition:leave-end="transform translate-y-full sm:translate-y-10 opacity-0">
-                 <div class="flex justify-between items-center">
-                    <h3 class="text-lg font-bold text-white">Année de sortie</h3>
-                    <button @click="clearYearFilter(); openYear=false; resetAndFetch()" class="text-xs text-gray-400 hover:text-white uppercase tracking-wider">Réinitialiser</button>
-                </div>
-                <div class="flex gap-2">
-                    <button @click="setYearPreset('this_year')" class="flex-1 py-2 rounded-lg text-sm font-medium transition-colors bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-white border border-gray-700">Cette année</button>
-                    <button @click="setYearPreset('last_year')" class="flex-1 py-2 rounded-lg text-sm font-medium transition-colors bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-white border border-gray-700">L'année dernière</button>
-                </div>
-                <div class="py-4 px-2">
-                    <div class="flex justify-between text-white font-bold text-lg mb-4">
-                        <span x-text="tempYearStart"></span><span x-text="tempYearEnd"></span>
-                    </div>
-                    <div class="relative w-full h-2 rounded-full bg-gray-700 range-slider">
-                        <div class="absolute top-0 bottom-0 bg-primary rounded-full opacity-60"
-                            :style="`left: ${((tempYearStart - 1900) / (new Date().getFullYear() - 1900)) * 100}%; right: ${100 - ((tempYearEnd - 1900) / (new Date().getFullYear() - 1900)) * 100}%`"></div>
-                        <input type="range" min="1900" :max="new Date().getFullYear()" step="1" x-model="tempYearStart"
-                            @input="if(parseInt(tempYearStart) > parseInt(tempYearEnd)) tempYearStart = tempYearEnd">
-                        <input type="range" min="1900" :max="new Date().getFullYear()" step="1" x-model="tempYearEnd"
-                            @input="if(parseInt(tempYearEnd) < parseInt(tempYearStart)) tempYearEnd = tempYearStart">
-                    </div>
-                </div>
-                <div class="pt-2">
-                    <button @click="applyYearFilter()" class="w-full py-3 bg-primary text-white font-bold rounded-xl shadow-lg shadow-primary/20 hover:bg-primary/90 transition-transform active:scale-95">Appliquer</button>
-                </div>
+            <div class="pt-1">
+                <button @click="applyYearFilter()" class="w-full py-2 bg-primary text-white font-bold text-sm rounded-lg shadow-lg shadow-primary/20 hover:bg-primary/90 transition-transform active:scale-95">Appliquer</button>
             </div>
-            <!-- Genre Modal -->
-            <div x-show="openGenre" @click.away="openGenre = false" class="w-full max-w-md bg-gray-900 rounded-t-2xl sm:rounded-2xl shadow-xl border border-gray-800 p-6 space-y-4 max-h-[80vh] flex flex-col" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="transform translate-y-full sm:translate-y-10 opacity-0" x-transition:enter-end="transform translate-y-0 opacity-100" x-transition:leave="transition ease-in duration-200" x-transition:leave-start="transform translate-y-0 opacity-100" x-transition:leave-end="transform translate-y-full sm:translate-y-10 opacity-0">
-                <div class="flex justify-between items-center flex-shrink-0">
-                    <h3 class="text-lg font-bold text-white">Genres</h3>
-                    <button @click="clearGenreFilter()" class="text-xs text-gray-400 hover:text-white uppercase tracking-wider">Tout décocher</button>
-                </div>
-                <div class="flex-1 overflow-y-auto no-scrollbar grid grid-cols-2 gap-2">
-                    <template x-for="genre in availableGenres" :key="genre.id">
-                        <button @click="toggleGenre(genre.id)"
-                            class="px-3 py-2 rounded-lg text-sm font-medium transition-all text-left truncate border"
-                            :class="tempSelectedGenres.includes(genre.id) ? 'bg-primary text-white border-primary shadow-lg shadow-primary/20' : 'bg-gray-800 text-gray-300 border-transparent hover:bg-gray-750'">
-                            <span x-text="genre.name"></span>
-                        </button>
-                    </template>
-                </div>
-                <div class="pt-2 flex-shrink-0">
-                    <button @click="applyGenreFilter()" class="w-full py-3 bg-primary text-white font-bold rounded-xl shadow-lg shadow-primary/20 hover:bg-primary/90 transition-transform active:scale-95">
-                        Appliquer (<span x-text="tempSelectedGenres.length"></span>)
+        </div>
+
+        <!-- Genre Popover -->
+        <div x-show="openGenre" x-anchor.bottom-start.offset.4="$refs.btnGenre" @click.away="openGenre = false" class="z-50 w-72 bg-gray-900 rounded-xl shadow-xl border border-gray-800 p-4 space-y-3 flex flex-col max-h-[60vh]" x-transition x-cloak>
+            <div class="flex justify-between items-center flex-shrink-0">
+                <h3 class="text-sm font-bold text-white">Genres</h3>
+                <button @click="clearGenreFilter()" class="text-[10px] text-gray-400 hover:text-white uppercase tracking-wider">Tout décocher</button>
+            </div>
+            <div class="flex-1 overflow-y-auto no-scrollbar grid grid-cols-2 gap-1.5">
+                <template x-for="genre in availableGenres" :key="genre.id">
+                    <button @click="toggleGenre(genre.id)"
+                        class="px-2 py-1.5 rounded-md text-xs font-medium transition-all text-left truncate border"
+                        :class="tempSelectedGenres.includes(genre.id) ? 'bg-primary text-white border-primary shadow-sm' : 'bg-gray-800 text-gray-300 border-transparent hover:bg-gray-750'">
+                        <span x-text="genre.name"></span>
                     </button>
-                </div>
+                </template>
+            </div>
+            <div class="pt-1 flex-shrink-0">
+                <button @click="applyGenreFilter()" class="w-full py-2 bg-primary text-white font-bold text-sm rounded-lg shadow-lg shadow-primary/20 hover:bg-primary/90 transition-transform active:scale-95">
+                    Appliquer (<span x-text="tempSelectedGenres.length"></span>)
+                </button>
             </div>
         </div>
     </div>
