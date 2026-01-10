@@ -181,9 +181,9 @@ document.addEventListener('alpine:init', () => {
             const seriesInProgress = {};
 
             // 1. Group watched episodes by series ID
-            for (const episodeId in watchedEpisodes) {
-                const [seriesId] = episodeId.split('-');
-                if (!seriesInProgress[seriesId]) {
+            // Format: { "seriesId": [episodeId1, episodeId2], ... }
+            for (const seriesId in watchedEpisodes) {
+                if (watchedEpisodes[seriesId] && watchedEpisodes[seriesId].length > 0) {
                     seriesInProgress[seriesId] = true;
                 }
             }
@@ -209,6 +209,7 @@ document.addEventListener('alpine:init', () => {
             for (const seriesDetails of results) {
                 if (!seriesDetails) continue;
 
+                const seriesIdStr = String(seriesDetails.id);
                 let totalEpisodes = 0;
                 let watchedCount = 0;
                 let nextEpisode = null;
@@ -225,7 +226,9 @@ document.addEventListener('alpine:init', () => {
                     totalEpisodes += seasonDetail.episodes.length;
 
                     for (const episode of seasonDetail.episodes) {
-                        const isWatched = watchedEpisodes.hasOwnProperty(`${seriesDetails.id}-${season.season_number}-${episode.episode_number}`);
+                        // Check if this episode ID is in the watched list for this series
+                        const isWatched = watchedEpisodes[seriesIdStr] && watchedEpisodes[seriesIdStr].includes(episode.id);
+
                         if (isWatched) {
                             watchedCount++;
                         } else if (!foundNext) {
