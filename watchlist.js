@@ -111,6 +111,19 @@ document.addEventListener('alpine:init', () => {
             });
 
             await this.renderMedia();
+
+            // OFFLINE CACHING SYNC (Backfill existing items)
+            if (navigator.onLine && window.offlineManager) {
+                this.watchlist.forEach(item => {
+                    // We simply add them to the queue. The manager handles concurrency.
+                    // Ideally we check if it's already cached but the manager handles that efficiently enough (Network First)
+                    // actually to save bandwidth on every load, maybe we shouldn't cache EVERYTHING every time.
+                    // But requirement is "updates as soon as I have network".
+                    // So let's rely on the fact that if user opens watchlist, they want it ready.
+                    // To be safe, we can add a small check or just let it run in background slowly.
+                    window.offlineManager.cacheMedia(item.id, item.type);
+                });
+            }
         },
 
         get isAllSelected() {
