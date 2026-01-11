@@ -126,7 +126,19 @@ document.addEventListener('alpine:init', () => {
             const posterPath = media.poster_path;
 
             const dateStr = isMovie ? media.release_date : media.first_air_date;
-            const year = dateStr ? dateStr.split('-')[0] : '';
+            let year = dateStr ? dateStr.split('-')[0] : '';
+
+            if (!isMovie) {
+                const seriesDatesCache = JSON.parse(localStorage.getItem('seriesDatesCache')) || {};
+                const cached = seriesDatesCache[id];
+                if (cached) {
+                    if (cached.status === 'Returning Series') {
+                        year = `${cached.start} - Présent`;
+                    } else if (cached.status === 'Ended') {
+                        year = (cached.end && cached.start !== cached.end) ? `${cached.start} - ${cached.end}` : cached.start;
+                    }
+                }
+            }
 
             if (!posterPath) return '';
 

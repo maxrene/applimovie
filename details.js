@@ -81,6 +81,21 @@ async function fetchFullFromTMDB(id, type) {
         if (type === 'tv' && data.seasons) {
             updateSeasonsUI(data.seasons, id, data.number_of_episodes);
         }
+
+        // Caching for Home/Popular views
+        if (type === 'tv') {
+            const seriesDatesCache = JSON.parse(localStorage.getItem('seriesDatesCache')) || {};
+            const startYear = data.first_air_date ? data.first_air_date.split('-')[0] : '';
+            const endYear = data.last_air_date ? data.last_air_date.split('-')[0] : '';
+            if(startYear) {
+                seriesDatesCache[id] = {
+                    start: startYear,
+                    end: endYear,
+                    status: data.status
+                };
+                localStorage.setItem('seriesDatesCache', JSON.stringify(seriesDatesCache));
+            }
+        }
     } catch (e) {
         console.error(e);
     }
@@ -131,17 +146,28 @@ async function fetchUpdates(id, type) {
             const lastAirDate = seriesDetailsData.last_air_date;
             const status = seriesDetailsData.status;
             const startYear = firstAirDate?.split('-')[0] || '';
+            const endYear = lastAirDate?.split('-')[0];
             
             const yearEl = document.getElementById('media-year');
             if(yearEl && startYear) {
                 if (status === 'Returning Series') {
                     yearEl.textContent = `${startYear} - Présent`;
                 } else if (status === 'Ended') {
-                    const endYear = lastAirDate?.split('-')[0];
                     yearEl.textContent = (endYear && startYear !== endYear) ? `${startYear} - ${endYear}` : startYear;
                 } else {
                     yearEl.textContent = startYear;
                 }
+            }
+
+            // Cache for Home/Popular
+            const seriesDatesCache = JSON.parse(localStorage.getItem('seriesDatesCache')) || {};
+            if(startYear) {
+                seriesDatesCache[id] = {
+                    start: startYear,
+                    end: endYear || '',
+                    status: status
+                };
+                localStorage.setItem('seriesDatesCache', JSON.stringify(seriesDatesCache));
             }
 
             // Update Creator
@@ -581,6 +607,7 @@ function updateSeasonsUI(seasons, seriesId, totalEpisodes) {
     seasons.forEach(season => {
         if (season.season_number === 0) return;
 
+        const year = season.air_date ? season.air_date.split('-')[0] : '';
         const seasonCardHTML = `
             <div class="season-card rounded-xl bg-gray-800/50 border border-white/5 overflow-hidden" data-season-number="${season.season_number}">
                 <div class="flex items-center justify-between p-4 cursor-pointer hover:bg-white/5 transition-colors">
@@ -590,7 +617,7 @@ function updateSeasonsUI(seasons, seriesId, totalEpisodes) {
                         </div>
                         <div>
                             <h3 class="font-bold text-white text-sm">${season.name}</h3>
-                            <span class="text-xs text-gray-400">${season.episode_count} Épisodes</span>
+                            <span class="text-xs text-gray-400"><span class="mr-1">${year ? year + ' •' : ''}</span>${season.episode_count} Épisodes</span>
                         </div>
                     </div>
                     <div class="flex items-center gap-4">

@@ -199,6 +199,25 @@ document.addEventListener('alpine:init', () => {
             }
         },
 
+        formatYear(item) {
+            const dateStr = item.release_date || item.first_air_date;
+            const startYear = dateStr ? dateStr.split('-')[0] : '';
+
+            if (this.subTab === 'tv' || item.media_type === 'tv') {
+                const seriesDatesCache = JSON.parse(localStorage.getItem('seriesDatesCache')) || {};
+                const cached = seriesDatesCache[item.id];
+
+                if (cached) {
+                    if (cached.status === 'Returning Series') {
+                        return `${cached.start} - Présent`;
+                    } else if (cached.status === 'Ended') {
+                        return (cached.end && cached.start !== cached.end) ? `${cached.start} - ${cached.end}` : cached.start;
+                    }
+                }
+            }
+            return startYear;
+        },
+
         async fetchContent(page) {
             if (page === 1) this.isLoading = true;
             else this.isLoadingMore = true;
@@ -238,7 +257,7 @@ document.addEventListener('alpine:init', () => {
                             ? `https://image.tmdb.org/t/p/w500${item.poster_path}` 
                             : 'https://placehold.co/300x450?text=No+Image',
                         vote_average: item.vote_average ? item.vote_average.toFixed(1) : 'N/A',
-                        year: (item.release_date || item.first_air_date || '').split('-')[0],
+                        year: this.formatYear(item),
                         media_type: this.subTab
                     }));
 
