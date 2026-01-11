@@ -1,6 +1,6 @@
 // sw.js
-// VERSION V10 - CHANGEMENT OBLIGATOIRE POUR FORCER LA MISE A JOUR
-const CACHE_NAME = 'cinematch-v10-force-update';
+// VERSION V11 - ACTIVATION DU MODE HORS LIGNE ET CACHE DYNAMIQUE
+const CACHE_NAME = 'cinematch-v11-offline-capable';
 
 const ASSETS_TO_CACHE = [
   './',
@@ -21,6 +21,7 @@ const ASSETS_TO_CACHE = [
   './js/search.js',
   './js/platforms.js',
   './js/awards.js',
+  './js/offlineManager.js',
   'https://cdn.tailwindcss.com?plugins=forms,container-queries',
   'https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js',
   'https://fonts.googleapis.com/css2?family=Spline+Sans:wght@400;500;700&display=swap',
@@ -55,10 +56,8 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  if (event.request.url.includes('api.themoviedb.org')) {
-    return; 
-  }
   // Stratégie : Réseau d'abord, puis cache (pour être sûr d'avoir les mises à jour)
+  // Cette stratégie s'applique désormais à TOUT (API TMDB incluse)
   event.respondWith(
     fetch(event.request).catch(() => caches.match(event.request))
   );

@@ -914,6 +914,18 @@ async function toggleWatchlist(mediaId) {
         watchlist.push({ id: mediaIdNum, type: type, added_at: new Date().toISOString() });
         localStorage.setItem('watchlist', JSON.stringify(watchlist));
         updateWatchlistButton(mediaId);
+
+        // TRIGGER OFFLINE CACHING
+        if (window.offlineManager) {
+            window.offlineManager.cacheMedia(mediaIdNum, type);
+            // Optional: Notify user?
+            // const btn = document.getElementById('watchlist-button');
+            // if(btn) {
+            //    const originalText = btn.querySelector('span:last-child').textContent;
+            //    btn.querySelector('span:last-child').textContent = 'Téléchargement...';
+            //    setTimeout(() => btn.querySelector('span:last-child').textContent = originalText, 2000);
+            // }
+        }
     }
 }
 
