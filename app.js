@@ -244,8 +244,13 @@ document.addEventListener('alpine:init', () => {
                         if (isWatched) {
                             watchedCount++;
                         } else if (!foundNext) {
-                            nextEpisode = episode;
-                            foundNext = true;
+                            const today = new Date().toISOString().split('T')[0];
+                            if (episode.air_date && episode.air_date <= today) {
+                                nextEpisode = episode;
+                                foundNext = true;
+                            } else {
+                                break;
+                            }
                         }
                     }
                 }
