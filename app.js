@@ -244,8 +244,15 @@ document.addEventListener('alpine:init', () => {
                         if (isWatched) {
                             watchedCount++;
                         } else if (!foundNext) {
-                            nextEpisode = episode;
-                            foundNext = true;
+                            const today = new Date().toISOString().split('T')[0];
+                            if (episode.air_date && episode.air_date <= today) {
+                                nextEpisode = episode;
+                                foundNext = true;
+                            } else {
+                                // Episode not yet aired, stop showing this series in "Continue Watching"
+                                foundNext = true;
+                                nextEpisode = null;
+                            }
                         }
                     }
                 }
