@@ -267,6 +267,26 @@ document.addEventListener('alpine:init', () => {
                 const popularContent = await this.fetchAPI('trending/all/week?language=fr-FR');
                 this.renderContent('popular-container', popularContent, 'popular');
 
+                // 1.5 Fetch Upcoming
+                const tomorrow = new Date();
+                tomorrow.setDate(tomorrow.getDate() + 1);
+                const dateStr = tomorrow.toISOString().split('T')[0];
+
+                const [upcomingMovies, upcomingTV] = await Promise.all([
+                     this.fetchAPI(`discover/movie?sort_by=popularity.desc&primary_release_date.gte=${dateStr}&language=fr-FR`),
+                     this.fetchAPI(`discover/tv?sort_by=popularity.desc&first_air_date.gte=${dateStr}&language=fr-FR`)
+                ]);
+
+                let combinedUpcoming = [...(upcomingMovies || []), ...(upcomingTV || [])];
+                combinedUpcoming.sort((a, b) => b.popularity - a.popularity);
+
+                this.renderContent('upcoming-container', combinedUpcoming.slice(0, 20), 'platform');
+
+                const upcomingSection = document.getElementById('upcoming-section');
+                if (upcomingSection) {
+                    upcomingSection.style.display = combinedUpcoming.length > 0 ? 'block' : 'none';
+                }
+
                 // 1b. Fetch Favorite Actors
                 const favoriteActors = JSON.parse(localStorage.getItem('favoriteActors')) || [];
                 const favoriteActorsSection = document.getElementById('favorite-actors-section');
