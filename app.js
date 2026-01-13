@@ -68,7 +68,7 @@ document.addEventListener('alpine:init', () => {
                 this.loadContinueWatching();
 
                 // Check if content is stale (> 12 hours)
-                const lastFetch = localStorage.getItem('lastHomeFetch');
+                const lastFetch = localStorage.getItem('lastHomeFetch_v2');
                 const now = Date.now();
                 const twelveHours = 12 * 60 * 60 * 1000;
 
@@ -311,7 +311,7 @@ document.addEventListener('alpine:init', () => {
                         section.style.display = combined.length > 0 ? 'block' : 'none';
                     }
                 }
-                localStorage.setItem('lastHomeFetch', Date.now());
+                localStorage.setItem('lastHomeFetch_v2', Date.now());
             } finally {
                 this.isLoading = false;
             }
