@@ -13,42 +13,48 @@ document.addEventListener('alpine:init', () => {
         sortOrder: 'popularity.desc',
         lastUpdate: Date.now(),
         
+        // Platform Mapping
+        allPlatforms: [
+            { id: 'netflix', apiId: 8, name: 'Netflix', logoUrl: 'https://images.ctfassets.net/4cd45et68cgf/Rx83JoRDMkYNlMC9MKzcB/2b14d5a59fc3937afd3f03191e19502d/Netflix-Symbol.png?w=700&h=456' },
+            { id: 'prime', apiId: 119, name: 'Prime Video', logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/ca/Amazon_Prime_Video_logo_%282024%29.svg/1024px-Amazon_Prime_Video_logo_%282024%29.svg.png' },
+            { id: 'disney', apiId: 337, name: 'Disney+', logoUrl: 'https://platform.theverge.com/wp-content/uploads/sites/2/chorus/uploads/chorus_asset/file/25357066/Disney__Logo_March_2024.png?quality=90&strip=all&crop=0,0,100,100' },
+            { id: 'apple', apiId: 350, name: 'Apple TV+', logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/ad/AppleTVLogo.svg/768px-AppleTVLogo.svg.png' },
+            { id: 'canal', apiId: 392, name: 'Canal+', logoUrl: 'https://static1.purepeople.com/articles/0/46/23/10/@/6655765-logo-de-la-chaine-canal-1200x0-2.png' },
+            { id: 'paramount', apiId: 531, name: 'Paramount+', logoUrl: 'https://images.seeklogo.com/logo-png/39/1/paramount-logo-png_seeklogo-397501.png' },
+            { id: 'max', apiId: 1899, name: 'Max', logoUrl: 'https://logo.clearbit.com/max.com' },
+            { id: 'skygo', apiId: 29, name: 'Sky Go', logoUrl: 'https://logo.clearbit.com/sky.com' },
+            { id: 'now', apiId: 39, name: 'Now', logoUrl: 'https://logo.clearbit.com/nowtv.com' },
+            { id: 'rakuten', apiId: 35, name: 'Rakuten TV', logoUrl: 'https://logo.clearbit.com/rakuten.tv' },
+            { id: 'pluto', apiId: 300, name: 'Pluto TV', logoUrl: 'https://logo.clearbit.com/pluto.tv' },
+            { id: 'crunchyroll', apiId: 283, name: 'Crunchyroll', logoUrl: 'https://logo.clearbit.com/crunchyroll.com' },
+            { id: 'arte', apiId: 234, name: 'Arte', logoUrl: 'https://logo.clearbit.com/arte.tv' }
+        ],
+
         // Filter states
         yearStart: 1900,
         yearEnd: new Date().getFullYear(),
         selectedGenres: [],
         availableGenres: [],
+        filterRating: 0, // 0 means any, 7, 8, 9
+        filterPlatform: null, // null means all, otherwise apiId
+
+        userPlatforms: [],
 
         // Modal states
         openSort: false,
-        openYear: false,
-        openGenre: false,
+        openFilter: false,
+        openPlatform: false,
 
         // Temporary states for filters (before applying)
         tempYearStart: 1900,
         tempYearEnd: new Date().getFullYear(),
         tempSelectedGenres: [],
+        tempFilterRating: 0,
 
         get sortLabel() {
             if (this.sortOrder === 'popularity.desc') return 'Popularité';
             if (this.sortOrder === 'vote_average.desc') return 'Mieux notés';
             return 'Récents';
-        },
-
-        get yearLabel() {
-            const currentYear = new Date().getFullYear();
-            if (this.yearStart === 1900 && this.yearEnd === currentYear) return 'Année';
-            if (this.yearStart === this.yearEnd) return `${this.yearStart}`;
-            return `${this.yearStart}-${this.yearEnd}`;
-        },
-
-        get genreLabel() {
-            if (this.selectedGenres.length === 0) return 'Genres';
-            if (this.selectedGenres.length === 1) {
-                const genre = this.availableGenres.find(g => g.id === this.selectedGenres[0]);
-                return genre ? genre.name : '1 sélectionné';
-            }
-            return `${this.selectedGenres.length} sélectionnés`;
         },
 
         getMediaStatus(item) {
@@ -76,16 +82,30 @@ document.addEventListener('alpine:init', () => {
             // SPA specific logic: Listen to global view change
             window.addEventListener('view-changed', () => {
                  this.lastUpdate = Date.now();
+                 this.loadUserPlatforms(); // Reload platforms in case user changed them
             });
 
             // Keep pageshow for initial load or back/forward cache
             window.addEventListener('pageshow', () => {
                 this.lastUpdate = Date.now();
+                this.loadUserPlatforms();
             });
 
+            this.loadUserPlatforms();
             this.resetFilters();
             this.fetchGenres();
             this.resetAndFetch();
+        },
+
+        loadUserPlatforms() {
+            try {
+                const selectedIds = JSON.parse(localStorage.getItem('selectedPlatforms')) || [];
+                // Map the string IDs (e.g. 'netflix') to full platform objects
+                this.userPlatforms = this.allPlatforms.filter(p => selectedIds.includes(p.id));
+            } catch (e) {
+                console.error("Error loading user platforms:", e);
+                this.userPlatforms = [];
+            }
         },
 
         setSubTab(tab) {
@@ -100,10 +120,13 @@ document.addEventListener('alpine:init', () => {
             this.yearStart = 1900;
             this.yearEnd = currentYear;
             this.selectedGenres = [];
+            this.filterRating = 0;
+            this.filterPlatform = null;
 
             this.tempYearStart = 1900;
             this.tempYearEnd = currentYear;
             this.tempSelectedGenres = [];
+            this.tempFilterRating = 0;
         },
 
         async fetchGenres() {
@@ -126,23 +149,30 @@ document.addEventListener('alpine:init', () => {
             this.resetAndFetch();
         },
 
-        // Year Filter Actions
-        openYearModal() {
+        // Combined Filter Modal Actions
+        openFilterModal() {
             this.tempYearStart = this.yearStart;
             this.tempYearEnd = this.yearEnd;
-            this.openYear = true;
+            this.tempSelectedGenres = [...this.selectedGenres];
+            this.tempFilterRating = this.filterRating;
+            this.openFilter = true;
         },
 
-        applyYearFilter() {
+        applyAllFilters() {
             this.yearStart = parseInt(this.tempYearStart);
             this.yearEnd = parseInt(this.tempYearEnd);
-            this.openYear = false;
+            this.selectedGenres = [...this.tempSelectedGenres];
+            this.filterRating = this.tempFilterRating;
+
+            this.openFilter = false;
             this.resetAndFetch();
         },
 
-        clearYearFilter() {
+        clearAllFilters() {
             this.tempYearStart = 1900;
             this.tempYearEnd = new Date().getFullYear();
+            this.tempSelectedGenres = [];
+            this.tempFilterRating = 0;
         },
 
         setYearPreset(preset) {
@@ -156,12 +186,6 @@ document.addEventListener('alpine:init', () => {
             }
         },
 
-        // Genre Filter Actions
-        openGenreModal() {
-            this.tempSelectedGenres = [...this.selectedGenres];
-            this.openGenre = true;
-        },
-
         toggleGenre(id) {
             if (this.tempSelectedGenres.includes(id)) {
                 this.tempSelectedGenres = this.tempSelectedGenres.filter(g => g !== id);
@@ -170,14 +194,23 @@ document.addEventListener('alpine:init', () => {
             }
         },
 
-        applyGenreFilter() {
-            this.selectedGenres = [...this.tempSelectedGenres];
-            this.openGenre = false;
-            this.resetAndFetch();
+        setRatingFilter(rating) {
+            if (this.tempFilterRating === rating) {
+                this.tempFilterRating = 0; // Toggle off if already selected
+            } else {
+                this.tempFilterRating = rating;
+            }
         },
 
-        clearGenreFilter() {
-            this.tempSelectedGenres = [];
+        // Platform Filter Actions
+        togglePlatform(apiId) {
+            if (this.filterPlatform === apiId) {
+                this.filterPlatform = null; // Toggle off
+            } else {
+                this.filterPlatform = apiId;
+            }
+            this.openPlatform = false;
+            this.resetAndFetch();
         },
 
         resetAndFetch() {
@@ -243,6 +276,16 @@ document.addEventListener('alpine:init', () => {
             // Apply Genre Filter (OR logic: pipe separated)
             if (this.selectedGenres.length > 0) {
                 url += `&with_genres=${this.selectedGenres.join('|')}`;
+            }
+
+            // Apply Rating Filter
+            if (this.filterRating > 0) {
+                url += `&vote_average.gte=${this.filterRating}`;
+            }
+
+            // Apply Platform Filter
+            if (this.filterPlatform) {
+                url += `&with_watch_providers=${this.filterPlatform}`;
             }
             
             try {
