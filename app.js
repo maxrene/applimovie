@@ -268,7 +268,24 @@ document.addEventListener('alpine:init', () => {
             const section = document.getElementById('continue-watching-section');
 
             if (seriesToDisplay.length > 0) {
-                seriesToDisplay.sort((a, b) => b.progress - a.progress);
+                const seriesLastWatchedDate = JSON.parse(localStorage.getItem('seriesLastWatchedDate')) || {};
+
+                seriesToDisplay.sort((a, b) => {
+                    const timeA = seriesLastWatchedDate[a.series.id] || 0;
+                    const timeB = seriesLastWatchedDate[b.series.id] || 0;
+
+                    // If both have timestamps, newest first
+                    if (timeA > 0 && timeB > 0) {
+                        return timeB - timeA;
+                    }
+                    // If only one has timestamp, it comes first
+                    if (timeA > 0) return -1;
+                    if (timeB > 0) return 1;
+
+                    // Fallback to progress for items without timestamp
+                    return b.progress - a.progress;
+                });
+
                 container.innerHTML = seriesToDisplay.map(item => this.createContinueWatchingCard(item.series, item.nextEpisode, item.progress)).join('');
                 section.style.display = 'block';
             } else {

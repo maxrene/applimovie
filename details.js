@@ -573,6 +573,11 @@ async function handleSeasonCheck(seriesId, seasonNumber, seasonCard, totalEpisod
             watchlist.push({ id: seriesIdNum, type: 'serie', added_at: new Date().toISOString() });
             localStorage.setItem('watchlist', JSON.stringify(watchlist));
         }
+
+        // Update last watched timestamp for sorting
+        let seriesLastWatchedDate = JSON.parse(localStorage.getItem('seriesLastWatchedDate')) || {};
+        seriesLastWatchedDate[seriesId] = Date.now();
+        localStorage.setItem('seriesLastWatchedDate', JSON.stringify(seriesLastWatchedDate));
     }
 
     localStorage.setItem('watchedEpisodes', JSON.stringify(watchedEpisodes));
@@ -764,6 +769,11 @@ function toggleEpisodeWatchedStatus(seriesId, episodeId, totalEpisodes, icon) {
         icon.textContent = 'check_circle';
         icon.classList.remove('text-gray-500');
         icon.classList.add('text-green-400');
+
+        // Update last watched timestamp for sorting
+        let seriesLastWatchedDate = JSON.parse(localStorage.getItem('seriesLastWatchedDate')) || {};
+        seriesLastWatchedDate[seriesId] = Date.now();
+        localStorage.setItem('seriesLastWatchedDate', JSON.stringify(seriesLastWatchedDate));
     }
 
     let watchlist = JSON.parse(localStorage.getItem('watchlist')) || [];
@@ -997,6 +1007,11 @@ function showConfirmationModal(seriesId, total) {
             });
 
             localStorage.setItem('watchedEpisodes', JSON.stringify(watchedEpisodes));
+
+            // Update last watched timestamp for sorting
+            let seriesLastWatchedDate = JSON.parse(localStorage.getItem('seriesLastWatchedDate')) || {};
+            seriesLastWatchedDate[seriesId] = Date.now();
+            localStorage.setItem('seriesLastWatchedDate', JSON.stringify(seriesLastWatchedDate));
 
             // 4. Update Global Watched Status
             let watchedList = JSON.parse(localStorage.getItem('watchedSeries')) || [];
