@@ -260,17 +260,22 @@ document.addEventListener('alpine:init', () => {
                      }
                  }
 
-                 if (details) {
-                     const index = this.enrichedWatchlist.findIndex(i => i.id === item.id);
-                     if (index !== -1) {
-                         const updatedItem = this.enrichedWatchlist[index];
+                 const index = this.enrichedWatchlist.findIndex(i => i.id === item.id);
+                 if (index !== -1) {
+                     const updatedItem = this.enrichedWatchlist[index];
+                     if (details) {
                          updatedItem.apiDetails = details;
-                         if (!updatedItem.title) updatedItem.title = details.title || details.name;
+                         // Update title if it's missing or if it's the placeholder
+                         if (!updatedItem.title || updatedItem.title.startsWith('Unknown Title')) {
+                             updatedItem.title = details.title || details.name;
+                         }
                          updatedItem.posterUrl = details.poster_path ? `https://image.tmdb.org/t/p/w500${details.poster_path}` : updatedItem.posterUrl;
                          updatedItem.year = (details.release_date || details.first_air_date || '').split('-')[0];
                          updatedItem.genres = details.genres ? details.genres.map(g => g.name) : [];
-                         triggerRender();
+                     } else {
+                         updatedItem.error = true;
                      }
+                     triggerRender();
                  }
             });
         },
@@ -288,10 +293,12 @@ document.addEventListener('alpine:init', () => {
             const cachedData = this.getCachedData(cacheKey);
             if (cachedData) return cachedData;
             try {
+                const apiKey = window.TMDB_API_KEY || TMDB_API_KEY;
                 const res = await apiQueue.add(() =>
-                    fetch(`https://api.themoviedb.org/3/movie/${movieId}?api_key=${TMDB_API_KEY}&append_to_response=watch/providers`)
+                    fetch(`https://api.themoviedb.org/3/movie/${movieId}?api_key=${apiKey}&append_to_response=watch/providers`)
                 );
                 if (!res.ok) {
+                    console.error(`Error fetching movie ${movieId}: ${res.status}`);
                     // Try to return stale data if available
                     return this.getCachedData(cacheKey, true) || null;
                 }
@@ -299,6 +306,7 @@ document.addEventListener('alpine:init', () => {
                 this.setCachedData(cacheKey, data);
                 return data;
             } catch (e) {
+                console.error(`Exception fetching movie ${movieId}:`, e);
                 return this.getCachedData(cacheKey, true) || null;
             }
         },
@@ -308,10 +316,15 @@ document.addEventListener('alpine:init', () => {
             const cachedData = this.getCachedData(cacheKey);
             if (cachedData) return cachedData;
             try {
+                const apiKey = window.TMDB_API_KEY || TMDB_API_KEY;
                 const seriesRes = await apiQueue.add(() =>
-                    fetch(`https://api.themoviedb.org/3/tv/${seriesId}?api_key=${TMDB_API_KEY}&append_to_response=watch/providers`)
+                    fetch(`https://api.themoviedb.org/3/tv/${seriesId}?api_key=${apiKey}&append_to_response=watch/providers`)
                 );
-                if (!seriesRes.ok) return this.getCachedData(cacheKey, true) || null;
+
+                if (!seriesRes.ok) {
+                    console.error(`Error fetching series ${seriesId}: ${seriesRes.status}`);
+                    return this.getCachedData(cacheKey, true) || null;
+                }
 
                 const seriesData = await seriesRes.json();
 
@@ -328,8 +341,11 @@ document.addEventListener('alpine:init', () => {
 
                 const seasonPromises = seasonsToFetch.map(season =>
                     apiQueue.add(() =>
-                        fetch(`https://api.themoviedb.org/3/tv/${seriesId}/season/${season.season_number}?api_key=${TMDB_API_KEY}`)
-                            .then(res => res.ok ? res.json() : null)
+                        fetch(`https://api.themoviedb.org/3/tv/${seriesId}/season/${season.season_number}?api_key=${apiKey}`)
+                            .then(res => {
+                                if (!res.ok) console.error(`Error fetching season ${season.season_number} for series ${seriesId}: ${res.status}`);
+                                return res.ok ? res.json() : null;
+                            })
                     )
                 );
 
@@ -339,6 +355,7 @@ document.addEventListener('alpine:init', () => {
                 this.setCachedData(cacheKey, seriesData);
                 return seriesData;
             } catch (e) {
+                console.error(`Exception fetching series ${seriesId}:`, e);
                 return this.getCachedData(cacheKey, true) || null;
             }
         },
@@ -460,6 +477,11 @@ document.addEventListener('alpine:init', () => {
             if (!item.apiDetails || !item.apiDetails.seasons) {
                  const platformsHTML = this.createPlatformIconsHTML(item.dynamicProviders);
                  const startYear = String(item.year).split(' - ')[0];
+
+                 if (item.error) {
+                     return ` <div class="relative flex items-start gap-4 p-4 hover:bg-white/5 transition-colors rounded-lg opacity-60"> <a href="serie.html?id=${item.id}" class="w-24 flex-shrink-0"> <img class="w-full aspect-[2/3] rounded-lg object-cover grayscale" src="${item.posterUrl}" alt="${item.title}"> </a> <div class="flex-1 min-w-0"> <div class="flex justify-between items-start"> <a href="serie.html?id=${item.id}" class="block"> <h3 class="font-bold text-lg text-white line-clamp-3 leading-tight">${item.title}</h3> </a> </div> <p class="text-sm text-gray-400 mt-1">${startYear}</p> <div class="mt-3 flex items-center gap-2 text-red-500 text-sm"> <span class="material-symbols-outlined text-base">error</span> <span>Erreur de chargement</span> </div> </div> </div>`;
+                 }
+
                  return ` <div class="relative flex items-start gap-4 p-4 hover:bg-white/5 transition-colors rounded-lg"> <a href="serie.html?id=${item.id}" class="w-24 flex-shrink-0"> <img class="w-full aspect-[2/3] rounded-lg object-cover" src="${item.posterUrl}" alt="${item.title}"> </a> <div class="flex-1 min-w-0"> <div class="flex justify-between items-start"> <a href="serie.html?id=${item.id}" class="block"> <h3 class="font-bold text-lg text-white line-clamp-3 leading-tight">${item.title}</h3> </a> </div> <p class="text-sm text-gray-400 mt-1">${startYear}</p> <div class="mt-3 flex items-center gap-2 text-gray-500 text-sm"> <span class="material-symbols-outlined text-base animate-spin">progress_activity</span> <span>Chargement...</span> </div> </div> </div>`;
             }
 
