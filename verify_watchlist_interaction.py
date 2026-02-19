@@ -1,55 +1,70 @@
-from playwright.sync_api import sync_playwright, expect
-import re
+from playwright.sync_api import sync_playwright
+import time
 
-def verify_interactions():
+def verify_watchlist_interaction():
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
-        context = browser.new_context(
-            viewport={"width": 375, "height": 667},
-            user_agent="Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15E148 Safari/604.1"
-        )
+        context = browser.new_context()
         page = context.new_page()
 
-        # Init with some state
-        page.add_init_script("""
-            localStorage.setItem('selectedPlatforms', JSON.dumps([
-                {'id': 'netflix', 'name': 'Netflix', 'logoUrl': 'https://image.tmdb.org/t/p/original/t2yyOv40HZeVlLjYsCsPHnWLk4W.jpg'}
-            ]));
-        """)
-
-        page.goto("http://localhost:8080/watchlist.html")
+        # Load a series page (e.g., Breaking Bad ID 1396 or Stranger Things 66732)
+        # Using a known ID that works with the API key provided in config.js
+        # Let's use 1396 (Breaking Bad)
+        page.goto("http://localhost:8080/serie.html?id=1396")
         page.wait_for_load_state("networkidle")
 
-        print("Checking initial state...")
-        # The slider div is the one with absolute position inside the toggle
-        slider = page.locator(".pb-2 .relative .absolute")
+        # Wait for the button to appear
+        watchlist_button = page.locator("#watchlist-button")
+        watchlist_button.wait_for()
 
-        # Check if class contains translate-x-0
-        expect(slider).to_have_class(re.compile(r"translate-x-0"))
+        print(f"Initial button text: '{watchlist_button.inner_text()}'")
 
-        # Tabs underline
-        underline = page.locator(".border-b .absolute").first
-        expect(underline).to_have_attribute("style", "left: 0%")
+        # Check initial state
+        if "Ajouter à ma liste" not in watchlist_button.inner_text():
+             print(f"FAIL: Initial button text is unexpected. Got: '{watchlist_button.inner_text()}'")
 
-        print("Interacting: Click 'Vu'...")
-        page.locator("text=Vu").first.click()
+        # Click the button to add to watchlist
+        print("Clicking 'Add to Watchlist'...")
+        watchlist_button.click()
+        page.wait_for_timeout(1000) # Wait for UI update
 
-        # Verify slider moved
-        expect(slider).to_have_class(re.compile(r"translate-x-\[100\%\]"))
-        print("Slider moved to 'Vu'.")
+        print(f"Button text after click 1: '{watchlist_button.inner_text()}'")
+        if "Dans ma liste" not in watchlist_button.inner_text():
+            print("FAIL: Button text did not change to 'Dans ma liste'.")
 
-        print("Interacting: Click 'Séries'...")
-        page.locator("text=Séries").click()
+        # Click the button again to trigger modal
+        print("Clicking 'In Watchlist' (should trigger modal)...")
+        watchlist_button.click()
+        page.wait_for_timeout(1000)
 
-        # Verify underline moved
-        expect(underline).to_have_attribute("style", "left: 50%")
-        print("Underline moved to 'Séries'.")
+        modal = page.locator("#confirmation-modal")
+        if modal.is_visible():
+            print("Modal is visible.")
+            modal_text = modal.locator("p").inner_text()
+            print(f"Modal text: '{modal_text}'")
 
-        # Take screenshot of final state
-        page.screenshot(path="verification/watchlist_interaction.png")
-        print("Interaction screenshot taken.")
+            if "Voulez-vous marquer tous les épisodes comme vus ?" not in modal_text:
+                print(f"FAIL: Modal text mismatch. Got: '{modal_text}'")
+
+            # Click confirm
+            print("Clicking 'Oui'...")
+            page.locator("#modal-confirm-button").click()
+
+            # Wait for async operations (fetching seasons etc)
+            # The button text changes to '...' then to final state
+            # We need to wait enough time
+            page.wait_for_timeout(5000)
+
+            print(f"Button text after modal confirm: '{watchlist_button.inner_text()}'")
+            if "Vu" not in watchlist_button.inner_text():
+                print("FAIL: Button text did not change to 'Vu'.")
+            else:
+                print("SUCCESS: Flow completed correctly.")
+
+        else:
+            print("FAIL: Modal did not appear.")
 
         browser.close()
 
 if __name__ == "__main__":
-    verify_interactions()
+    verify_watchlist_interaction()
