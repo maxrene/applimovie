@@ -1088,6 +1088,6 @@ function updateWatchlistButton(mediaId) {
         btn.classList.remove('bg-green-500', 'bg-primary', 'text-white');
         btn.classList.add('bg-white', 'text-black');
         icon.textContent = 'add';
-        text.textContent = 'Ma Liste';
+        text.textContent = 'Ajouter à ma liste';
     }
 }
