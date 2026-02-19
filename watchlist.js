@@ -1,6 +1,6 @@
 // Queue de requête pour éviter les limites de l'API (429 Too Many Requests)
 class RequestQueue {
-    constructor(concurrency = 3, delay = 150) {
+    constructor(concurrency = 5, delay = 150) {
         this.concurrency = concurrency;
         this.delay = delay;
         this.queue = [];
@@ -196,65 +196,83 @@ document.addEventListener('alpine:init', () => {
         },
 
         async fetchAndEnrichWatchlist() {
-            // First pass: Merge local mediaData if available
+            // 1. FAST INITIALIZATION (from Cache & Local Data)
             const watchlistWithMediaData = this.watchlist.map(item => {
                 const media = (typeof mediaData !== 'undefined') ? mediaData.find(m => m.id === item.id) : null;
-                return { ...(media || {}), ...item, apiDetails: null };
+                // Merge local hardcoded data
+                let enriched = { ...(media || {}), ...item, apiDetails: null };
+
+                // Check LocalStorage Cache (ignoring expiration for instant display)
+                let cachedDetails = null;
+                if (item.type === 'movie') {
+                    cachedDetails = this.getCachedData(`movie-details-${item.id}`, true);
+                } else if (item.type === 'serie' || item.type === 'tv') {
+                    cachedDetails = this.getCachedData(`series-details-${item.id}`, true);
+                }
+
+                if (cachedDetails) {
+                    enriched.apiDetails = cachedDetails;
+                    if (!enriched.title) enriched.title = cachedDetails.title || cachedDetails.name;
+                    if (!enriched.posterUrl) enriched.posterUrl = cachedDetails.poster_path ? `https://image.tmdb.org/t/p/w500${cachedDetails.poster_path}` : 'https://placehold.co/300x450?text=No+Image';
+                    if (!enriched.year) enriched.year = (cachedDetails.release_date || cachedDetails.first_air_date || '').split('-')[0];
+                    if (!enriched.genres || enriched.genres.length === 0) enriched.genres = cachedDetails.genres ? cachedDetails.genres.map(g => g.name) : [];
+                }
+                 // Fallback defaults
+                if (!enriched.type) enriched.type = 'movie';
+                if (!enriched.posterUrl) enriched.posterUrl = 'https://placehold.co/300x450?text=No+Data';
+                if (!enriched.title) enriched.title = `Unknown Title (${enriched.id})`;
+
+                return enriched;
             });
 
-            const promises = watchlistWithMediaData.map(async item => {
-                if (!item) return null;
+            this.enrichedWatchlist = watchlistWithMediaData;
+            this.renderMedia(); // Initial Fast Render
 
-                // 1. If type is known, fetch accordingly
-                if (item.type === 'serie' || item.type === 'tv') {
-                    return this.fetchFullSeriesDetails(item.id);
-                } else if (item.type === 'movie') {
-                    return this.fetchMovieDetails(item.id);
-                }
-
-                // 2. If type is UNKNOWN (e.g. added from search but not in local data), try movie first, then TV
-                // This is the fallback to ensure items don't disappear
-                const movieData = await this.fetchMovieDetails(item.id);
-                if (movieData) {
-                    item.type = 'movie'; // Update the item's type in memory
-                    return movieData;
-                }
-
-                const tvData = await this.fetchFullSeriesDetails(item.id);
-                if (tvData) {
-                    item.type = 'serie'; // Update the item's type in memory
-                    return tvData;
-                }
-
-                // If both fail, we might still want to show it if we have minimal data,
-                // but usually this means the ID is bad or API is down.
-                return null;
+            // 2. BACKGROUND FETCH (Fresh Data)
+            const itemsToFetch = this.enrichedWatchlist.filter(item => {
+                const cacheKey = (item.type === 'movie') ? `movie-details-${item.id}` : `series-details-${item.id}`;
+                return !this.getCachedData(cacheKey, false); // Fetch if expired/missing
             });
 
-            const results = await Promise.all(promises);
+            if (itemsToFetch.length === 0) return;
 
-            this.enrichedWatchlist = watchlistWithMediaData.map(item => {
-                if (!item) return null;
+            let renderTimeout;
+            const triggerRender = () => {
+                if (renderTimeout) clearTimeout(renderTimeout);
+                renderTimeout = setTimeout(() => this.renderMedia(), 500);
+            };
 
-                // Find the result corresponding to this item (API result)
-                const details = results.find(d => d && d.id === item.id);
+            itemsToFetch.forEach(async (item) => {
+                 let details = null;
+                 // Use existing type if known, otherwise try movie then series
+                 if (item.type === 'serie' || item.type === 'tv') {
+                     details = await this.fetchFullSeriesDetails(item.id);
+                 } else if (item.type === 'movie') {
+                     details = await this.fetchMovieDetails(item.id);
+                 } else {
+                     // Unknown type fallback logic
+                     details = await this.fetchMovieDetails(item.id);
+                     if (details) {
+                         item.type = 'movie';
+                     } else {
+                         details = await this.fetchFullSeriesDetails(item.id);
+                         if (details) item.type = 'serie';
+                     }
+                 }
 
-                if (details) {
-                    item.apiDetails = details;
-                    // Enrich missing fields from API
-                    if (!item.title) item.title = details.title || details.name;
-                    if (!item.posterUrl) item.posterUrl = details.poster_path ? `https://image.tmdb.org/t/p/w500${details.poster_path}` : 'https://placehold.co/300x450?text=No+Image';
-                    if (!item.year) item.year = (details.release_date || details.first_air_date || '').split('-')[0];
-                    if (!item.genres || item.genres.length === 0) item.genres = details.genres ? details.genres.map(g => g.name) : [];
-                } else {
-                    // Fallback for items with NO API data (so they don't disappear)
-                    // If we don't have a type, we default to 'movie' so it shows up somewhere
-                    if (!item.type) item.type = 'movie';
-                    if (!item.posterUrl) item.posterUrl = 'https://placehold.co/300x450?text=No+Data';
-                    if (!item.title) item.title = `Unknown Title (${item.id})`;
-                }
-                return item;
-            }).filter(Boolean);
+                 if (details) {
+                     const index = this.enrichedWatchlist.findIndex(i => i.id === item.id);
+                     if (index !== -1) {
+                         const updatedItem = this.enrichedWatchlist[index];
+                         updatedItem.apiDetails = details;
+                         if (!updatedItem.title) updatedItem.title = details.title || details.name;
+                         updatedItem.posterUrl = details.poster_path ? `https://image.tmdb.org/t/p/w500${details.poster_path}` : updatedItem.posterUrl;
+                         updatedItem.year = (details.release_date || details.first_air_date || '').split('-')[0];
+                         updatedItem.genres = details.genres ? details.genres.map(g => g.name) : [];
+                         triggerRender();
+                     }
+                 }
+            });
         },
         getCachedData(key, ignoreExpiration = false) {
             const cached = localStorage.getItem(key);
@@ -438,7 +456,24 @@ document.addEventListener('alpine:init', () => {
         formatDuration(runtime) { if (!runtime) return ''; const h = Math.floor(runtime / 60); const m = runtime % 60; return `${h}h ${m}m`; },
         createMovieItemHTML(item) { const link = `film.html?id=${item.id}`; const durationStr = item.duration || (item.apiDetails?.runtime ? this.formatDuration(item.apiDetails.runtime) : 'N/A'); const genresStr = item.genres && item.genres.length > 0 ? item.genres[0] : 'Genre'; const metaLine = `${item.year} • ${genresStr} • ${durationStr}`; const platformsHTML = this.createPlatformIconsHTML(item.dynamicProviders); const availableLine = platformsHTML ? `<div class="mt-5 flex items-center gap-2 text-xs text-gray-400"> <span>Available on:</span> <div class="flex items-center gap-1">${platformsHTML}</div> </div>` : ''; const checkButton = this.createCheckButtonHTML(item.id, item.isWatched, 'movie'); return ` <div class="relative flex items-start gap-4 p-4 hover:bg-white/5 transition-colors rounded-lg"> <a href="${link}" class="w-24 flex-shrink-0 group"> <div class="relative w-full aspect-[2/3] rounded-lg overflow-hidden"> <img src="${item.posterUrl}" alt="${item.title}" class="w-full h-full object-cover group-hover:scale-105 transition-transform"> ${item.isWatched ? '<div class="absolute inset-0 bg-black/40 flex items-center justify-center"><span class="material-symbols-outlined text-white">visibility</span></div>' : ''} </div> </a> <div class="flex-1 min-w-0"> <div class="flex justify-between items-start"> <a href="${link}" class="block pr-2"> <h3 class="font-bold text-lg text-white line-clamp-3 leading-tight">${item.title}</h3> </a> ${checkButton} </div> <p class="text-sm text-gray-400 mt-1">${metaLine}</p> ${availableLine} </div> </div>`; },
         createTVItemHTML(item) { const watchedEpisodes = JSON.parse(localStorage.getItem('watchedEpisodes')) || {}; const seriesWatchedEpisodes = new Set(watchedEpisodes[item.id] || []); const watchedCount = seriesWatchedEpisodes.size; if (item.isWatched || (item.apiDetails && watchedCount > 0 && watchedCount === item.apiDetails.number_of_episodes)) { const checkButton = this.createCheckButtonHTML(item.id, true, 'serie', 'all'); return ` <div class="relative flex items-center gap-4 p-4 hover:bg-white/5 transition-colors rounded-lg"> <a href="serie.html?id=${item.id}" class="w-24 flex-shrink-0"> <div class="relative w-full aspect-[2/3] rounded-lg overflow-hidden"> <img src="${item.posterUrl}" class="w-full h-full object-cover"> <div class="absolute inset-0 flex items-center justify-center bg-black/60"> <span class="material-symbols-outlined text-white">visibility</span> </div> </div> </a> <div class="flex-1 min-w-0"> <div class="flex justify-between items-start"> <h3 class="font-bold text-lg text-white line-clamp-3 leading-tight">${item.title}</h3> ${checkButton} </div> <p class="text-sm text-gray-400">${String(item.year).split(' - ')[0]} • ${item.genres[0]}</p> <p class="text-xs text-green-500 mt-2 font-medium">Série terminée</p> </div> </div>`; } if (watchedCount > 0 && item.apiDetails) { return this.createInProgressTVItemHTML(item, seriesWatchedEpisodes); } return this.createUnwatchedTVItemHTML(item); },
-        createUnwatchedTVItemHTML(item) { if (!item.apiDetails || !item.apiDetails.seasons) return '<div class="p-4 text-gray-400">Loading details...</div>'; const firstSeason = item.apiDetails.seasons.find(s => s.season_number === 1); if (!firstSeason || !firstSeason.episodes || firstSeason.episodes.length === 0) return ''; const firstEpisode = firstSeason.episodes.find(e => e.episode_number === 1); if (!firstEpisode) return ''; const platformsHTML = this.createPlatformIconsHTML(item.dynamicProviders); const totalSeasons = item.apiDetails.number_of_seasons; const startYear = String(item.year).split(' - ')[0]; const infoLine = `<div class="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 mt-1"> <span>${totalSeasons} Saisons • ${startYear}</span> ${platformsHTML ? '<span class="text-gray-600">•</span>' : ''} <div class="flex items-center gap-1">${platformsHTML}</div> </div>`; const checkButton = this.createCheckButtonHTML(item.id, false, 'tv', firstEpisode.id); return ` <div class="relative flex items-start gap-4 p-4 hover:bg-white/5 transition-colors rounded-lg"> <a href="serie.html?id=${item.id}" class="w-24 flex-shrink-0"> <img class="w-full aspect-[2/3] rounded-lg object-cover" src="${item.posterUrl}" alt="${item.title}"> </a> <div class="flex-1 min-w-0"> <div class="flex justify-between items-start"> <a href="serie.html?id=${item.id}" class="block"> <h3 class="font-bold text-lg text-white line-clamp-3 leading-tight">${item.title}</h3> </a> ${checkButton} </div> ${infoLine} <div class="mt-3"> <p class="text-xs font-semibold text-primary uppercase tracking-wide">Prochain épisode</p> <p class="text-sm font-medium text-gray-300 mt-0.5 truncate">S01 E01 - ${firstEpisode.name}</p> </div> </div> </div>`; },
+        createUnwatchedTVItemHTML(item) {
+            if (!item.apiDetails || !item.apiDetails.seasons) {
+                 const platformsHTML = this.createPlatformIconsHTML(item.dynamicProviders);
+                 const startYear = String(item.year).split(' - ')[0];
+                 return ` <div class="relative flex items-start gap-4 p-4 hover:bg-white/5 transition-colors rounded-lg"> <a href="serie.html?id=${item.id}" class="w-24 flex-shrink-0"> <img class="w-full aspect-[2/3] rounded-lg object-cover" src="${item.posterUrl}" alt="${item.title}"> </a> <div class="flex-1 min-w-0"> <div class="flex justify-between items-start"> <a href="serie.html?id=${item.id}" class="block"> <h3 class="font-bold text-lg text-white line-clamp-3 leading-tight">${item.title}</h3> </a> </div> <p class="text-sm text-gray-400 mt-1">${startYear}</p> <div class="mt-3 flex items-center gap-2 text-gray-500 text-sm"> <span class="material-symbols-outlined text-base animate-spin">progress_activity</span> <span>Chargement...</span> </div> </div> </div>`;
+            }
+
+            const firstSeason = item.apiDetails.seasons.find(s => s.season_number === 1);
+            if (!firstSeason || !firstSeason.episodes || firstSeason.episodes.length === 0) return '';
+            const firstEpisode = firstSeason.episodes.find(e => e.episode_number === 1);
+            if (!firstEpisode) return '';
+            const platformsHTML = this.createPlatformIconsHTML(item.dynamicProviders);
+            const totalSeasons = item.apiDetails.number_of_seasons;
+            const startYear = String(item.year).split(' - ')[0];
+            const infoLine = `<div class="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 mt-1"> <span>${totalSeasons} Saisons • ${startYear}</span> ${platformsHTML ? '<span class="text-gray-600">•</span>' : ''} <div class="flex items-center gap-1">${platformsHTML}</div> </div>`;
+            const checkButton = this.createCheckButtonHTML(item.id, false, 'tv', firstEpisode.id);
+            return ` <div class="relative flex items-start gap-4 p-4 hover:bg-white/5 transition-colors rounded-lg"> <a href="serie.html?id=${item.id}" class="w-24 flex-shrink-0"> <img class="w-full aspect-[2/3] rounded-lg object-cover" src="${item.posterUrl}" alt="${item.title}"> </a> <div class="flex-1 min-w-0"> <div class="flex justify-between items-start"> <a href="serie.html?id=${item.id}" class="block"> <h3 class="font-bold text-lg text-white line-clamp-3 leading-tight">${item.title}</h3> </a> ${checkButton} </div> ${infoLine} <div class="mt-3"> <p class="text-xs font-semibold text-primary uppercase tracking-wide">Prochain épisode</p> <p class="text-sm font-medium text-gray-300 mt-0.5 truncate">S01 E01 - ${firstEpisode.name}</p> </div> </div> </div>`;
+        },
         createInProgressTVItemHTML(item, seriesWatchedEpisodes) { let nextEpisode = null; let currentSeasonForProgress = null; const sortedSeasons = item.apiDetails.seasons.filter(s => s.season_number > 0).sort((a, b) => a.season_number - b.season_number); for (const season of sortedSeasons) { const sortedEpisodes = season.episodes.sort((a, b) => a.episode_number - b.episode_number); for (const episode of sortedEpisodes) { if (!seriesWatchedEpisodes.has(episode.id)) { nextEpisode = episode; currentSeasonForProgress = season; break; } } if (nextEpisode) break; } if (!nextEpisode || !currentSeasonForProgress) return this.createUnwatchedTVItemHTML(item); const seasonEpisodeIds = new Set(currentSeasonForProgress.episodes.map(e => e.id)); const seasonWatchedCount = [...seriesWatchedEpisodes].filter(id => seasonEpisodeIds.has(id)).length; const remainingInSeason = currentSeasonForProgress.episodes.length - seasonWatchedCount; const totalProgress = (seriesWatchedEpisodes.size / item.apiDetails.number_of_episodes) * 100; const platformsHTML = this.createPlatformIconsHTML(item.dynamicProviders); const totalSeasons = item.apiDetails.number_of_seasons; const startYear = String(item.year).split(' - ')[0]; const infoLine = `<div class="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 mt-1"> <span>${totalSeasons} Saisons • ${startYear}</span> ${platformsHTML ? '<span class="text-gray-600">•</span>' : ''} <div class="flex items-center gap-1">${platformsHTML}</div> </div>`; const checkButton = this.createCheckButtonHTML(item.id, false, 'tv', nextEpisode.id); return ` <div class="relative p-4 hover:bg-white/5 transition-colors rounded-lg"> <div class="flex gap-4 pb-2"> <div class="w-24 flex-shrink-0"> <a href="serie.html?id=${item.id}"> <img alt="${item.title} cover" class="w-full aspect-[2/3] rounded-lg object-cover" src="${item.posterUrl}"> </a> </div> <div class="flex min-w-0 flex-1 flex-col"> <div class="flex justify-between items-start"> <a href="serie.html?id=${item.id}" class="block"> <h3 class="font-bold text-lg text-white line-clamp-3 leading-tight">${item.title}</h3> </a> ${checkButton} </div> ${infoLine} <div class="mt-3"> <p class="text-xs font-semibold text-primary uppercase tracking-wide"> S${this.formatEpisodeNumber(nextEpisode.season_number)} E${this.formatEpisodeNumber(nextEpisode.episode_number)} <span class="text-gray-500 normal-case font-normal ml-1">(${remainingInSeason} restants)</span> </p> <p class="text-sm font-medium text-gray-300 mt-0.5 truncate">${nextEpisode.name}</p> </div> </div> </div> <div class="absolute bottom-0 left-4 right-4 h-1 bg-gray-700 rounded-full overflow-hidden mb-2"> <div class="h-full bg-primary" style="width: ${totalProgress}%"></div> </div> </div>`; },
         formatEpisodeNumber(num) { return String(num).padStart(2, '0'); },
         async markEpisodeWatched(seriesId, episodeId) {
