@@ -265,10 +265,22 @@ document.addEventListener('alpine:init', () => {
                      if (index !== -1) {
                          const updatedItem = this.enrichedWatchlist[index];
                          updatedItem.apiDetails = details;
-                         if (!updatedItem.title) updatedItem.title = details.title || details.name;
+
+                         // CORRECTION : Forcer la mise à jour si le titre est le fallback par défaut
+                         if (updatedItem.title.startsWith("Unknown Title")) {
+                             updatedItem.title = details.title || details.name;
+                         }
+
                          updatedItem.posterUrl = details.poster_path ? `https://image.tmdb.org/t/p/w500${details.poster_path}` : updatedItem.posterUrl;
                          updatedItem.year = (details.release_date || details.first_air_date || '').split('-')[0];
                          updatedItem.genres = details.genres ? details.genres.map(g => g.name) : [];
+                         triggerRender();
+                     }
+                 } else {
+                     // CORRECTION : Si l'API échoue (details = null), on flag l'erreur pour arrêter le chargement
+                     const index = this.enrichedWatchlist.findIndex(i => i.id === item.id);
+                     if (index !== -1) {
+                         this.enrichedWatchlist[index].apiDetails = { error: true };
                          triggerRender();
                      }
                  }
@@ -457,6 +469,28 @@ document.addEventListener('alpine:init', () => {
         createMovieItemHTML(item) { const link = `film.html?id=${item.id}`; const durationStr = item.duration || (item.apiDetails?.runtime ? this.formatDuration(item.apiDetails.runtime) : 'N/A'); const genresStr = item.genres && item.genres.length > 0 ? item.genres[0] : 'Genre'; const metaLine = `${item.year} • ${genresStr} • ${durationStr}`; const platformsHTML = this.createPlatformIconsHTML(item.dynamicProviders); const availableLine = platformsHTML ? `<div class="mt-5 flex items-center gap-2 text-xs text-gray-400"> <span>Available on:</span> <div class="flex items-center gap-1">${platformsHTML}</div> </div>` : ''; const checkButton = this.createCheckButtonHTML(item.id, item.isWatched, 'movie'); return ` <div class="relative flex items-start gap-4 p-4 hover:bg-white/5 transition-colors rounded-lg"> <a href="${link}" class="w-24 flex-shrink-0 group"> <div class="relative w-full aspect-[2/3] rounded-lg overflow-hidden"> <img src="${item.posterUrl}" alt="${item.title}" class="w-full h-full object-cover group-hover:scale-105 transition-transform"> ${item.isWatched ? '<div class="absolute inset-0 bg-black/40 flex items-center justify-center"><span class="material-symbols-outlined text-white">visibility</span></div>' : ''} </div> </a> <div class="flex-1 min-w-0"> <div class="flex justify-between items-start"> <a href="${link}" class="block pr-2"> <h3 class="font-bold text-lg text-white line-clamp-3 leading-tight">${item.title}</h3> </a> ${checkButton} </div> <p class="text-sm text-gray-400 mt-1">${metaLine}</p> ${availableLine} </div> </div>`; },
         createTVItemHTML(item) { const watchedEpisodes = JSON.parse(localStorage.getItem('watchedEpisodes')) || {}; const seriesWatchedEpisodes = new Set(watchedEpisodes[item.id] || []); const watchedCount = seriesWatchedEpisodes.size; if (item.isWatched || (item.apiDetails && watchedCount > 0 && watchedCount === item.apiDetails.number_of_episodes)) { const checkButton = this.createCheckButtonHTML(item.id, true, 'serie', 'all'); return ` <div class="relative flex items-center gap-4 p-4 hover:bg-white/5 transition-colors rounded-lg"> <a href="serie.html?id=${item.id}" class="w-24 flex-shrink-0"> <div class="relative w-full aspect-[2/3] rounded-lg overflow-hidden"> <img src="${item.posterUrl}" class="w-full h-full object-cover"> <div class="absolute inset-0 flex items-center justify-center bg-black/60"> <span class="material-symbols-outlined text-white">visibility</span> </div> </div> </a> <div class="flex-1 min-w-0"> <div class="flex justify-between items-start"> <h3 class="font-bold text-lg text-white line-clamp-3 leading-tight">${item.title}</h3> ${checkButton} </div> <p class="text-sm text-gray-400">${String(item.year).split(' - ')[0]} • ${item.genres[0]}</p> <p class="text-xs text-green-500 mt-2 font-medium">Série terminée</p> </div> </div>`; } if (watchedCount > 0 && item.apiDetails) { return this.createInProgressTVItemHTML(item, seriesWatchedEpisodes); } return this.createUnwatchedTVItemHTML(item); },
         createUnwatchedTVItemHTML(item) {
+            // CORRECTION : Stopper le spinner et afficher une carte d'erreur si l'API a renvoyé null
+            if (item.apiDetails && item.apiDetails.error) {
+                 return `
+                 <div class="relative flex items-start gap-4 p-4 hover:bg-white/5 transition-colors rounded-lg">
+                     <a href="serie.html?id=${item.id}" class="w-24 flex-shrink-0">
+                         <div class="w-full aspect-[2/3] rounded-lg bg-gray-800 flex items-center justify-center border border-gray-700">
+                             <span class="material-symbols-outlined text-gray-500">broken_image</span>
+                         </div>
+                     </a>
+                     <div class="flex-1 min-w-0">
+                         <a href="serie.html?id=${item.id}" class="block">
+                             <h3 class="font-bold text-lg text-white leading-tight">Média indisponible</h3>
+                         </a>
+                         <p class="text-sm text-gray-500 mt-1">ID: ${item.id}</p>
+                         <div class="mt-3 flex items-center gap-2 text-red-500 text-sm">
+                             <span class="material-symbols-outlined text-base">error</span>
+                             <span>Erreur réseau ou ID invalide</span>
+                         </div>
+                     </div>
+                 </div>`;
+            }
+
             if (!item.apiDetails || !item.apiDetails.seasons) {
                  const platformsHTML = this.createPlatformIconsHTML(item.dynamicProviders);
                  const startYear = String(item.year).split(' - ')[0];
