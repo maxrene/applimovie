@@ -44,9 +44,9 @@
     <div class="px-4 mt-3">
         <div class="flex items-end justify-between border-b border-gray-200 dark:border-gray-800">
             <div class="relative flex flex-1 mr-4">
-                <div class="absolute bottom-0 h-0.5 bg-primary transition-all duration-300 ease-out w-1/2" :style="activeTab === 'movie' ? 'left: 0%' : 'left: 50%'"></div>
-                <button @click="activeTab = 'movie'" class="flex-1 py-3 text-center text-sm font-bold uppercase tracking-wide transition-colors" :class="activeTab === 'movie' ? 'text-primary' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'">Films</button>
-                <button @click="activeTab = 'tv'" class="flex-1 py-3 text-center text-sm font-bold uppercase tracking-wide transition-colors" :class="activeTab === 'tv' ? 'text-primary' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'">Séries</button>
+                <div class="absolute bottom-0 h-0.5 bg-primary transition-all duration-300 ease-out w-1/2" :style="subTab === 'movie' ? 'left: 0%' : 'left: 50%'"></div>
+                <button @click="subTab = 'movie'" class="flex-1 py-3 text-center text-sm font-bold uppercase tracking-wide transition-colors" :class="subTab === 'movie' ? 'text-primary' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'">Films</button>
+                <button @click="subTab = 'tv'" class="flex-1 py-3 text-center text-sm font-bold uppercase tracking-wide transition-colors" :class="subTab === 'tv' ? 'text-primary' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'">Séries</button>
             </div>
             <div class="pb-2">
                 <div class="relative flex w-32 items-center bg-gray-200 dark:bg-gray-800 rounded-full p-1 h-7 cursor-pointer shadow-inner">
