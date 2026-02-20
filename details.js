@@ -41,7 +41,8 @@ const myPlatformIds = JSON.parse(localStorage.getItem('selectedPlatforms')) || [
 document.addEventListener('DOMContentLoaded', async () => {
     const urlParams = new URLSearchParams(window.location.search);
     const mediaId = urlParams.get('id');
-    const isMovie = window.location.pathname.includes('film.html');
+    const bodyType = document.body.dataset.type;
+    const isMovie = bodyType ? bodyType === 'movie' : window.location.pathname.includes('film.html');
     const type = isMovie ? 'movie' : 'tv';
 
     if (!mediaId) return console.error("Pas d'ID");
@@ -922,7 +923,8 @@ function initializeWatchlistButton(mediaId) {
 
 async function toggleWatchlist(mediaId) {
     const mediaIdNum = parseInt(mediaId, 10);
-    const isMovie = window.location.pathname.includes('film.html');
+    const bodyType = document.body.dataset.type;
+    const isMovie = bodyType ? bodyType === 'movie' : window.location.pathname.includes('film.html');
     const watchedListKey = isMovie ? 'watchedMovies' : 'watchedSeries';
     let watchlist = JSON.parse(localStorage.getItem('watchlist')) || [];
     let watchedList = JSON.parse(localStorage.getItem(watchedListKey)) || [];
@@ -970,6 +972,8 @@ async function toggleWatchlist(mediaId) {
 
 function showConfirmationModal(seriesId, total) {
     const modal = document.getElementById('confirmation-modal');
+    if (!modal) return;
+
     modal.style.display = 'flex';
     document.getElementById('modal-cancel-button').onclick = () => modal.style.display = 'none';
     document.getElementById('modal-confirm-button').onclick = async () => {
@@ -1089,7 +1093,8 @@ function updateWatchlistButton(mediaId) {
     const btn = document.getElementById('watchlist-button');
     if(!btn) return;
     const mediaIdNum = parseInt(mediaId, 10);
-    const isMovie = window.location.pathname.includes('film.html');
+    const bodyType = document.body.dataset.type;
+    const isMovie = bodyType ? bodyType === 'movie' : window.location.pathname.includes('film.html');
     const watchedListKey = isMovie ? 'watchedMovies' : 'watchedSeries';
     const watchlist = JSON.parse(localStorage.getItem('watchlist')) || [];
     const watchedList = JSON.parse(localStorage.getItem(watchedListKey)) || [];
