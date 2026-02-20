@@ -16,7 +16,7 @@ document.addEventListener('alpine:init', () => {
                 this.errorMessage = "Erreur de configuration : Clé API manquante.";
             }
 
-            this.previousSearches = JSON.parse(localStorage.getItem('previousSearches')) || [];
+            this.previousSearches = getSafeLocalStorage('previousSearches', []);
             this.fetchPopular();
 
             this.$watch('searchQuery', (newValue) => {
@@ -31,13 +31,13 @@ document.addEventListener('alpine:init', () => {
             // Handle SPA tab switching
             window.addEventListener('view-changed', () => {
                 this.lastUpdate = Date.now();
-                this.previousSearches = JSON.parse(localStorage.getItem('previousSearches')) || [];
+                this.previousSearches = getSafeLocalStorage('previousSearches', []);
             });
 
             window.addEventListener('pageshow', () => {
                 this.lastUpdate = Date.now();
                 // Refresh previous searches as well since they are stored in localStorage
-                this.previousSearches = JSON.parse(localStorage.getItem('previousSearches')) || [];
+                this.previousSearches = getSafeLocalStorage('previousSearches', []);
             });
         },
 
@@ -88,7 +88,7 @@ document.addEventListener('alpine:init', () => {
 
         handleItemClick(item) {
             try {
-                let history = JSON.parse(localStorage.getItem('previousSearches')) || [];
+                let history = getSafeLocalStorage('previousSearches', []);
                 history = history.filter(i => i.id !== item.id);
                 // Use Alpine.raw if available to strip proxy, otherwise use item directly
                 const rawItem = (typeof Alpine !== 'undefined' && Alpine.raw) ? Alpine.raw(item) : item;
@@ -148,8 +148,8 @@ document.addEventListener('alpine:init', () => {
              // Normalize tv -> serie for local storage check if needed, but here we just need movie vs tv/serie logic
 
              // Watched
-             const watchedMovies = JSON.parse(localStorage.getItem('watchedMovies')) || [];
-             const watchedSeries = JSON.parse(localStorage.getItem('watchedSeries')) || [];
+             const watchedMovies = getSafeLocalStorage('watchedMovies', []);
+             const watchedSeries = getSafeLocalStorage('watchedSeries', []);
 
              // Check based on type
              const isMovie = type === 'movie';
@@ -161,7 +161,7 @@ document.addEventListener('alpine:init', () => {
              if (isWatched) return 'watched';
 
              // Watchlist
-             const watchlist = JSON.parse(localStorage.getItem('watchlist')) || [];
+             const watchlist = getSafeLocalStorage('watchlist', []);
              const isInWatchlist = watchlist.some(w => w.id == id);
              if (isInWatchlist) return 'watchlist';
 

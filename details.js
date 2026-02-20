@@ -36,7 +36,7 @@ const PLATFORM_ID_MAP = {
 let currentCastData = [];
 let isCastExpanded = false;
 const userRegion = localStorage.getItem('userRegion') || 'FR';
-const myPlatformIds = JSON.parse(localStorage.getItem('selectedPlatforms')) || [];
+const myPlatformIds = getSafeLocalStorage('selectedPlatforms', []);
 
 document.addEventListener('DOMContentLoaded', async () => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -86,7 +86,7 @@ async function fetchFullFromTMDB(id, type) {
 
         // Caching for Home/Popular views
         if (type === 'tv') {
-            const seriesDatesCache = JSON.parse(localStorage.getItem('seriesDatesCache')) || {};
+            const seriesDatesCache = getSafeLocalStorage('seriesDatesCache', {});
             const startYear = data.first_air_date ? data.first_air_date.split('-')[0] : '';
             const endYear = data.last_air_date ? data.last_air_date.split('-')[0] : '';
             if(startYear) {
@@ -162,7 +162,7 @@ async function fetchUpdates(id, type) {
             }
 
             // Cache for Home/Popular
-            const seriesDatesCache = JSON.parse(localStorage.getItem('seriesDatesCache')) || {};
+            const seriesDatesCache = getSafeLocalStorage('seriesDatesCache', {});
             if(startYear) {
                 seriesDatesCache[id] = {
                     start: startYear,
@@ -282,8 +282,7 @@ function updateStreamingUI(allProvidersData) {
     if (!container || !section) return;
     container.innerHTML = '';
 
-    const saved = localStorage.getItem('selectedPlatforms');
-    const selectedPlatforms = saved ? JSON.parse(saved) : [];
+    const selectedPlatforms = getSafeLocalStorage('selectedPlatforms', []);
 
     // If no platforms are selected, show nothing/message as per user request (strict filtering)
     if (selectedPlatforms.length === 0) {
@@ -456,7 +455,7 @@ function updateSeasonWatchedStatus(seasonCard) {
 
 async function checkSeasonStatus(seriesId, seasonNumber, seasonCard) {
     try {
-        let watchedEpisodes = JSON.parse(localStorage.getItem('watchedEpisodes')) || {};
+        let watchedEpisodes = getSafeLocalStorage('watchedEpisodes', {});
         let seriesWatched = watchedEpisodes[seriesId] || [];
 
         // Optimization: If series has NO watched episodes, skip fetch
@@ -502,7 +501,7 @@ async function handleSeasonCheck(seriesId, seasonNumber, seasonCard, totalEpisod
 
             // Render hidden (just to populate DOM and check IDs)
             if (episodes.length > 0) {
-                 const watchedEpisodes = JSON.parse(localStorage.getItem('watchedEpisodes')) || {};
+                 const watchedEpisodes = getSafeLocalStorage('watchedEpisodes', {});
                  const seriesWatchedEpisodes = watchedEpisodes[seriesId] || [];
 
                  const episodesListHTML = episodes.map(episode => {
@@ -543,7 +542,7 @@ async function handleSeasonCheck(seriesId, seasonNumber, seasonCard, totalEpisod
     // If mixed or none are watched (GREY), we want to WATCH all.
     const shouldMarkWatched = !allCurrentlyWatched;
 
-    let watchedEpisodes = JSON.parse(localStorage.getItem('watchedEpisodes')) || {};
+    let watchedEpisodes = getSafeLocalStorage('watchedEpisodes', {});
     if (!watchedEpisodes[seriesId]) watchedEpisodes[seriesId] = [];
 
     episodeIcons.forEach(icon => {
@@ -570,7 +569,7 @@ async function handleSeasonCheck(seriesId, seasonNumber, seasonCard, totalEpisod
     // 3. Update Storage & Global State
     if (shouldMarkWatched) {
         // Add series to Watchlist if adding episodes
-        let watchlist = JSON.parse(localStorage.getItem('watchlist')) || [];
+        let watchlist = getSafeLocalStorage('watchlist', []);
         const seriesIdNum = parseInt(seriesId, 10);
         if (!watchlist.some(item => item.id === seriesIdNum)) {
             watchlist.push({ id: seriesIdNum, type: 'serie', added_at: new Date().toISOString() });
@@ -578,7 +577,7 @@ async function handleSeasonCheck(seriesId, seasonNumber, seasonCard, totalEpisod
         }
 
         // Update last watched timestamp for sorting
-        let seriesLastWatchedDate = JSON.parse(localStorage.getItem('seriesLastWatchedDate')) || {};
+        let seriesLastWatchedDate = getSafeLocalStorage('seriesLastWatchedDate', {});
         seriesLastWatchedDate[seriesId] = Date.now();
         localStorage.setItem('seriesLastWatchedDate', JSON.stringify(seriesLastWatchedDate));
     }
@@ -587,7 +586,7 @@ async function handleSeasonCheck(seriesId, seasonNumber, seasonCard, totalEpisod
 
     // Check global "Vu" status for series
     const watchedCount = watchedEpisodes[seriesId].length;
-    let watchedList = JSON.parse(localStorage.getItem('watchedSeries')) || [];
+    let watchedList = getSafeLocalStorage('watchedSeries', []);
     const seriesIdNum = parseInt(seriesId, 10);
 
     if (totalEpisodes && watchedCount >= totalEpisodes) { // Use >= for safety
@@ -683,7 +682,7 @@ function updateSeasonsUI(seasons, seriesId, totalEpisodes) {
                         if (!episodes || episodes.length === 0) {
                             episodesContainer.innerHTML = '<div class="p-4 text-gray-400 text-sm">Aucun épisode.</div>';
                         } else {
-                            const watchedEpisodes = JSON.parse(localStorage.getItem('watchedEpisodes')) || {};
+                            const watchedEpisodes = getSafeLocalStorage('watchedEpisodes', {});
                             const seriesWatchedEpisodes = watchedEpisodes[seriesId] || [];
 
                             const episodesListHTML = episodes.map(episode => {
@@ -756,7 +755,7 @@ function updateVideosUI(videos) {
 
 
 function toggleEpisodeWatchedStatus(seriesId, episodeId, totalEpisodes, icon) {
-    let watchedEpisodes = JSON.parse(localStorage.getItem('watchedEpisodes')) || {};
+    let watchedEpisodes = getSafeLocalStorage('watchedEpisodes', {});
     if (!watchedEpisodes[seriesId]) watchedEpisodes[seriesId] = [];
 
     const seriesIdNum = parseInt(seriesId, 10);
@@ -774,12 +773,12 @@ function toggleEpisodeWatchedStatus(seriesId, episodeId, totalEpisodes, icon) {
         icon.classList.add('text-green-400');
 
         // Update last watched timestamp for sorting
-        let seriesLastWatchedDate = JSON.parse(localStorage.getItem('seriesLastWatchedDate')) || {};
+        let seriesLastWatchedDate = getSafeLocalStorage('seriesLastWatchedDate', {});
         seriesLastWatchedDate[seriesId] = Date.now();
         localStorage.setItem('seriesLastWatchedDate', JSON.stringify(seriesLastWatchedDate));
     }
 
-    let watchlist = JSON.parse(localStorage.getItem('watchlist')) || [];
+    let watchlist = getSafeLocalStorage('watchlist', []);
     if (!watchlist.some(item => item.id === seriesIdNum)) {
         watchlist.push({ id: seriesIdNum, type: 'serie', added_at: new Date().toISOString() });
         localStorage.setItem('watchlist', JSON.stringify(watchlist));
@@ -792,7 +791,7 @@ function toggleEpisodeWatchedStatus(seriesId, episodeId, totalEpisodes, icon) {
     updateSeasonWatchedStatus(seasonCard);
 
     const watchedCount = watchedEpisodes[seriesId].length;
-    let watchedList = JSON.parse(localStorage.getItem('watchedSeries')) || [];
+    let watchedList = getSafeLocalStorage('watchedSeries', []);
     
     if (totalEpisodes && watchedCount >= totalEpisodes) {
         if (!watchedList.includes(seriesIdNum)) {
@@ -926,8 +925,8 @@ async function toggleWatchlist(mediaId) {
     const bodyType = document.body.dataset.type;
     const isMovie = bodyType ? bodyType === 'movie' : window.location.pathname.includes('film.html');
     const watchedListKey = isMovie ? 'watchedMovies' : 'watchedSeries';
-    let watchlist = JSON.parse(localStorage.getItem('watchlist')) || [];
-    let watchedList = JSON.parse(localStorage.getItem(watchedListKey)) || [];
+    let watchlist = getSafeLocalStorage('watchlist', []);
+    let watchedList = getSafeLocalStorage(watchedListKey, []);
     const isInWatchlist = watchlist.some(item => item.id === mediaIdNum);
     const isWatched = watchedList.includes(mediaIdNum);
 
@@ -990,7 +989,7 @@ function showConfirmationModal(seriesId, total) {
             const seriesData = await seriesRes.json();
             const seasons = seriesData.seasons || [];
 
-            let watchedEpisodes = JSON.parse(localStorage.getItem('watchedEpisodes')) || {};
+            let watchedEpisodes = getSafeLocalStorage('watchedEpisodes', {});
             if (!watchedEpisodes[seriesId]) watchedEpisodes[seriesId] = [];
 
             // 2. Fetch all seasons in parallel to get episode IDs
@@ -1015,19 +1014,19 @@ function showConfirmationModal(seriesId, total) {
             localStorage.setItem('watchedEpisodes', JSON.stringify(watchedEpisodes));
 
             // Update last watched timestamp for sorting
-            let seriesLastWatchedDate = JSON.parse(localStorage.getItem('seriesLastWatchedDate')) || {};
+            let seriesLastWatchedDate = getSafeLocalStorage('seriesLastWatchedDate', {});
             seriesLastWatchedDate[seriesId] = Date.now();
             localStorage.setItem('seriesLastWatchedDate', JSON.stringify(seriesLastWatchedDate));
 
             // 4. Update Global Watched Status
-            let watchedList = JSON.parse(localStorage.getItem('watchedSeries')) || [];
+            let watchedList = getSafeLocalStorage('watchedSeries', []);
             if (!watchedList.includes(seriesIdNum)) {
                 watchedList.push(seriesIdNum);
                 localStorage.setItem('watchedSeries', JSON.stringify(watchedList));
             }
 
             // 5. Remove from Watchlist
-            let watchlist = JSON.parse(localStorage.getItem('watchlist')) || [];
+            let watchlist = getSafeLocalStorage('watchlist', []);
             watchlist = watchlist.filter(item => item.id !== seriesIdNum);
             localStorage.setItem('watchlist', JSON.stringify(watchlist));
 
@@ -1107,8 +1106,8 @@ function updateWatchlistButton(mediaId) {
     const bodyType = document.body.dataset.type;
     const isMovie = bodyType ? bodyType === 'movie' : window.location.pathname.includes('film.html');
     const watchedListKey = isMovie ? 'watchedMovies' : 'watchedSeries';
-    const watchlist = JSON.parse(localStorage.getItem('watchlist')) || [];
-    const watchedList = JSON.parse(localStorage.getItem(watchedListKey)) || [];
+    const watchlist = getSafeLocalStorage('watchlist', []);
+    const watchedList = getSafeLocalStorage(watchedListKey, []);
     const isInWatchlist = watchlist.some(item => item.id === mediaIdNum);
     const isWatched = watchedList.includes(mediaIdNum);
     

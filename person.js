@@ -38,12 +38,12 @@ function personProfile() {
         },
 
         checkIfFavorite(id) {
-            const favorites = JSON.parse(localStorage.getItem('favoriteActors')) || [];
+            const favorites = getSafeLocalStorage('favoriteActors', []);
             this.isFavorite = favorites.some(actor => actor.id == id);
         },
 
         toggleFavorite() {
-            const favorites = JSON.parse(localStorage.getItem('favoriteActors')) || [];
+            const favorites = getSafeLocalStorage('favoriteActors', []);
             const index = favorites.findIndex(actor => actor.id == this.person.id);
 
             if (index > -1) {
