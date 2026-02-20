@@ -207,7 +207,28 @@ document.addEventListener('alpine:init', () => {
                 if (item.type === 'movie') {
                     cachedDetails = this.getCachedData(`movie-details-${item.id}`, true);
                 } else if (item.type === 'serie' || item.type === 'tv') {
-                    cachedDetails = this.getCachedData(`series-details-${item.id}`, true);
+                    const cacheKey = `series-details-${item.id}`;
+                    cachedDetails = this.getCachedData(cacheKey, true);
+
+                    // CACHE VALIDATION: Check if user watched episodes NOT in cache
+                    // This fixes the issue where user watches new episodes in Detail view,
+                    // but Watchlist uses old cache missing those episodes, causing "blocked" state.
+                    if (cachedDetails && cachedDetails.seasons) {
+                        const watchedEpisodes = JSON.parse(localStorage.getItem('watchedEpisodes')) || {};
+                        const seriesWatched = watchedEpisodes[item.id] || [];
+
+                        // Collect all episode IDs known in cache
+                        const cachedEpisodeIds = new Set();
+                        cachedDetails.seasons.forEach(s => {
+                            if (s.episodes) s.episodes.forEach(e => cachedEpisodeIds.add(e.id));
+                        });
+
+                        // If user watched an episode not in cache, force refresh
+                        if (seriesWatched.some(id => !cachedEpisodeIds.has(id))) {
+                            cachedDetails = null;
+                            localStorage.removeItem(cacheKey); // Force fetch in step 2
+                        }
+                    }
                 }
 
                 if (cachedDetails) {
@@ -496,13 +517,17 @@ document.addEventListener('alpine:init', () => {
                 if (season.season_number === 0) return; // Skip specials
                 if (!season.air_date) return; // Skip unreleased seasons without date
 
-                const airDate = new Date(season.air_date);
-                if (airDate > today) return; // Skip future seasons
+                const seasonDate = new Date(season.air_date);
+                if (seasonDate > today) return; // Skip future seasons
 
-                if (data.next_episode_to_air &&
-                    data.next_episode_to_air.season_number === season.season_number) {
-                    total += (data.next_episode_to_air.episode_number - 1);
+                // Use detailed episodes if available for accuracy
+                if (season.episodes && season.episodes.length > 0) {
+                     season.episodes.forEach(ep => {
+                         const epDate = ep.air_date ? new Date(ep.air_date) : seasonDate;
+                         if (epDate <= today) total++;
+                     });
                 } else {
+                    // Fallback to simple count if episodes not fetched
                     total += season.episode_count;
                 }
             });
