@@ -467,7 +467,48 @@ document.addEventListener('alpine:init', () => {
         },
         formatDuration(runtime) { if (!runtime) return ''; const h = Math.floor(runtime / 60); const m = runtime % 60; return `${h}h ${m}m`; },
         createMovieItemHTML(item) { const link = `film.html?id=${item.id}`; const durationStr = item.duration || (item.apiDetails?.runtime ? this.formatDuration(item.apiDetails.runtime) : 'N/A'); const genresStr = item.genres && item.genres.length > 0 ? item.genres[0] : 'Genre'; const metaLine = `${item.year} • ${genresStr} • ${durationStr}`; const platformsHTML = this.createPlatformIconsHTML(item.dynamicProviders); const availableLine = platformsHTML ? `<div class="mt-5 flex items-center gap-2 text-xs text-gray-400"> <span>Available on:</span> <div class="flex items-center gap-1">${platformsHTML}</div> </div>` : ''; const checkButton = this.createCheckButtonHTML(item.id, item.isWatched, 'movie'); return ` <div class="relative flex items-start gap-4 p-4 hover:bg-white/5 transition-colors rounded-lg"> <a href="${link}" class="w-24 flex-shrink-0 group"> <div class="relative w-full aspect-[2/3] rounded-lg overflow-hidden"> <img src="${item.posterUrl}" alt="${item.title}" class="w-full h-full object-cover group-hover:scale-105 transition-transform"> ${item.isWatched ? '<div class="absolute inset-0 bg-black/40 flex items-center justify-center"><span class="material-symbols-outlined text-white">visibility</span></div>' : ''} </div> </a> <div class="flex-1 min-w-0"> <div class="flex justify-between items-start"> <a href="${link}" class="block pr-2"> <h3 class="font-bold text-lg text-white line-clamp-3 leading-tight">${item.title}</h3> </a> ${checkButton} </div> <p class="text-sm text-gray-400 mt-1">${metaLine}</p> ${availableLine} </div> </div>`; },
-        createTVItemHTML(item) { const watchedEpisodes = JSON.parse(localStorage.getItem('watchedEpisodes')) || {}; const seriesWatchedEpisodes = new Set(watchedEpisodes[item.id] || []); const watchedCount = seriesWatchedEpisodes.size; if (item.isWatched || (item.apiDetails && watchedCount > 0 && watchedCount === item.apiDetails.number_of_episodes)) { const checkButton = this.createCheckButtonHTML(item.id, true, 'serie', 'all'); return ` <div class="relative flex items-center gap-4 p-4 hover:bg-white/5 transition-colors rounded-lg"> <a href="serie.html?id=${item.id}" class="w-24 flex-shrink-0"> <div class="relative w-full aspect-[2/3] rounded-lg overflow-hidden"> <img src="${item.posterUrl}" class="w-full h-full object-cover"> <div class="absolute inset-0 flex items-center justify-center bg-black/60"> <span class="material-symbols-outlined text-white">visibility</span> </div> </div> </a> <div class="flex-1 min-w-0"> <div class="flex justify-between items-start"> <h3 class="font-bold text-lg text-white line-clamp-3 leading-tight">${item.title}</h3> ${checkButton} </div> <p class="text-sm text-gray-400">${String(item.year).split(' - ')[0]} • ${item.genres[0]}</p> <p class="text-xs text-green-500 mt-2 font-medium">Série terminée</p> </div> </div>`; } if (watchedCount > 0 && item.apiDetails) { return this.createInProgressTVItemHTML(item, seriesWatchedEpisodes); } return this.createUnwatchedTVItemHTML(item); },
+        createTVItemHTML(item) {
+            const watchedEpisodes = JSON.parse(localStorage.getItem('watchedEpisodes')) || {};
+            const seriesWatchedEpisodes = new Set(watchedEpisodes[item.id] || []);
+            const watchedCount = seriesWatchedEpisodes.size;
+
+            // Use released count logic (exclude unreleased seasons)
+            const totalEpisodes = this.getReleasedEpisodeCount(item.apiDetails);
+
+            if (item.isWatched || (item.apiDetails && watchedCount > 0 && watchedCount >= totalEpisodes)) {
+                 const checkButton = this.createCheckButtonHTML(item.id, true, 'serie', 'all');
+                 return ` <div class="relative flex items-center gap-4 p-4 hover:bg-white/5 transition-colors rounded-lg"> <a href="serie.html?id=${item.id}" class="w-24 flex-shrink-0"> <div class="relative w-full aspect-[2/3] rounded-lg overflow-hidden"> <img src="${item.posterUrl}" class="w-full h-full object-cover"> <div class="absolute inset-0 flex items-center justify-center bg-black/60"> <span class="material-symbols-outlined text-white">visibility</span> </div> </div> </a> <div class="flex-1 min-w-0"> <div class="flex justify-between items-start"> <h3 class="font-bold text-lg text-white line-clamp-3 leading-tight">${item.title}</h3> ${checkButton} </div> <p class="text-sm text-gray-400">${String(item.year).split(' - ')[0]} • ${item.genres[0]}</p> <p class="text-xs text-green-500 mt-2 font-medium">Série terminée</p> </div> </div>`;
+            }
+
+            // Fix: Check for API error to prevent crash in createInProgressTVItemHTML
+            if (watchedCount > 0 && item.apiDetails && !item.apiDetails.error) {
+                return this.createInProgressTVItemHTML(item, seriesWatchedEpisodes);
+            }
+            return this.createUnwatchedTVItemHTML(item);
+        },
+        getReleasedEpisodeCount(data) {
+            if (!data || !data.seasons) return data ? data.number_of_episodes : 0;
+
+            const today = new Date();
+            let total = 0;
+
+            data.seasons.forEach(season => {
+                if (season.season_number === 0) return; // Skip specials
+                if (!season.air_date) return; // Skip unreleased seasons without date
+
+                const airDate = new Date(season.air_date);
+                if (airDate > today) return; // Skip future seasons
+
+                if (data.next_episode_to_air &&
+                    data.next_episode_to_air.season_number === season.season_number) {
+                    total += (data.next_episode_to_air.episode_number - 1);
+                } else {
+                    total += season.episode_count;
+                }
+            });
+
+            return total;
+        },
         createUnwatchedTVItemHTML(item) {
             // CORRECTION : Stopper le spinner et afficher une carte d'erreur si l'API a renvoyé null
             if (item.apiDetails && item.apiDetails.error) {
@@ -508,7 +549,40 @@ document.addEventListener('alpine:init', () => {
             const checkButton = this.createCheckButtonHTML(item.id, false, 'tv', firstEpisode.id);
             return ` <div class="relative flex items-start gap-4 p-4 hover:bg-white/5 transition-colors rounded-lg"> <a href="serie.html?id=${item.id}" class="w-24 flex-shrink-0"> <img class="w-full aspect-[2/3] rounded-lg object-cover" src="${item.posterUrl}" alt="${item.title}"> </a> <div class="flex-1 min-w-0"> <div class="flex justify-between items-start"> <a href="serie.html?id=${item.id}" class="block"> <h3 class="font-bold text-lg text-white line-clamp-3 leading-tight">${item.title}</h3> </a> ${checkButton} </div> ${infoLine} <div class="mt-3"> <p class="text-xs font-semibold text-primary uppercase tracking-wide">Prochain épisode</p> <p class="text-sm font-medium text-gray-300 mt-0.5 truncate">S01 E01 - ${firstEpisode.name}</p> </div> </div> </div>`;
         },
-        createInProgressTVItemHTML(item, seriesWatchedEpisodes) { let nextEpisode = null; let currentSeasonForProgress = null; const sortedSeasons = item.apiDetails.seasons.filter(s => s.season_number > 0).sort((a, b) => a.season_number - b.season_number); for (const season of sortedSeasons) { const sortedEpisodes = season.episodes.sort((a, b) => a.episode_number - b.episode_number); for (const episode of sortedEpisodes) { if (!seriesWatchedEpisodes.has(episode.id)) { nextEpisode = episode; currentSeasonForProgress = season; break; } } if (nextEpisode) break; } if (!nextEpisode || !currentSeasonForProgress) return this.createUnwatchedTVItemHTML(item); const seasonEpisodeIds = new Set(currentSeasonForProgress.episodes.map(e => e.id)); const seasonWatchedCount = [...seriesWatchedEpisodes].filter(id => seasonEpisodeIds.has(id)).length; const remainingInSeason = currentSeasonForProgress.episodes.length - seasonWatchedCount; const totalProgress = (seriesWatchedEpisodes.size / item.apiDetails.number_of_episodes) * 100; const platformsHTML = this.createPlatformIconsHTML(item.dynamicProviders); const totalSeasons = item.apiDetails.number_of_seasons; const startYear = String(item.year).split(' - ')[0]; const infoLine = `<div class="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 mt-1"> <span>${totalSeasons} Saisons • ${startYear}</span> ${platformsHTML ? '<span class="text-gray-600">•</span>' : ''} <div class="flex items-center gap-1">${platformsHTML}</div> </div>`; const checkButton = this.createCheckButtonHTML(item.id, false, 'tv', nextEpisode.id); return ` <div class="relative p-4 hover:bg-white/5 transition-colors rounded-lg"> <div class="flex gap-4 pb-2"> <div class="w-24 flex-shrink-0"> <a href="serie.html?id=${item.id}"> <img alt="${item.title} cover" class="w-full aspect-[2/3] rounded-lg object-cover" src="${item.posterUrl}"> </a> </div> <div class="flex min-w-0 flex-1 flex-col"> <div class="flex justify-between items-start"> <a href="serie.html?id=${item.id}" class="block"> <h3 class="font-bold text-lg text-white line-clamp-3 leading-tight">${item.title}</h3> </a> ${checkButton} </div> ${infoLine} <div class="mt-3"> <p class="text-xs font-semibold text-primary uppercase tracking-wide"> S${this.formatEpisodeNumber(nextEpisode.season_number)} E${this.formatEpisodeNumber(nextEpisode.episode_number)} <span class="text-gray-500 normal-case font-normal ml-1">(${remainingInSeason} restants)</span> </p> <p class="text-sm font-medium text-gray-300 mt-0.5 truncate">${nextEpisode.name}</p> </div> </div> </div> <div class="absolute bottom-0 left-4 right-4 h-1 bg-gray-700 rounded-full overflow-hidden mb-2"> <div class="h-full bg-primary" style="width: ${totalProgress}%"></div> </div> </div>`; },
+        createInProgressTVItemHTML(item, seriesWatchedEpisodes) {
+             let nextEpisode = null;
+             let currentSeasonForProgress = null;
+
+             // Safety check
+             if (!item.apiDetails.seasons) return this.createUnwatchedTVItemHTML(item);
+
+             const sortedSeasons = item.apiDetails.seasons.filter(s => s.season_number > 0).sort((a, b) => a.season_number - b.season_number);
+
+             for (const season of sortedSeasons) {
+                 const sortedEpisodes = season.episodes.sort((a, b) => a.episode_number - b.episode_number);
+                 for (const episode of sortedEpisodes) {
+                     if (!seriesWatchedEpisodes.has(episode.id)) {
+                         nextEpisode = episode;
+                         currentSeasonForProgress = season;
+                         break;
+                     }
+                 }
+                 if (nextEpisode) break;
+             }
+
+             if (!nextEpisode || !currentSeasonForProgress) return this.createUnwatchedTVItemHTML(item);
+
+             const seasonEpisodeIds = new Set(currentSeasonForProgress.episodes.map(e => e.id));
+             const seasonWatchedCount = [...seriesWatchedEpisodes].filter(id => seasonEpisodeIds.has(id)).length;
+             const remainingInSeason = currentSeasonForProgress.episodes.length - seasonWatchedCount;
+             const totalProgress = (seriesWatchedEpisodes.size / item.apiDetails.number_of_episodes) * 100;
+             const platformsHTML = this.createPlatformIconsHTML(item.dynamicProviders);
+             const totalSeasons = item.apiDetails.number_of_seasons;
+             const startYear = String(item.year).split(' - ')[0];
+             const infoLine = `<div class="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 mt-1"> <span>${totalSeasons} Saisons • ${startYear}</span> ${platformsHTML ? '<span class="text-gray-600">•</span>' : ''} <div class="flex items-center gap-1">${platformsHTML}</div> </div>`;
+             const checkButton = this.createCheckButtonHTML(item.id, false, 'tv', nextEpisode.id);
+             return ` <div class="relative p-4 hover:bg-white/5 transition-colors rounded-lg"> <div class="flex gap-4 pb-2"> <div class="w-24 flex-shrink-0"> <a href="serie.html?id=${item.id}"> <img alt="${item.title} cover" class="w-full aspect-[2/3] rounded-lg object-cover" src="${item.posterUrl}"> </a> </div> <div class="flex min-w-0 flex-1 flex-col"> <div class="flex justify-between items-start"> <a href="serie.html?id=${item.id}" class="block"> <h3 class="font-bold text-lg text-white line-clamp-3 leading-tight">${item.title}</h3> </a> ${checkButton} </div> ${infoLine} <div class="mt-3"> <p class="text-xs font-semibold text-primary uppercase tracking-wide"> S${this.formatEpisodeNumber(nextEpisode.season_number)} E${this.formatEpisodeNumber(nextEpisode.episode_number)} <span class="text-gray-500 normal-case font-normal ml-1">(${remainingInSeason} restants)</span> </p> <p class="text-sm font-medium text-gray-300 mt-0.5 truncate">${nextEpisode.name}</p> </div> </div> </div> <div class="absolute bottom-0 left-4 right-4 h-1 bg-gray-700 rounded-full overflow-hidden mb-2"> <div class="h-full bg-primary" style="width: ${totalProgress}%"></div> </div> </div>`;
+        },
         formatEpisodeNumber(num) { return String(num).padStart(2, '0'); },
         async markEpisodeWatched(seriesId, episodeId) {
             if(!episodeId) return;
@@ -525,7 +599,9 @@ document.addEventListener('alpine:init', () => {
                 localStorage.setItem('seriesLastWatchedDate', JSON.stringify(seriesLastWatchedDate));
             }
             const item = this.enrichedWatchlist.find(i => i.id === seriesIdNum);
-            if (item && item.apiDetails && watchedEpisodes[seriesId].length >= item.apiDetails.number_of_episodes) {
+            const totalEpisodes = this.getReleasedEpisodeCount(item ? item.apiDetails : null);
+
+            if (item && item.apiDetails && watchedEpisodes[seriesId].length >= totalEpisodes) {
                 let watchedSeries = JSON.parse(localStorage.getItem('watchedSeries')) || [];
                 if (!watchedSeries.includes(seriesIdNum)) {
                     watchedSeries.push(seriesIdNum);

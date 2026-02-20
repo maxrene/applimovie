@@ -79,7 +79,8 @@ async function fetchFullFromTMDB(id, type) {
         updateStreamingUI(data['watch/providers']?.results || {});
 
         if (type === 'tv' && data.seasons) {
-            updateSeasonsUI(data.seasons, id, data.number_of_episodes);
+            const releasedCount = getReleasedEpisodeCount(data);
+            updateSeasonsUI(data.seasons, id, releasedCount);
         }
 
         // Caching for Home/Popular views
@@ -190,7 +191,8 @@ async function fetchUpdates(id, type) {
             updatePersonUI(creator, 'tv');
 
             if (seriesDetailsData.seasons) {
-                updateSeasonsUI(seriesDetailsData.seasons, id, seriesDetailsData.number_of_episodes);
+                const releasedCount = getReleasedEpisodeCount(seriesDetailsData);
+                updateSeasonsUI(seriesDetailsData.seasons, id, releasedCount);
             }
         }
 
@@ -1056,6 +1058,31 @@ function showConfirmationModal(seriesId, total) {
             confirmBtn.disabled = false;
         }
     };
+}
+
+function getReleasedEpisodeCount(data) {
+    if (!data.seasons) return data.number_of_episodes;
+
+    const today = new Date();
+    let total = 0;
+
+    data.seasons.forEach(season => {
+        if (season.season_number === 0) return; // Skip specials
+        if (!season.air_date) return; // Skip unreleased seasons without date
+
+        const airDate = new Date(season.air_date);
+        if (airDate > today) return; // Skip future seasons
+
+        // For current season, check if it's ongoing
+        if (data.next_episode_to_air &&
+            data.next_episode_to_air.season_number === season.season_number) {
+            total += (data.next_episode_to_air.episode_number - 1);
+        } else {
+            total += season.episode_count;
+        }
+    });
+
+    return total;
 }
 
 function updateWatchlistButton(mediaId) {
