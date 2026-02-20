@@ -794,7 +794,7 @@ function toggleEpisodeWatchedStatus(seriesId, episodeId, totalEpisodes, icon) {
     const watchedCount = watchedEpisodes[seriesId].length;
     let watchedList = JSON.parse(localStorage.getItem('watchedSeries')) || [];
     
-    if (totalEpisodes && watchedCount === totalEpisodes) {
+    if (totalEpisodes && watchedCount >= totalEpisodes) {
         if (!watchedList.includes(seriesIdNum)) {
             watchedList.push(seriesIdNum);
             localStorage.setItem('watchedSeries', JSON.stringify(watchedList));
@@ -1067,6 +1067,23 @@ function showConfirmationModal(seriesId, total) {
 function getReleasedEpisodeCount(data) {
     if (!data.seasons) return data.number_of_episodes;
 
+    // Use last_episode_to_air if available for accurate "currently released" count
+    if (data.last_episode_to_air) {
+        let total = 0;
+        const lastS = data.last_episode_to_air.season_number;
+        const lastE = data.last_episode_to_air.episode_number;
+
+        data.seasons.forEach(season => {
+            if (season.season_number === 0) return;
+            if (season.season_number < lastS) {
+                total += season.episode_count;
+            } else if (season.season_number === lastS) {
+                total += lastE;
+            }
+        });
+        return total;
+    }
+
     const today = new Date();
     let total = 0;
 
@@ -1077,13 +1094,7 @@ function getReleasedEpisodeCount(data) {
         const airDate = new Date(season.air_date);
         if (airDate > today) return; // Skip future seasons
 
-        // For current season, check if it's ongoing
-        if (data.next_episode_to_air &&
-            data.next_episode_to_air.season_number === season.season_number) {
-            total += (data.next_episode_to_air.episode_number - 1);
-        } else {
-            total += season.episode_count;
-        }
+        total += season.episode_count;
     });
 
     return total;
