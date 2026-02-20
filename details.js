@@ -937,10 +937,6 @@ async function toggleWatchlist(mediaId) {
         localStorage.setItem(watchedListKey, JSON.stringify(watchedList));
         updateWatchlistButton(mediaId);
     } else if (isInWatchlist) {
-        if (!isMovie) {
-             showConfirmationModal(mediaId, 99); 
-             return;
-        }
         // Remove from watchlist when marking as watched
         watchlist = watchlist.filter(item => item.id !== mediaIdNum);
         localStorage.setItem('watchlist', JSON.stringify(watchlist));
@@ -948,6 +944,10 @@ async function toggleWatchlist(mediaId) {
         watchedList.push(mediaIdNum);
         localStorage.setItem(watchedListKey, JSON.stringify(watchedList));
         updateWatchlistButton(mediaId);
+
+        if (!isMovie) {
+            markAllEpisodesWatched(mediaId);
+        }
     } else {
         // Fix: Save the type (movie/serie) to avoid missing metadata issues in Watchlist
         const type = isMovie ? 'movie' : 'serie';
@@ -969,98 +969,67 @@ async function toggleWatchlist(mediaId) {
     }
 }
 
-function showConfirmationModal(seriesId, total) {
-    const modal = document.getElementById('confirmation-modal');
-    if (!modal) return;
+async function markAllEpisodesWatched(seriesId) {
+    try {
+        // 1. Fetch Series Details to get accurate season list
+        const seriesUrl = `${BASE_URL}/tv/${seriesId}?api_key=${TMDB_API_KEY}`;
+        const seriesRes = await fetch(seriesUrl);
+        const seriesData = await seriesRes.json();
+        const seasons = seriesData.seasons || [];
 
-    modal.style.display = 'flex';
-    document.getElementById('modal-cancel-button').onclick = () => modal.style.display = 'none';
-    document.getElementById('modal-confirm-button').onclick = async () => {
-        const seriesIdNum = parseInt(seriesId, 10);
-        const confirmBtn = document.getElementById('modal-confirm-button');
-        const originalText = confirmBtn.textContent;
-        confirmBtn.textContent = '...';
-        confirmBtn.disabled = true;
+        let watchedEpisodes = getSafeLocalStorage('watchedEpisodes', {});
+        if (!watchedEpisodes[seriesId]) watchedEpisodes[seriesId] = [];
 
-        try {
-            // 1. Fetch Series Details to get accurate season list
-            const seriesUrl = `${BASE_URL}/tv/${seriesId}?api_key=${TMDB_API_KEY}`;
-            const seriesRes = await fetch(seriesUrl);
-            const seriesData = await seriesRes.json();
-            const seasons = seriesData.seasons || [];
+        // 2. Fetch all seasons in parallel to get episode IDs
+        const seasonPromises = seasons.map(season => {
+            if(season.season_number === 0) return Promise.resolve(null);
+            return fetch(`${BASE_URL}/tv/${seriesId}/season/${season.season_number}?api_key=${TMDB_API_KEY}`)
+                .then(r => r.json());
+        });
 
-            let watchedEpisodes = getSafeLocalStorage('watchedEpisodes', {});
-            if (!watchedEpisodes[seriesId]) watchedEpisodes[seriesId] = [];
+        const allSeasonsData = await Promise.all(seasonPromises);
 
-            // 2. Fetch all seasons in parallel to get episode IDs
-            const seasonPromises = seasons.map(season => {
-                if(season.season_number === 0) return Promise.resolve(null);
-                return fetch(`${BASE_URL}/tv/${seriesId}/season/${season.season_number}?api_key=${TMDB_API_KEY}`)
-                    .then(r => r.json());
+        // 3. Mark all episodes as watched
+        allSeasonsData.forEach(seasonData => {
+            if(!seasonData || !seasonData.episodes) return;
+            seasonData.episodes.forEach(ep => {
+                if(!watchedEpisodes[seriesId].includes(ep.id)) {
+                    watchedEpisodes[seriesId].push(ep.id);
+                }
             });
+        });
 
-            const allSeasonsData = await Promise.all(seasonPromises);
+        localStorage.setItem('watchedEpisodes', JSON.stringify(watchedEpisodes));
 
-            // 3. Mark all episodes as watched
-            allSeasonsData.forEach(seasonData => {
-                if(!seasonData || !seasonData.episodes) return;
-                seasonData.episodes.forEach(ep => {
-                    if(!watchedEpisodes[seriesId].includes(ep.id)) {
-                        watchedEpisodes[seriesId].push(ep.id);
-                    }
-                });
-            });
+        // Update last watched timestamp for sorting
+        let seriesLastWatchedDate = getSafeLocalStorage('seriesLastWatchedDate', {});
+        seriesLastWatchedDate[seriesId] = Date.now();
+        localStorage.setItem('seriesLastWatchedDate', JSON.stringify(seriesLastWatchedDate));
 
-            localStorage.setItem('watchedEpisodes', JSON.stringify(watchedEpisodes));
-
-            // Update last watched timestamp for sorting
-            let seriesLastWatchedDate = getSafeLocalStorage('seriesLastWatchedDate', {});
-            seriesLastWatchedDate[seriesId] = Date.now();
-            localStorage.setItem('seriesLastWatchedDate', JSON.stringify(seriesLastWatchedDate));
-
-            // 4. Update Global Watched Status
-            let watchedList = getSafeLocalStorage('watchedSeries', []);
-            if (!watchedList.includes(seriesIdNum)) {
-                watchedList.push(seriesIdNum);
-                localStorage.setItem('watchedSeries', JSON.stringify(watchedList));
+        // 6. Update Rendered UI (Optimistic)
+        const seasonCards = document.querySelectorAll('.season-card');
+        seasonCards.forEach(card => {
+            // Update Season Tick
+            const rightTick = card.querySelector('.season-tick-action');
+            if(rightTick) {
+                rightTick.textContent = 'check_circle';
+                rightTick.classList.remove('text-gray-500');
+                rightTick.classList.add('text-green-400');
+                rightTick.style.transform = 'none';
             }
 
-            // 5. Remove from Watchlist
-            let watchlist = getSafeLocalStorage('watchlist', []);
-            watchlist = watchlist.filter(item => item.id !== seriesIdNum);
-            localStorage.setItem('watchlist', JSON.stringify(watchlist));
-
-            updateWatchlistButton(seriesId);
-
-            // 6. Update Rendered UI (Optimistic)
-            const seasonCards = document.querySelectorAll('.season-card');
-            seasonCards.forEach(card => {
-                // Update Season Tick
-                const rightTick = card.querySelector('.season-tick-action');
-                if(rightTick) {
-                    rightTick.textContent = 'check_circle';
-                    rightTick.classList.remove('text-gray-500');
-                    rightTick.classList.add('text-green-400');
-                    rightTick.style.transform = 'none';
-                }
-
-                // Update Episode Ticks if rendered
-                const epIcons = card.querySelectorAll('.episode-tick-icon');
-                epIcons.forEach(icon => {
-                    icon.textContent = 'check_circle';
-                    icon.classList.remove('text-gray-500');
-                    icon.classList.add('text-green-400');
-                });
+            // Update Episode Ticks if rendered
+            const epIcons = card.querySelectorAll('.episode-tick-icon');
+            epIcons.forEach(icon => {
+                icon.textContent = 'check_circle';
+                icon.classList.remove('text-gray-500');
+                icon.classList.add('text-green-400');
             });
+        });
 
-        } catch (e) {
-            console.error("Error marking all watched", e);
-        } finally {
-            modal.style.display = 'none';
-            confirmBtn.textContent = originalText;
-            confirmBtn.disabled = false;
-        }
-    };
+    } catch (e) {
+        console.error("Error marking all watched", e);
+    }
 }
 
 function getReleasedEpisodeCount(data) {
