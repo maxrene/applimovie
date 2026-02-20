@@ -258,16 +258,50 @@ document.addEventListener('alpine:init', () => {
             const endpoint = this.subTab === 'movie' ? '/discover/movie' : '/discover/tv';
             let url = `https://api.themoviedb.org/3${endpoint}?api_key=${TMDB_API_KEY}&language=fr-FR&page=${page}`;
             
-            url += `&sort_by=${this.sortOrder}`;
+            // Default Sort Logic
+            let useCustomTvSort = false;
+
+            if (this.subTab === 'tv' && this.sortOrder === 'primary_release_date.desc') {
+                useCustomTvSort = true;
+                // For TV Recent sort, we use a custom logic:
+                // 1. Filter by air_date in the last 30 days
+                // 2. Sort by POPULARITY to get the best active shows
+                // 3. Client-side re-sort by "Last Season Premiere Date"
+
+                const today = new Date();
+                const thirtyDaysAgo = new Date(today);
+                thirtyDaysAgo.setDate(today.getDate() - 30);
+
+                const dateStart = thirtyDaysAgo.toISOString().split('T')[0];
+                const dateEnd = today.toISOString().split('T')[0];
+
+                url += `&sort_by=popularity.desc`; // Override sort order for API fetch
+                url += `&air_date.gte=${dateStart}`;
+                url += `&air_date.lte=${dateEnd}`;
+            } else {
+                url += `&sort_by=${this.sortOrder}`;
+            }
+
             url += `&watch_region=${this.userRegion}`;
             url += `&vote_count.gte=100`;
 
-            // Apply Year Filter
+            // Apply Year Filter (Only if not in custom TV Recent mode, or if user explicitly filtered years)
+            // Note: If user uses "Recent" sort, we generally ignore the Year slider unless they changed it from default?
+            // To be safe and consistent with previous logic, we apply it if it's set.
+            // But for "Recent" TV sort, our "last 30 days" filter is stricter.
+            // We should only apply user year filter if it doesn't conflict or if not in custom mode.
+            // Given the requirement "Last 30 days", that overrides the Year slider usually.
+            // Let's apply it only if NOT in custom mode, OR if the user manually set a range that is outside our scope?
+            // Simpler: Just apply it. If they filter for 1990-2000 and ask for Recent (last 30 days), result is empty. That's correct.
             if (this.yearStart > 1900 || this.yearEnd < new Date().getFullYear()) {
                 if (this.subTab === 'movie') {
                     url += `&primary_release_date.gte=${this.yearStart}-01-01`;
                     url += `&primary_release_date.lte=${this.yearEnd}-12-31`;
                 } else {
+                    // If in custom mode, we already have air_date filters.
+                    // TMDB allows multiple filters but they AND together.
+                    // If we add first_air_date filters, it will restrict by show start date.
+                    // That is compatible.
                     url += `&first_air_date.gte=${this.yearStart}-01-01`;
                     url += `&first_air_date.lte=${this.yearEnd}-12-31`;
                 }
@@ -293,7 +327,49 @@ document.addEventListener('alpine:init', () => {
                 const data = await res.json();
                 
                 if (data.results) {
-                    const newItems = data.results.map(item => ({
+                    let processedResults = data.results;
+
+                    // If Custom TV Sort: Enrich with Season details and Sort
+                    if (useCustomTvSort) {
+                        const enrichedResults = await Promise.all(processedResults.map(async (item) => {
+                            try {
+                                const detailRes = await fetch(`https://api.themoviedb.org/3/tv/${item.id}?api_key=${TMDB_API_KEY}&language=fr-FR`);
+                                const detailData = await detailRes.json();
+
+                                // Find the latest season that has already started (air_date <= today)
+                                const today = new Date();
+                                let lastSeasonDate = null;
+
+                                if (detailData.seasons && detailData.seasons.length > 0) {
+                                    // Filter seasons with valid air_date in the past or today
+                                    const validSeasons = detailData.seasons.filter(s => {
+                                        if (!s.air_date) return false;
+                                        return new Date(s.air_date) <= today;
+                                    });
+
+                                    if (validSeasons.length > 0) {
+                                        // Take the last one (usually highest season number)
+                                        lastSeasonDate = validSeasons[validSeasons.length - 1].air_date;
+                                    }
+                                }
+
+                                // Fallback if no season date found (use last_air_date or first_air_date)
+                                if (!lastSeasonDate) {
+                                    lastSeasonDate = detailData.last_air_date || item.first_air_date || '1900-01-01';
+                                }
+
+                                return { ...item, sortDate: lastSeasonDate };
+                            } catch (e) {
+                                return { ...item, sortDate: item.first_air_date || '1900-01-01' };
+                            }
+                        }));
+
+                        // Sort descending by the found date
+                        enrichedResults.sort((a, b) => new Date(b.sortDate) - new Date(a.sortDate));
+                        processedResults = enrichedResults;
+                    }
+
+                    const newItems = processedResults.map(item => ({
                         id: item.id,
                         title: this.subTab === 'movie' ? item.title : item.name,
                         poster_path: item.poster_path 
