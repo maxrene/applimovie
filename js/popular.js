@@ -63,15 +63,15 @@ document.addEventListener('alpine:init', () => {
              const id = item.id;
              const type = item.media_type === 'tv' ? 'serie' : 'movie';
 
-             const watchedMovies = JSON.parse(localStorage.getItem('watchedMovies')) || [];
-             const watchedSeries = JSON.parse(localStorage.getItem('watchedSeries')) || [];
+             const watchedMovies = getSafeLocalStorage('watchedMovies', []);
+             const watchedSeries = getSafeLocalStorage('watchedSeries', []);
 
              const isWatched = (type === 'movie' && watchedMovies.includes(Number(id))) ||
                                (type === 'serie' && watchedSeries.includes(Number(id)));
 
              if (isWatched) return 'watched';
 
-             const watchlist = JSON.parse(localStorage.getItem('watchlist')) || [];
+             const watchlist = getSafeLocalStorage('watchlist', []);
              const isInWatchlist = watchlist.some(w => w.id == id);
              if (isInWatchlist) return 'watchlist';
 
@@ -99,7 +99,7 @@ document.addEventListener('alpine:init', () => {
 
         loadUserPlatforms() {
             try {
-                const selectedIds = JSON.parse(localStorage.getItem('selectedPlatforms')) || [];
+                const selectedIds = getSafeLocalStorage('selectedPlatforms', []);
                 // Map the string IDs (e.g. 'netflix') to full platform objects
                 this.userPlatforms = this.allPlatforms.filter(p => selectedIds.includes(p.id));
             } catch (e) {
@@ -237,7 +237,7 @@ document.addEventListener('alpine:init', () => {
             const startYear = dateStr ? dateStr.split('-')[0] : '';
 
             if (this.subTab === 'tv' || item.media_type === 'tv') {
-                const seriesDatesCache = JSON.parse(localStorage.getItem('seriesDatesCache')) || {};
+                const seriesDatesCache = getSafeLocalStorage('seriesDatesCache', {});
                 const cached = seriesDatesCache[item.id];
 
                 if (cached) {

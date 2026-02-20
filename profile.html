@@ -114,14 +114,15 @@
     </div>
 </div>
 
+<script src="js/utils.js"></script>
 <script>
     document.addEventListener('alpine:init', () => {
         Alpine.data('userProfile', () => ({
             showCountryModal: false,
             country: localStorage.getItem('userRegion') || 'FR',
             get countryName() { return this.country === 'FR' ? 'France' : 'Irlande'; },
-            get platformCount() { const saved = localStorage.getItem('selectedPlatforms'); return saved ? JSON.parse(saved).length : 0; },
-            get actorCount() { const saved = localStorage.getItem('favoriteActors'); return saved ? JSON.parse(saved).length : 0; },
+            get platformCount() { return getSafeLocalStorage('selectedPlatforms', []).length; },
+            get actorCount() { return getSafeLocalStorage('favoriteActors', []).length; },
             setCountry(code) { this.country = code; localStorage.setItem('userRegion', code); this.showCountryModal = false; }
         }));
     });

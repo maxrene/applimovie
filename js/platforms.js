@@ -49,8 +49,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const saveButton = document.getElementById('save-platforms');
 
     function getSelectedPlatforms() {
-        const saved = localStorage.getItem('selectedPlatforms');
-        return saved ? JSON.parse(saved) : [];
+        return getSafeLocalStorage('selectedPlatforms', []);
     }
 
     function renderPlatforms() {

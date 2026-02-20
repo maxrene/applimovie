@@ -87,8 +87,7 @@ document.addEventListener('alpine:init', () => {
             this.loadWatchlist();
             // Flag logic moved to data binding in HTML
 
-            const savedPlatforms = localStorage.getItem('selectedPlatforms');
-            this.myPlatformIds = savedPlatforms ? JSON.parse(savedPlatforms) : [];
+            this.myPlatformIds = getSafeLocalStorage('selectedPlatforms', []);
 
             this.userSelectedPlatforms = this.availablePlatforms.filter(p => 
                 this.myPlatformIds.includes(p.id)
@@ -144,11 +143,10 @@ document.addEventListener('alpine:init', () => {
         },
 
         loadWatchlist() {
-            const savedList = localStorage.getItem('watchlist');
-            const watchlist = savedList ? JSON.parse(savedList) : [];
+            const watchlist = getSafeLocalStorage('watchlist', []);
 
-            const watchedMovies = JSON.parse(localStorage.getItem('watchedMovies')) || [];
-            const watchedSeries = JSON.parse(localStorage.getItem('watchedSeries')) || [];
+            const watchedMovies = getSafeLocalStorage('watchedMovies', []);
+            const watchedSeries = getSafeLocalStorage('watchedSeries', []);
 
             // Add watched items if not already in watchlist
             // We use a fake added_at date for sorting if needed, or just let it be null
@@ -214,7 +212,7 @@ document.addEventListener('alpine:init', () => {
                     // This fixes the issue where user watches new episodes in Detail view,
                     // but Watchlist uses old cache missing those episodes, causing "blocked" state.
                     if (cachedDetails && cachedDetails.seasons) {
-                        const watchedEpisodes = JSON.parse(localStorage.getItem('watchedEpisodes')) || {};
+                        const watchedEpisodes = getSafeLocalStorage('watchedEpisodes', {});
                         const seriesWatched = watchedEpisodes[item.id] || [];
 
                         // Collect all episode IDs known in cache
@@ -308,9 +306,9 @@ document.addEventListener('alpine:init', () => {
             });
         },
         getCachedData(key, ignoreExpiration = false) {
-            const cached = localStorage.getItem(key);
-            if (!cached) return null;
-            const { timestamp, data } = JSON.parse(cached);
+            const cachedObj = getSafeLocalStorage(key, null);
+            if (!cachedObj) return null;
+            const { timestamp, data } = cachedObj;
             const isExpired = (new Date().getTime() - timestamp) > 24 * 60 * 60 * 1000;
             return (isExpired && !ignoreExpiration) ? null : data;
         },
@@ -349,7 +347,7 @@ document.addEventListener('alpine:init', () => {
                 const seriesData = await seriesRes.json();
 
                 // OPTIMIZATION: Check watched episodes to determine what to fetch
-                const watchedEpisodes = JSON.parse(localStorage.getItem('watchedEpisodes')) || {};
+                const watchedEpisodes = getSafeLocalStorage('watchedEpisodes', {});
                 const seriesWatched = watchedEpisodes[seriesId] || [];
 
                 let seasonsToFetch = seriesData.seasons.filter(s => s.season_number > 0);
@@ -378,8 +376,8 @@ document.addEventListener('alpine:init', () => {
 
         get filteredMedia() {
             const type = this.subTab === 'movie' ? 'movie' : 'serie';
-            const watchedMovies = JSON.parse(localStorage.getItem('watchedMovies')) || [];
-            const watchedSeries = JSON.parse(localStorage.getItem('watchedSeries')) || [];
+            const watchedMovies = getSafeLocalStorage('watchedMovies', []);
+            const watchedSeries = getSafeLocalStorage('watchedSeries', []);
 
             let filtered = this.enrichedWatchlist
                 .map(item => {
@@ -422,7 +420,7 @@ document.addEventListener('alpine:init', () => {
 
             // Calculate "In Progress" status for sorting
             if (this.subTab === 'serie') {
-                const watchedEpisodes = JSON.parse(localStorage.getItem('watchedEpisodes')) || {};
+                const watchedEpisodes = getSafeLocalStorage('watchedEpisodes', {});
                 itemsToRender.forEach(item => {
                     const seriesWatched = watchedEpisodes[item.id] || [];
                     item._hasStarted = seriesWatched.length > 0;
@@ -489,7 +487,7 @@ document.addEventListener('alpine:init', () => {
         formatDuration(runtime) { if (!runtime) return ''; const h = Math.floor(runtime / 60); const m = runtime % 60; return `${h}h ${m}m`; },
         createMovieItemHTML(item) { const link = `film.html?id=${item.id}`; const durationStr = item.duration || (item.apiDetails?.runtime ? this.formatDuration(item.apiDetails.runtime) : 'N/A'); const genresStr = item.genres && item.genres.length > 0 ? item.genres[0] : 'Genre'; const metaLine = `${item.year} • ${genresStr} • ${durationStr}`; const platformsHTML = this.createPlatformIconsHTML(item.dynamicProviders); const availableLine = platformsHTML ? `<div class="mt-5 flex items-center gap-2 text-xs text-gray-400"> <span>Available on:</span> <div class="flex items-center gap-1">${platformsHTML}</div> </div>` : ''; const checkButton = this.createCheckButtonHTML(item.id, item.isWatched, 'movie'); return ` <div class="relative flex items-start gap-4 p-4 hover:bg-white/5 transition-colors rounded-lg"> <a href="${link}" class="w-24 flex-shrink-0 group"> <div class="relative w-full aspect-[2/3] rounded-lg overflow-hidden"> <img src="${item.posterUrl}" alt="${item.title}" class="w-full h-full object-cover group-hover:scale-105 transition-transform"> ${item.isWatched ? '<div class="absolute inset-0 bg-black/40 flex items-center justify-center"><span class="material-symbols-outlined text-white">visibility</span></div>' : ''} </div> </a> <div class="flex-1 min-w-0"> <div class="flex justify-between items-start"> <a href="${link}" class="block pr-2"> <h3 class="font-bold text-lg text-white line-clamp-3 leading-tight">${item.title}</h3> </a> ${checkButton} </div> <p class="text-sm text-gray-400 mt-1">${metaLine}</p> ${availableLine} </div> </div>`; },
         createTVItemHTML(item) {
-            const watchedEpisodes = JSON.parse(localStorage.getItem('watchedEpisodes')) || {};
+            const watchedEpisodes = getSafeLocalStorage('watchedEpisodes', {});
             const seriesWatchedEpisodes = new Set(watchedEpisodes[item.id] || []);
             const watchedCount = seriesWatchedEpisodes.size;
 
@@ -611,7 +609,7 @@ document.addEventListener('alpine:init', () => {
         formatEpisodeNumber(num) { return String(num).padStart(2, '0'); },
         async markEpisodeWatched(seriesId, episodeId) {
             if(!episodeId) return;
-            let watchedEpisodes = JSON.parse(localStorage.getItem('watchedEpisodes')) || {};
+            let watchedEpisodes = getSafeLocalStorage('watchedEpisodes', {});
             if (!watchedEpisodes[seriesId]) watchedEpisodes[seriesId] = [];
             const seriesIdNum = parseInt(seriesId, 10);
             if (!watchedEpisodes[seriesId].includes(episodeId)) {
@@ -619,7 +617,7 @@ document.addEventListener('alpine:init', () => {
                 localStorage.setItem('watchedEpisodes', JSON.stringify(watchedEpisodes));
 
                 // Update last watched timestamp for sorting
-                let seriesLastWatchedDate = JSON.parse(localStorage.getItem('seriesLastWatchedDate')) || {};
+                let seriesLastWatchedDate = getSafeLocalStorage('seriesLastWatchedDate', {});
                 seriesLastWatchedDate[seriesId] = Date.now();
                 localStorage.setItem('seriesLastWatchedDate', JSON.stringify(seriesLastWatchedDate));
             }
@@ -627,7 +625,7 @@ document.addEventListener('alpine:init', () => {
             const totalEpisodes = this.getReleasedEpisodeCount(item ? item.apiDetails : null);
 
             if (item && item.apiDetails && watchedEpisodes[seriesId].length >= totalEpisodes) {
-                let watchedSeries = JSON.parse(localStorage.getItem('watchedSeries')) || [];
+                let watchedSeries = getSafeLocalStorage('watchedSeries', []);
                 if (!watchedSeries.includes(seriesIdNum)) {
                     watchedSeries.push(seriesIdNum);
                     localStorage.setItem('watchedSeries', JSON.stringify(watchedSeries));
@@ -636,6 +634,6 @@ document.addEventListener('alpine:init', () => {
             }
             await this.renderMedia();
         },
-        async toggleMovieWatched(movieId) { let watchedMovies = JSON.parse(localStorage.getItem('watchedMovies')) || []; const movieIdNum = parseInt(movieId, 10); if (watchedMovies.includes(movieIdNum)) { watchedMovies = watchedMovies.filter(id => id !== movieIdNum); } else { watchedMovies.push(movieIdNum); } localStorage.setItem('watchedMovies', JSON.stringify(watchedMovies)); await this.renderMedia(); }
+        async toggleMovieWatched(movieId) { let watchedMovies = getSafeLocalStorage('watchedMovies', []); const movieIdNum = parseInt(movieId, 10); if (watchedMovies.includes(movieIdNum)) { watchedMovies = watchedMovies.filter(id => id !== movieIdNum); } else { watchedMovies.push(movieIdNum); } localStorage.setItem('watchedMovies', JSON.stringify(watchedMovies)); await this.renderMedia(); }
     }));
 });

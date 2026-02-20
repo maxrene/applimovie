@@ -5,8 +5,8 @@ const IMG_BASE_POSTER = 'https://image.tmdb.org/t/p/w500';
 
 // Global shared helper for media status
 function getMediaStatusGlobal(id, type) {
-    const watchedMovies = JSON.parse(localStorage.getItem('watchedMovies')) || [];
-    const watchedSeries = JSON.parse(localStorage.getItem('watchedSeries')) || [];
+    const watchedMovies = getSafeLocalStorage('watchedMovies', []);
+    const watchedSeries = getSafeLocalStorage('watchedSeries', []);
 
     const isWatched = (type === 'movie' && watchedMovies.includes(Number(id))) ||
                       (type === 'tv' && watchedSeries.includes(Number(id))) ||
@@ -14,7 +14,7 @@ function getMediaStatusGlobal(id, type) {
 
     if (isWatched) return 'watched';
 
-    const watchlist = JSON.parse(localStorage.getItem('watchlist')) || [];
+    const watchlist = getSafeLocalStorage('watchlist', []);
     const isInWatchlist = watchlist.some(item => item.id == id);
     if (isInWatchlist) return 'watchlist';
 
@@ -129,7 +129,7 @@ document.addEventListener('alpine:init', () => {
             let year = dateStr ? dateStr.split('-')[0] : '';
 
             if (!isMovie) {
-                const seriesDatesCache = JSON.parse(localStorage.getItem('seriesDatesCache')) || {};
+                const seriesDatesCache = getSafeLocalStorage('seriesDatesCache', {});
                 const cached = seriesDatesCache[id];
                 if (cached) {
                     if (cached.status === 'Returning Series') {
@@ -189,7 +189,7 @@ document.addEventListener('alpine:init', () => {
         },
 
         async loadContinueWatching() {
-            const watchedEpisodes = JSON.parse(localStorage.getItem('watchedEpisodes')) || {};
+            const watchedEpisodes = getSafeLocalStorage('watchedEpisodes', {});
             const seriesInProgress = {};
 
             // 1. Group watched episodes by series ID
@@ -268,7 +268,7 @@ document.addEventListener('alpine:init', () => {
             const section = document.getElementById('continue-watching-section');
 
             if (seriesToDisplay.length > 0) {
-                const seriesLastWatchedDate = JSON.parse(localStorage.getItem('seriesLastWatchedDate')) || {};
+                const seriesLastWatchedDate = getSafeLocalStorage('seriesLastWatchedDate', {});
 
                 seriesToDisplay.sort((a, b) => {
                     const timeA = seriesLastWatchedDate[a.series.id] || 0;
@@ -304,7 +304,7 @@ document.addEventListener('alpine:init', () => {
                 this.renderContent('popular-container', popularContent, 'popular');
 
                 // 1b. Fetch Favorite Actors
-                const favoriteActors = JSON.parse(localStorage.getItem('favoriteActors')) || [];
+                const favoriteActors = getSafeLocalStorage('favoriteActors', []);
                 const favoriteActorsSection = document.getElementById('favorite-actors-section');
 
                 if (favoriteActors.length > 0) {
