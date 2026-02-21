@@ -495,7 +495,7 @@ document.addEventListener('alpine:init', () => {
             const totalEpisodes = this.getReleasedEpisodeCount(item.apiDetails);
 
             if (item.isWatched || (item.apiDetails && watchedCount > 0 && watchedCount >= totalEpisodes)) {
-                 const checkButton = this.createCheckButtonHTML(item.id, true, 'serie', 'all');
+                 const checkButton = this.createCheckButtonHTML(item.id, true, 'serie', "'all'");
                  return ` <div class="relative flex items-center gap-4 p-4 hover:bg-white/5 transition-colors rounded-lg"> <a href="serie.html?id=${item.id}" class="w-24 flex-shrink-0"> <div class="relative w-full aspect-[2/3] rounded-lg overflow-hidden"> <img src="${item.posterUrl}" class="w-full h-full object-cover"> <div class="absolute inset-0 flex items-center justify-center bg-black/60"> <span class="material-symbols-outlined text-white">visibility</span> </div> </div> </a> <div class="flex-1 min-w-0"> <div class="flex justify-between items-start"> <h3 class="font-bold text-lg text-white line-clamp-3 leading-tight">${item.title}</h3> ${checkButton} </div> <p class="text-sm text-gray-400">${String(item.year).split(' - ')[0]} • ${item.genres[0]}</p> <p class="text-xs text-green-500 mt-2 font-medium">Série terminée</p> </div> </div>`;
             }
 
@@ -609,6 +609,30 @@ document.addEventListener('alpine:init', () => {
         formatEpisodeNumber(num) { return String(num).padStart(2, '0'); },
         async markEpisodeWatched(seriesId, episodeId) {
             if(!episodeId) return;
+            const seriesIdNum = parseInt(seriesId, 10);
+
+    // --- DÉBUT DU BLOC À AJOUTER ---
+    // Si l'utilisateur clique sur la coche d'une série terminée pour l'annuler
+    if (episodeId === 'all') {
+        // 1. On retire la série de la liste "Vu" globale
+        let watchedSeries = JSON.parse(localStorage.getItem('watchedSeries')) || [];
+        watchedSeries = watchedSeries.filter(id => id !== seriesIdNum);
+        localStorage.setItem('watchedSeries', JSON.stringify(watchedSeries));
+
+        // 2. On supprime les épisodes vus pour que la série reparte de zéro dans la Watchlist
+        let watchedEpisodes = JSON.parse(localStorage.getItem('watchedEpisodes')) || {};
+        if (watchedEpisodes[seriesId]) {
+            delete watchedEpisodes[seriesId];
+            localStorage.setItem('watchedEpisodes', JSON.stringify(watchedEpisodes));
+        }
+
+        // 3. On met à jour l'affichage en temps réel
+        const item = this.enrichedWatchlist.find(i => i.id === seriesIdNum);
+        if (item) item.isWatched = false;
+
+        await this.renderMedia();
+        return;
+    }
             let watchedEpisodes = getSafeLocalStorage('watchedEpisodes', {});
             if (!watchedEpisodes[seriesId]) watchedEpisodes[seriesId] = [];
             const seriesIdNum = parseInt(seriesId, 10);
