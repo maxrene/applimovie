@@ -339,14 +339,33 @@ document.addEventListener('alpine:init', () => {
             const type = this.subTab === 'movie' ? 'movie' : 'serie';
             const watchedMovies = JSON.parse(localStorage.getItem('watchedMovies')) || [];
             const watchedSeries = JSON.parse(localStorage.getItem('watchedSeries')) || [];
+            const watchedEpisodes = JSON.parse(localStorage.getItem('watchedEpisodes')) || {};
 
             let filtered = this.enrichedWatchlist
                 .map(item => {
                     if (!item.type && item.title) item.type = 'movie'; 
                     if (!item.type && item.name) item.type = 'serie';
                     const normalizedType = (item.type === 'tv') ? 'serie' : item.type;
-                    const isWatched = (normalizedType === 'movie' && watchedMovies.includes(item.id)) ||
-                                    (normalizedType === 'serie' && watchedSeries.includes(item.id));
+                    
+                    let isWatched = false;
+                    if (normalizedType === 'movie') {
+                        isWatched = watchedMovies.includes(item.id);
+                    } else {
+                        // Pour les séries, calcul dynamique : est-ce que les épisodes vus >= épisodes sortis ?
+                        if (item.apiDetails && !item.apiDetails.error) {
+                            const seriesWatched = watchedEpisodes[item.id] || [];
+                            const totalEpisodes = this.getReleasedEpisodeCount(item.apiDetails);
+                            
+                            if (totalEpisodes > 0) {
+                                isWatched = seriesWatched.length >= totalEpisodes;
+                            } else {
+                                isWatched = watchedSeries.includes(item.id);
+                            }
+                        } else {
+                            isWatched = watchedSeries.includes(item.id);
+                        }
+                    }
+
                     const dynamicProviders = this.getProvidersForItem(item);
                     return { ...item, type: normalizedType, isWatched, dynamicProviders };
                 })
