@@ -35,7 +35,6 @@ class RequestQueue {
     async retry(fn, retries = 3, backoff = 1000) {
         try {
             const result = await fn();
-            // Si c'est une réponse Fetch, on vérifie le status 429
             if (result instanceof Response) {
                  if (result.status === 429) {
                      throw new Error('429');
@@ -43,7 +42,7 @@ class RequestQueue {
             }
             return result;
         } catch (e) {
-            if (e.message === '429' || e.name === 'TypeError') { // TypeError est souvent une erreur réseau
+            if (e.message === '429' || e.name === 'TypeError') {
                 if (retries > 0) {
                     await new Promise(r => setTimeout(r, backoff));
                     return this.retry(fn, retries - 1, backoff * 2);
@@ -60,7 +59,7 @@ document.addEventListener('alpine:init', () => {
     Alpine.data('watchlistPage', () => ({
         watchlist: [],
         enrichedWatchlist: [],
-        subTab: 'movie', // Using subTab to avoid conflict with global app activeTab
+        subTab: 'movie', 
         sortOrder: 'popularity',
         
         activePlatformFilters: [], 
@@ -85,15 +84,14 @@ document.addEventListener('alpine:init', () => {
 
         async init() {
             this.loadWatchlist();
-            // Flag logic moved to data binding in HTML
 
-            this.myPlatformIds = getSafeLocalStorage('selectedPlatforms', []);
+            const savedPlatforms = localStorage.getItem('selectedPlatforms');
+            this.myPlatformIds = savedPlatforms ? JSON.parse(savedPlatforms) : [];
 
             this.userSelectedPlatforms = this.availablePlatforms.filter(p => 
                 this.myPlatformIds.includes(p.id)
             );
 
-            // TOUT COCHÉ PAR DÉFAUT (activePlatformFilters vide = TOUT)
             this.activePlatformFilters = [];
 
             await this.fetchAndEnrichWatchlist();
@@ -103,7 +101,6 @@ document.addEventListener('alpine:init', () => {
             this.$watch('activePlatformFilters', () => this.renderMedia());
 
             window.addEventListener('pageshow', async () => {
-                // Reload data from localStorage and re-enrich/re-render
                 this.loadWatchlist();
                 await this.fetchAndEnrichWatchlist();
                 await this.renderMedia();
@@ -111,15 +108,8 @@ document.addEventListener('alpine:init', () => {
 
             await this.renderMedia();
 
-            // OFFLINE CACHING SYNC (Backfill existing items)
             if (navigator.onLine && window.offlineManager) {
                 this.watchlist.forEach(item => {
-                    // We simply add them to the queue. The manager handles concurrency.
-                    // Ideally we check if it's already cached but the manager handles that efficiently enough (Network First)
-                    // actually to save bandwidth on every load, maybe we shouldn't cache EVERYTHING every time.
-                    // But requirement is "updates as soon as I have network".
-                    // So let's rely on the fact that if user opens watchlist, they want it ready.
-                    // To be safe, we can add a small check or just let it run in background slowly.
                     window.offlineManager.cacheMedia(item.id, item.type);
                 });
             }
@@ -143,13 +133,12 @@ document.addEventListener('alpine:init', () => {
         },
 
         loadWatchlist() {
-            const watchlist = getSafeLocalStorage('watchlist', []);
+            const savedList = localStorage.getItem('watchlist');
+            const watchlist = savedList ? JSON.parse(savedList) : [];
 
-            const watchedMovies = getSafeLocalStorage('watchedMovies', []);
-            const watchedSeries = getSafeLocalStorage('watchedSeries', []);
+            const watchedMovies = JSON.parse(localStorage.getItem('watchedMovies')) || [];
+            const watchedSeries = JSON.parse(localStorage.getItem('watchedSeries')) || [];
 
-            // Add watched items if not already in watchlist
-            // We use a fake added_at date for sorting if needed, or just let it be null
             watchedMovies.forEach(id => {
                 if (!watchlist.some(item => item.id === id)) {
                     watchlist.push({ id: id, type: 'movie', isWatched: true, added_at: new Date(0).toISOString() });
@@ -164,6 +153,7 @@ document.addEventListener('alpine:init', () => {
 
             this.watchlist = watchlist;
         },
+        
         getInternalPlatformId(tmdbName) { const lower = tmdbName.toLowerCase(); if (lower.includes('netflix')) return 'netflix'; if (lower.includes('amazon') || lower.includes('prime')) return 'prime'; if (lower.includes('disney')) return 'disney'; if (lower.includes('apple')) return 'apple'; if (lower.includes('canal')) return 'canal'; if (lower.includes('paramount')) return 'paramount'; if (lower.includes('max') || lower.includes('hbo')) return 'max'; if (lower.includes('sky')) return 'skygo'; if (lower.includes('now')) return 'now'; return 'other'; },
 
         getProvidersForItem(item) {
@@ -181,7 +171,6 @@ document.addEventListener('alpine:init', () => {
                 }
             }
 
-            // Dédoublonnage via Set sur provider_id
             const unique = [];
             const seen = new Set();
             for (const p of rawProviders) {
@@ -194,39 +183,15 @@ document.addEventListener('alpine:init', () => {
         },
 
         async fetchAndEnrichWatchlist() {
-            // 1. FAST INITIALIZATION (from Cache & Local Data)
             const watchlistWithMediaData = this.watchlist.map(item => {
                 const media = (typeof mediaData !== 'undefined') ? mediaData.find(m => m.id === item.id) : null;
-                // Merge local hardcoded data
                 let enriched = { ...(media || {}), ...item, apiDetails: null };
 
-                // Check LocalStorage Cache (ignoring expiration for instant display)
                 let cachedDetails = null;
                 if (item.type === 'movie') {
                     cachedDetails = this.getCachedData(`movie-details-${item.id}`, true);
                 } else if (item.type === 'serie' || item.type === 'tv') {
-                    const cacheKey = `series-details-${item.id}`;
-                    cachedDetails = this.getCachedData(cacheKey, true);
-
-                    // CACHE VALIDATION: Check if user watched episodes NOT in cache
-                    // This fixes the issue where user watches new episodes in Detail view,
-                    // but Watchlist uses old cache missing those episodes, causing "blocked" state.
-                    if (cachedDetails && cachedDetails.seasons) {
-                        const watchedEpisodes = getSafeLocalStorage('watchedEpisodes', {});
-                        const seriesWatched = watchedEpisodes[item.id] || [];
-
-                        // Collect all episode IDs known in cache
-                        const cachedEpisodeIds = new Set();
-                        cachedDetails.seasons.forEach(s => {
-                            if (s.episodes) s.episodes.forEach(e => cachedEpisodeIds.add(e.id));
-                        });
-
-                        // If user watched an episode not in cache, force refresh
-                        if (seriesWatched.some(id => !cachedEpisodeIds.has(id))) {
-                            cachedDetails = null;
-                            localStorage.removeItem(cacheKey); // Force fetch in step 2
-                        }
-                    }
+                    cachedDetails = this.getCachedData(`series-details-${item.id}`, true);
                 }
 
                 if (cachedDetails) {
@@ -236,7 +201,6 @@ document.addEventListener('alpine:init', () => {
                     if (!enriched.year) enriched.year = (cachedDetails.release_date || cachedDetails.first_air_date || '').split('-')[0];
                     if (!enriched.genres || enriched.genres.length === 0) enriched.genres = cachedDetails.genres ? cachedDetails.genres.map(g => g.name) : [];
                 }
-                 // Fallback defaults
                 if (!enriched.type) enriched.type = 'movie';
                 if (!enriched.posterUrl) enriched.posterUrl = 'https://placehold.co/300x450?text=No+Data';
                 if (!enriched.title) enriched.title = `Unknown Title (${enriched.id})`;
@@ -245,12 +209,11 @@ document.addEventListener('alpine:init', () => {
             });
 
             this.enrichedWatchlist = watchlistWithMediaData;
-            this.renderMedia(); // Initial Fast Render
+            this.renderMedia(); 
 
-            // 2. BACKGROUND FETCH (Fresh Data)
             const itemsToFetch = this.enrichedWatchlist.filter(item => {
                 const cacheKey = (item.type === 'movie') ? `movie-details-${item.id}` : `series-details-${item.id}`;
-                return !this.getCachedData(cacheKey, false); // Fetch if expired/missing
+                return !this.getCachedData(cacheKey, false); 
             });
 
             if (itemsToFetch.length === 0) return;
@@ -263,13 +226,11 @@ document.addEventListener('alpine:init', () => {
 
             itemsToFetch.forEach(async (item) => {
                  let details = null;
-                 // Use existing type if known, otherwise try movie then series
                  if (item.type === 'serie' || item.type === 'tv') {
                      details = await this.fetchFullSeriesDetails(item.id);
                  } else if (item.type === 'movie') {
                      details = await this.fetchMovieDetails(item.id);
                  } else {
-                     // Unknown type fallback logic
                      details = await this.fetchMovieDetails(item.id);
                      if (details) {
                          item.type = 'movie';
@@ -285,7 +246,6 @@ document.addEventListener('alpine:init', () => {
                          const updatedItem = this.enrichedWatchlist[index];
                          updatedItem.apiDetails = details;
 
-                         // CORRECTION : Forcer la mise à jour si le titre est le fallback par défaut
                          if (updatedItem.title.startsWith("Unknown Title")) {
                              updatedItem.title = details.title || details.name;
                          }
@@ -296,7 +256,6 @@ document.addEventListener('alpine:init', () => {
                          triggerRender();
                      }
                  } else {
-                     // CORRECTION : Si l'API échoue (details = null), on flag l'erreur pour arrêter le chargement
                      const index = this.enrichedWatchlist.findIndex(i => i.id === item.id);
                      if (index !== -1) {
                          this.enrichedWatchlist[index].apiDetails = { error: true };
@@ -305,14 +264,19 @@ document.addEventListener('alpine:init', () => {
                  }
             });
         },
+        
         getCachedData(key, ignoreExpiration = false) {
-            const cachedObj = getSafeLocalStorage(key, null);
-            if (!cachedObj) return null;
-            const { timestamp, data } = cachedObj;
+            const cached = localStorage.getItem(key);
+            if (!cached) return null;
+            const { timestamp, data } = JSON.parse(cached);
             const isExpired = (new Date().getTime() - timestamp) > 24 * 60 * 60 * 1000;
             return (isExpired && !ignoreExpiration) ? null : data;
         },
-        setCachedData(key, data) { const item = { timestamp: new Date().getTime(), data: data }; localStorage.setItem(key, JSON.stringify(item)); },
+        
+        setCachedData(key, data) { 
+            const item = { timestamp: new Date().getTime(), data: data }; 
+            localStorage.setItem(key, JSON.stringify(item)); 
+        },
 
         async fetchMovieDetails(movieId) {
             const cacheKey = `movie-details-${movieId}`;
@@ -323,7 +287,6 @@ document.addEventListener('alpine:init', () => {
                     fetch(`https://api.themoviedb.org/3/movie/${movieId}?api_key=${TMDB_API_KEY}&append_to_response=watch/providers`)
                 );
                 if (!res.ok) {
-                    // Try to return stale data if available
                     return this.getCachedData(cacheKey, true) || null;
                 }
                 const data = await res.json();
@@ -346,13 +309,11 @@ document.addEventListener('alpine:init', () => {
 
                 const seriesData = await seriesRes.json();
 
-                // OPTIMIZATION: Check watched episodes to determine what to fetch
-                const watchedEpisodes = getSafeLocalStorage('watchedEpisodes', {});
+                const watchedEpisodes = JSON.parse(localStorage.getItem('watchedEpisodes')) || {};
                 const seriesWatched = watchedEpisodes[seriesId] || [];
 
                 let seasonsToFetch = seriesData.seasons.filter(s => s.season_number > 0);
 
-                // If NO episodes watched, only fetch Season 1
                 if (seriesWatched.length === 0) {
                     seasonsToFetch = seasonsToFetch.filter(s => s.season_number === 1);
                 }
@@ -376,8 +337,8 @@ document.addEventListener('alpine:init', () => {
 
         get filteredMedia() {
             const type = this.subTab === 'movie' ? 'movie' : 'serie';
-            const watchedMovies = getSafeLocalStorage('watchedMovies', []);
-            const watchedSeries = getSafeLocalStorage('watchedSeries', []);
+            const watchedMovies = JSON.parse(localStorage.getItem('watchedMovies')) || [];
+            const watchedSeries = JSON.parse(localStorage.getItem('watchedSeries')) || [];
 
             let filtered = this.enrichedWatchlist
                 .map(item => {
@@ -391,7 +352,6 @@ document.addEventListener('alpine:init', () => {
                 })
                 .filter(item => item && item.type === type);
 
-            // Filter by selected platforms if any are selected (otherwise "All" shows everything)
             if (this.activePlatformFilters.length > 0) {
                 filtered = filtered.filter(item => {
                     if (!item.dynamicProviders || item.dynamicProviders.length === 0) return false;
@@ -412,15 +372,15 @@ document.addEventListener('alpine:init', () => {
 
         setSort(order) { this.sortOrder = order; this.renderMedia(); },
         get sortLabel() { if (this.sortOrder === 'popularity') return 'Popularité'; if (this.sortOrder === 'release_date') return 'Date de sortie'; return 'Date d\'ajout'; },
+        
         async renderMedia() {
             const container = document.getElementById('media-list');
             const emptyState = document.getElementById('empty-state');
             if (!container) return;
             let itemsToRender = [...this.filteredMedia];
 
-            // Calculate "In Progress" status for sorting
             if (this.subTab === 'serie') {
-                const watchedEpisodes = getSafeLocalStorage('watchedEpisodes', {});
+                const watchedEpisodes = JSON.parse(localStorage.getItem('watchedEpisodes')) || {};
                 itemsToRender.forEach(item => {
                     const seriesWatched = watchedEpisodes[item.id] || [];
                     item._hasStarted = seriesWatched.length > 0;
@@ -428,7 +388,6 @@ document.addEventListener('alpine:init', () => {
             }
 
             itemsToRender.sort((a, b) => {
-                // 1. Primary Sort: Started Series First (Only for Series tab)
                 if (this.subTab === 'serie') {
                     const aStarted = a._hasStarted || false;
                     const bStarted = b._hasStarted || false;
@@ -436,7 +395,6 @@ document.addEventListener('alpine:init', () => {
                     if (!aStarted && bStarted) return 1;
                 }
 
-                // 2. Secondary Sort: User Selection
                 if (this.sortOrder === 'recently_added') {
                     return new Date(b.added_at) - new Date(a.added_at);
                 } else if (this.sortOrder === 'release_date') {
@@ -459,17 +417,21 @@ document.addEventListener('alpine:init', () => {
             const mediaHTML = await Promise.all(mediaHTMLPromises);
             container.innerHTML = mediaHTML.join('');
 
-            // INITIALIZE ALPINE ON NEW CONTENT
             if (typeof Alpine !== 'undefined') {
                 Alpine.initTree(container);
             }
         },
+        
         async createMediaItemHTML(item) { if (item.type === 'movie') return this.createMovieItemHTML(item); if (item.type === 'serie') return this.createTVItemHTML(item); return ''; },
-        createCheckButtonHTML(itemId, isWatched, type, extraAction = '') { const action = type === 'movie' ? `toggleMovieWatched(${itemId})` : `markEpisodeWatched(${itemId}, ${extraAction})`; const bgClass = isWatched ? 'bg-primary border-primary text-white' : 'bg-black/40 border-gray-600 text-gray-500 hover:text-white hover:border-gray-400'; return ` <button @click.prevent.stop="${action}" class="flex h-8 w-8 items-center justify-center rounded-full border transition-all ${bgClass} z-10 shrink-0 ml-2"> <span class="material-symbols-outlined text-[20px]">check</span> </button>`; },
+        
+        createCheckButtonHTML(itemId, isWatched, type, extraAction = '') { 
+            const action = type === 'movie' ? `toggleMovieWatched(${itemId})` : `markEpisodeWatched(${itemId}, ${extraAction})`; 
+            const bgClass = isWatched ? 'bg-primary border-primary text-white' : 'bg-black/40 border-gray-600 text-gray-500 hover:text-white hover:border-gray-400'; 
+            return ` <button @click.prevent.stop="${action}" class="flex h-8 w-8 items-center justify-center rounded-full border transition-all ${bgClass} z-10 shrink-0 ml-2"> <span class="material-symbols-outlined text-[20px]">check</span> </button>`; 
+        },
+        
         createPlatformIconsHTML(providers) {
             if (!providers || providers.length === 0) return '';
-            // Show all icons available on user's platforms, regardless of the active filter
-            // (The filter hides the card, but the card should show all valid icons)
             const myProviders = providers.filter(p => this.myPlatformIds.includes(this.getInternalPlatformId(p.provider_name)));
             if (myProviders.length === 0) return '';
 
@@ -484,27 +446,39 @@ document.addEventListener('alpine:init', () => {
                 return `<img src="${logo}" alt="${p.provider_name}" class="h-4 w-4 rounded-sm object-cover bg-gray-800" title="${p.provider_name}">`;
             }).join('');
         },
+        
         formatDuration(runtime) { if (!runtime) return ''; const h = Math.floor(runtime / 60); const m = runtime % 60; return `${h}h ${m}m`; },
-        createMovieItemHTML(item) { const link = `film.html?id=${item.id}`; const durationStr = item.duration || (item.apiDetails?.runtime ? this.formatDuration(item.apiDetails.runtime) : 'N/A'); const genresStr = item.genres && item.genres.length > 0 ? item.genres[0] : 'Genre'; const metaLine = `${item.year} • ${genresStr} • ${durationStr}`; const platformsHTML = this.createPlatformIconsHTML(item.dynamicProviders); const availableLine = platformsHTML ? `<div class="mt-5 flex items-center gap-2 text-xs text-gray-400"> <span>Available on:</span> <div class="flex items-center gap-1">${platformsHTML}</div> </div>` : ''; const checkButton = this.createCheckButtonHTML(item.id, item.isWatched, 'movie'); return ` <div class="relative flex items-start gap-4 p-4 hover:bg-white/5 transition-colors rounded-lg"> <a href="${link}" class="w-24 flex-shrink-0 group"> <div class="relative w-full aspect-[2/3] rounded-lg overflow-hidden"> <img src="${item.posterUrl}" alt="${item.title}" class="w-full h-full object-cover group-hover:scale-105 transition-transform"> ${item.isWatched ? '<div class="absolute inset-0 bg-black/40 flex items-center justify-center"><span class="material-symbols-outlined text-white">visibility</span></div>' : ''} </div> </a> <div class="flex-1 min-w-0"> <div class="flex justify-between items-start"> <a href="${link}" class="block pr-2"> <h3 class="font-bold text-lg text-white line-clamp-3 leading-tight">${item.title}</h3> </a> ${checkButton} </div> <p class="text-sm text-gray-400 mt-1">${metaLine}</p> ${availableLine} </div> </div>`; },
+        
+        createMovieItemHTML(item) { 
+            const link = `film.html?id=${item.id}`; 
+            const durationStr = item.duration || (item.apiDetails?.runtime ? this.formatDuration(item.apiDetails.runtime) : 'N/A'); 
+            const genresStr = item.genres && item.genres.length > 0 ? item.genres[0] : 'Genre'; 
+            const metaLine = `${item.year} • ${genresStr} • ${durationStr}`; 
+            const platformsHTML = this.createPlatformIconsHTML(item.dynamicProviders); 
+            const availableLine = platformsHTML ? `<div class="mt-5 flex items-center gap-2 text-xs text-gray-400"> <span>Available on:</span> <div class="flex items-center gap-1">${platformsHTML}</div> </div>` : ''; 
+            const checkButton = this.createCheckButtonHTML(item.id, item.isWatched, 'movie'); 
+            return ` <div class="relative flex items-start gap-4 p-4 hover:bg-white/5 transition-colors rounded-lg"> <a href="${link}" class="w-24 flex-shrink-0 group"> <div class="relative w-full aspect-[2/3] rounded-lg overflow-hidden"> <img src="${item.posterUrl}" alt="${item.title}" class="w-full h-full object-cover group-hover:scale-105 transition-transform"> ${item.isWatched ? '<div class="absolute inset-0 bg-black/40 flex items-center justify-center"><span class="material-symbols-outlined text-white">visibility</span></div>' : ''} </div> </a> <div class="flex-1 min-w-0"> <div class="flex justify-between items-start"> <a href="${link}" class="block pr-2"> <h3 class="font-bold text-lg text-white line-clamp-3 leading-tight">${item.title}</h3> </a> ${checkButton} </div> <p class="text-sm text-gray-400 mt-1">${metaLine}</p> ${availableLine} </div> </div>`; 
+        },
+        
         createTVItemHTML(item) {
-            const watchedEpisodes = getSafeLocalStorage('watchedEpisodes', {});
+            const watchedEpisodes = JSON.parse(localStorage.getItem('watchedEpisodes')) || {};
             const seriesWatchedEpisodes = new Set(watchedEpisodes[item.id] || []);
             const watchedCount = seriesWatchedEpisodes.size;
 
-            // Use released count logic (exclude unreleased seasons)
             const totalEpisodes = this.getReleasedEpisodeCount(item.apiDetails);
 
             if (item.isWatched || (item.apiDetails && watchedCount > 0 && watchedCount >= totalEpisodes)) {
+                 // LA CORRECTION DES GUILLEMETS EST ICI : "'all'"
                  const checkButton = this.createCheckButtonHTML(item.id, true, 'serie', "'all'");
                  return ` <div class="relative flex items-center gap-4 p-4 hover:bg-white/5 transition-colors rounded-lg"> <a href="serie.html?id=${item.id}" class="w-24 flex-shrink-0"> <div class="relative w-full aspect-[2/3] rounded-lg overflow-hidden"> <img src="${item.posterUrl}" class="w-full h-full object-cover"> <div class="absolute inset-0 flex items-center justify-center bg-black/60"> <span class="material-symbols-outlined text-white">visibility</span> </div> </div> </a> <div class="flex-1 min-w-0"> <div class="flex justify-between items-start"> <h3 class="font-bold text-lg text-white line-clamp-3 leading-tight">${item.title}</h3> ${checkButton} </div> <p class="text-sm text-gray-400">${String(item.year).split(' - ')[0]} • ${item.genres[0]}</p> <p class="text-xs text-green-500 mt-2 font-medium">Série terminée</p> </div> </div>`;
             }
 
-            // Fix: Check for API error to prevent crash in createInProgressTVItemHTML
             if (watchedCount > 0 && item.apiDetails && !item.apiDetails.error) {
                 return this.createInProgressTVItemHTML(item, seriesWatchedEpisodes);
             }
             return this.createUnwatchedTVItemHTML(item);
         },
+        
         getReleasedEpisodeCount(data) {
             if (!data || !data.seasons) return data ? data.number_of_episodes : 0;
 
@@ -512,28 +486,24 @@ document.addEventListener('alpine:init', () => {
             let total = 0;
 
             data.seasons.forEach(season => {
-                if (season.season_number === 0) return; // Skip specials
-                if (!season.air_date) return; // Skip unreleased seasons without date
+                if (season.season_number === 0) return; 
+                if (!season.air_date) return; 
 
-                const seasonDate = new Date(season.air_date);
-                if (seasonDate > today) return; // Skip future seasons
+                const airDate = new Date(season.air_date);
+                if (airDate > today) return; 
 
-                // Use detailed episodes if available for accuracy
-                if (season.episodes && season.episodes.length > 0) {
-                     season.episodes.forEach(ep => {
-                         const epDate = ep.air_date ? new Date(ep.air_date) : seasonDate;
-                         if (epDate <= today) total++;
-                     });
+                if (data.next_episode_to_air &&
+                    data.next_episode_to_air.season_number === season.season_number) {
+                    total += (data.next_episode_to_air.episode_number - 1);
                 } else {
-                    // Fallback to simple count if episodes not fetched
                     total += season.episode_count;
                 }
             });
 
             return total;
         },
+        
         createUnwatchedTVItemHTML(item) {
-            // CORRECTION : Stopper le spinner et afficher une carte d'erreur si l'API a renvoyé null
             if (item.apiDetails && item.apiDetails.error) {
                  return `
                  <div class="relative flex items-start gap-4 p-4 hover:bg-white/5 transition-colors rounded-lg">
@@ -572,11 +542,11 @@ document.addEventListener('alpine:init', () => {
             const checkButton = this.createCheckButtonHTML(item.id, false, 'tv', firstEpisode.id);
             return ` <div class="relative flex items-start gap-4 p-4 hover:bg-white/5 transition-colors rounded-lg"> <a href="serie.html?id=${item.id}" class="w-24 flex-shrink-0"> <img class="w-full aspect-[2/3] rounded-lg object-cover" src="${item.posterUrl}" alt="${item.title}"> </a> <div class="flex-1 min-w-0"> <div class="flex justify-between items-start"> <a href="serie.html?id=${item.id}" class="block"> <h3 class="font-bold text-lg text-white line-clamp-3 leading-tight">${item.title}</h3> </a> ${checkButton} </div> ${infoLine} <div class="mt-3"> <p class="text-xs font-semibold text-primary uppercase tracking-wide">Prochain épisode</p> <p class="text-sm font-medium text-gray-300 mt-0.5 truncate">S01 E01 - ${firstEpisode.name}</p> </div> </div> </div>`;
         },
+        
         createInProgressTVItemHTML(item, seriesWatchedEpisodes) {
              let nextEpisode = null;
              let currentSeasonForProgress = null;
 
-             // Safety check
              if (!item.apiDetails.seasons) return this.createUnwatchedTVItemHTML(item);
 
              const sortedSeasons = item.apiDetails.seasons.filter(s => s.season_number > 0).sort((a, b) => a.season_number - b.season_number);
@@ -606,50 +576,50 @@ document.addEventListener('alpine:init', () => {
              const checkButton = this.createCheckButtonHTML(item.id, false, 'tv', nextEpisode.id);
              return ` <div class="relative p-4 hover:bg-white/5 transition-colors rounded-lg"> <div class="flex gap-4 pb-2"> <div class="w-24 flex-shrink-0"> <a href="serie.html?id=${item.id}"> <img alt="${item.title} cover" class="w-full aspect-[2/3] rounded-lg object-cover" src="${item.posterUrl}"> </a> </div> <div class="flex min-w-0 flex-1 flex-col"> <div class="flex justify-between items-start"> <a href="serie.html?id=${item.id}" class="block"> <h3 class="font-bold text-lg text-white line-clamp-3 leading-tight">${item.title}</h3> </a> ${checkButton} </div> ${infoLine} <div class="mt-3"> <p class="text-xs font-semibold text-primary uppercase tracking-wide"> S${this.formatEpisodeNumber(nextEpisode.season_number)} E${this.formatEpisodeNumber(nextEpisode.episode_number)} <span class="text-gray-500 normal-case font-normal ml-1">(${remainingInSeason} restants)</span> </p> <p class="text-sm font-medium text-gray-300 mt-0.5 truncate">${nextEpisode.name}</p> </div> </div> </div> <div class="absolute bottom-0 left-4 right-4 h-1 bg-gray-700 rounded-full overflow-hidden mb-2"> <div class="h-full bg-primary" style="width: ${totalProgress}%"></div> </div> </div>`;
         },
+        
         formatEpisodeNumber(num) { return String(num).padStart(2, '0'); },
+        
         async markEpisodeWatched(seriesId, episodeId) {
             if(!episodeId) return;
+            
             const seriesIdNum = parseInt(seriesId, 10);
 
-    // --- DÉBUT DU BLOC À AJOUTER ---
-    // Si l'utilisateur clique sur la coche d'une série terminée pour l'annuler
-    if (episodeId === 'all') {
-        // 1. On retire la série de la liste "Vu" globale
-        let watchedSeries = JSON.parse(localStorage.getItem('watchedSeries')) || [];
-        watchedSeries = watchedSeries.filter(id => id !== seriesIdNum);
-        localStorage.setItem('watchedSeries', JSON.stringify(watchedSeries));
+            // LA CORRECTION DU BOUTON EST ICI : Annulation d'une série entière
+            if (episodeId === 'all') {
+                let watchedSeries = JSON.parse(localStorage.getItem('watchedSeries')) || [];
+                watchedSeries = watchedSeries.filter(id => id !== seriesIdNum);
+                localStorage.setItem('watchedSeries', JSON.stringify(watchedSeries));
 
-        // 2. On supprime les épisodes vus pour que la série reparte de zéro dans la Watchlist
-        let watchedEpisodes = JSON.parse(localStorage.getItem('watchedEpisodes')) || {};
-        if (watchedEpisodes[seriesId]) {
-            delete watchedEpisodes[seriesId];
-            localStorage.setItem('watchedEpisodes', JSON.stringify(watchedEpisodes));
-        }
+                let watchedEpisodes = JSON.parse(localStorage.getItem('watchedEpisodes')) || {};
+                if (watchedEpisodes[seriesId]) {
+                    delete watchedEpisodes[seriesId];
+                    localStorage.setItem('watchedEpisodes', JSON.stringify(watchedEpisodes));
+                }
 
-        // 3. On met à jour l'affichage en temps réel
-        const item = this.enrichedWatchlist.find(i => i.id === seriesIdNum);
-        if (item) item.isWatched = false;
+                const item = this.enrichedWatchlist.find(i => i.id === seriesIdNum);
+                if (item) item.isWatched = false;
 
-        await this.renderMedia();
-        return;
-    }
-            let watchedEpisodes = getSafeLocalStorage('watchedEpisodes', {});
+                await this.renderMedia();
+                return;
+            }
+
+            let watchedEpisodes = JSON.parse(localStorage.getItem('watchedEpisodes')) || {};
             if (!watchedEpisodes[seriesId]) watchedEpisodes[seriesId] = [];
-            const seriesIdNum = parseInt(seriesId, 10);
+            
             if (!watchedEpisodes[seriesId].includes(episodeId)) {
                 watchedEpisodes[seriesId].push(episodeId);
                 localStorage.setItem('watchedEpisodes', JSON.stringify(watchedEpisodes));
 
-                // Update last watched timestamp for sorting
-                let seriesLastWatchedDate = getSafeLocalStorage('seriesLastWatchedDate', {});
+                let seriesLastWatchedDate = JSON.parse(localStorage.getItem('seriesLastWatchedDate')) || {};
                 seriesLastWatchedDate[seriesId] = Date.now();
                 localStorage.setItem('seriesLastWatchedDate', JSON.stringify(seriesLastWatchedDate));
             }
+            
             const item = this.enrichedWatchlist.find(i => i.id === seriesIdNum);
             const totalEpisodes = this.getReleasedEpisodeCount(item ? item.apiDetails : null);
 
             if (item && item.apiDetails && watchedEpisodes[seriesId].length >= totalEpisodes) {
-                let watchedSeries = getSafeLocalStorage('watchedSeries', []);
+                let watchedSeries = JSON.parse(localStorage.getItem('watchedSeries')) || [];
                 if (!watchedSeries.includes(seriesIdNum)) {
                     watchedSeries.push(seriesIdNum);
                     localStorage.setItem('watchedSeries', JSON.stringify(watchedSeries));
@@ -658,6 +628,19 @@ document.addEventListener('alpine:init', () => {
             }
             await this.renderMedia();
         },
-        async toggleMovieWatched(movieId) { let watchedMovies = getSafeLocalStorage('watchedMovies', []); const movieIdNum = parseInt(movieId, 10); if (watchedMovies.includes(movieIdNum)) { watchedMovies = watchedMovies.filter(id => id !== movieIdNum); } else { watchedMovies.push(movieIdNum); } localStorage.setItem('watchedMovies', JSON.stringify(watchedMovies)); await this.renderMedia(); }
+        
+        async toggleMovieWatched(movieId) { 
+            let watchedMovies = JSON.parse(localStorage.getItem('watchedMovies')) || []; 
+            const movieIdNum = parseInt(movieId, 10); 
+            
+            if (watchedMovies.includes(movieIdNum)) { 
+                watchedMovies = watchedMovies.filter(id => id !== movieIdNum); 
+            } else { 
+                watchedMovies.push(movieIdNum); 
+            } 
+            
+            localStorage.setItem('watchedMovies', JSON.stringify(watchedMovies)); 
+            await this.renderMedia(); 
+        }
     }));
 });
