@@ -348,22 +348,27 @@ document.addEventListener('alpine:init', () => {
                     const normalizedType = (item.type === 'tv') ? 'serie' : item.type;
                     
                     let isWatched = false;
-                    if (normalizedType === 'movie') {
-                        isWatched = watchedMovies.includes(item.id);
-                    } else {
-                        // Pour les séries, calcul dynamique : est-ce que les épisodes vus >= épisodes sortis ?
-                        if (item.apiDetails && !item.apiDetails.error) {
-                            const seriesWatched = watchedEpisodes[item.id] || [];
-                            const totalEpisodes = this.getReleasedEpisodeCount(item.apiDetails);
-                            
-                            if (totalEpisodes > 0) {
-                                isWatched = seriesWatched.length >= totalEpisodes;
+                    try {
+                        if (normalizedType === 'movie') {
+                            isWatched = watchedMovies.includes(item.id);
+                        } else {
+                            // Pour les séries, calcul dynamique : est-ce que les épisodes vus >= épisodes sortis ?
+                            if (item.apiDetails && !item.apiDetails.error) {
+                                const seriesWatched = watchedEpisodes[item.id] || [];
+                                const totalEpisodes = this.getReleasedEpisodeCount(item.apiDetails);
+
+                                if (totalEpisodes > 0) {
+                                    isWatched = seriesWatched.length >= totalEpisodes;
+                                } else {
+                                    isWatched = watchedSeries.includes(item.id);
+                                }
                             } else {
                                 isWatched = watchedSeries.includes(item.id);
                             }
-                        } else {
-                            isWatched = watchedSeries.includes(item.id);
                         }
+                    } catch (e) {
+                         console.error('Error calculating watch status for:', item.id, e);
+                         isWatched = false;
                     }
 
                     const dynamicProviders = this.getProvidersForItem(item);
@@ -432,7 +437,14 @@ document.addEventListener('alpine:init', () => {
             if (itemsToRender.length === 0) { container.innerHTML = ''; if (emptyState) emptyState.classList.remove('hidden'); return; }
             if (emptyState) emptyState.classList.add('hidden');
 
-            const mediaHTMLPromises = itemsToRender.map(item => this.createMediaItemHTML(item));
+            const mediaHTMLPromises = itemsToRender.map(async item => {
+                try {
+                    return await this.createMediaItemHTML(item);
+                } catch (e) {
+                    console.error('Error rendering item:', item.id, e);
+                    return '';
+                }
+            });
             const mediaHTML = await Promise.all(mediaHTMLPromises);
             container.innerHTML = mediaHTML.join('');
 
@@ -499,23 +511,28 @@ document.addEventListener('alpine:init', () => {
         },
         
         getReleasedEpisodeCount(data) {
-            if (!data || !data.seasons) return data ? data.number_of_episodes : 0;
+            if (!data || !data.seasons || !Array.isArray(data.seasons)) return data ? (data.number_of_episodes || 0) : 0;
 
             const today = new Date();
             let total = 0;
 
             data.seasons.forEach(season => {
-                if (season.season_number === 0) return; 
-                if (!season.air_date) return; 
+                try {
+                    if (!season || season.season_number === 0) return;
+                    if (!season.air_date) return;
 
-                const airDate = new Date(season.air_date);
-                if (airDate > today) return; 
+                    const airDate = new Date(season.air_date);
+                    if (airDate > today) return;
 
-                if (data.next_episode_to_air &&
-                    data.next_episode_to_air.season_number === season.season_number) {
-                    total += (data.next_episode_to_air.episode_number - 1);
-                } else {
-                    total += season.episode_count;
+                    if (data.next_episode_to_air &&
+                        data.next_episode_to_air.season_number === season.season_number) {
+                        total += (data.next_episode_to_air.episode_number - 1);
+                    } else {
+                         const count = season.episode_count || (season.episodes ? season.episodes.length : 0);
+                        total += count;
+                    }
+                } catch (e) {
+                    console.error('Error in getReleasedEpisodeCount loop:', e);
                 }
             });
 
@@ -571,6 +588,8 @@ document.addEventListener('alpine:init', () => {
              const sortedSeasons = item.apiDetails.seasons.filter(s => s.season_number > 0).sort((a, b) => a.season_number - b.season_number);
 
              for (const season of sortedSeasons) {
+                 if (!season.episodes || !Array.isArray(season.episodes)) continue;
+
                  const sortedEpisodes = season.episodes.sort((a, b) => a.episode_number - b.episode_number);
                  for (const episode of sortedEpisodes) {
                      if (!seriesWatchedEpisodes.has(episode.id)) {
