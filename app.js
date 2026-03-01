@@ -60,6 +60,7 @@ document.addEventListener('alpine:init', () => {
             window.addEventListener('view-changed', (e) => {
                 if (!e.detail || e.detail.tab === 'home') {
                     this.updateMediaStatuses();
+                    this.loadContinueWatching();
                 }
             });
 
