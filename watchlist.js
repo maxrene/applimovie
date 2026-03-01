@@ -326,14 +326,20 @@ document.addEventListener('alpine:init', () => {
                 );
 
                 const seasonsWithEpisodes = await Promise.all(seasonPromises);
-                seriesData.seasons = seasonsWithEpisodes.filter(s => s);
+        seriesData.seasons = seasonsWithEpisodes.filter(s => s);
 
-                this.setCachedData(cacheKey, seriesData);
-                return seriesData;
-            } catch (e) {
-                return this.getCachedData(cacheKey, true) || null;
-            }
-        },
+        // On isole la mise en cache pour ne pas faire planter l'affichage si le stockage mobile est plein
+        try { 
+            this.setCachedData(cacheKey, seriesData); 
+        } catch (cacheError) { 
+            console.warn("Stockage local saturé, impossible de mettre la série en cache."); 
+        }
+        
+        return seriesData;
+    } catch (e) {
+        return this.getCachedData(cacheKey, true) || null;
+    }
+},
 
         get filteredMedia() {
             const type = this.subTab === 'movie' ? 'movie' : 'serie';
