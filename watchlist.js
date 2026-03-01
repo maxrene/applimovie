@@ -290,12 +290,18 @@ document.addEventListener('alpine:init', () => {
                     return this.getCachedData(cacheKey, true) || null;
                 }
                 const data = await res.json();
-                this.setCachedData(cacheKey, data);
-                return data;
-            } catch (e) {
-                return this.getCachedData(cacheKey, true) || null;
-            }
-        },
+        
+        try { 
+            this.setCachedData(cacheKey, data); 
+        } catch (cacheError) { 
+            console.warn("Stockage local saturé, impossible de mettre le film en cache."); 
+        }
+        
+        return data;
+    } catch (e) {
+        return this.getCachedData(cacheKey, true) || null;
+    }
+},
 
         async fetchFullSeriesDetails(seriesId) {
             const cacheKey = `series-details-${seriesId}`;
