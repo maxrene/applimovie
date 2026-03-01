@@ -70,8 +70,35 @@ async function fetchFromCloud() {
 // --- LA MAGIE : Le "Snoop" (Mise sur écoute du LocalStorage) ---
 const originalSetItem = localStorage.setItem;
 localStorage.setItem = function(key, value) {
-    // 1. On sauvegarde normalement dans le téléphone (pour la rapidité)
-    originalSetItem.apply(this, arguments);
+    
+    // 1. On tente de sauvegarder normalement dans le téléphone
+    try {
+        originalSetItem.apply(this, arguments);
+    } catch (error) {
+        // Si la mémoire est pleine, on supprime tout le cache lourd pour faire de la place !
+        if (error.name === 'QuotaExceededError' || error.message.includes('quota')) {
+            console.warn("📦 Mémoire saturée : Nettoyage automatique du cache en cours...");
+            
+            const keysToRemove = [];
+            // On cherche toutes les données de cache (résumés, acteurs, épisodes complets...)
+            for (let i = 0; i < localStorage.length; i++) {
+                const k = localStorage.key(i);
+                if (k && (k.startsWith('movie-details-') || k.startsWith('series-details-'))) {
+                    keysToRemove.push(k);
+                }
+            }
+            // On les supprime
+            keysToRemove.forEach(k => localStorage.removeItem(k));
+            
+            // On retente la sauvegarde de la liste maintenant qu'il y a de la place
+            try {
+                originalSetItem.apply(this, arguments);
+                console.log("✅ Sauvegarde locale réussie après le grand nettoyage.");
+            } catch (e2) {
+                console.error("❌ Échec critique de la sauvegarde locale.", e2);
+            }
+        }
+    }
     
     // 2. Si on est en train de télécharger depuis le cloud, on s'arrête là
     if (window.isFetchingFromCloud) return;
@@ -79,8 +106,6 @@ localStorage.setItem = function(key, value) {
     // 3. Si c'est une liste de films/séries, on synchronise avec Firebase !
     const syncKeys = ['watchlist', 'watchedMovies', 'watchedSeries', 'watchedEpisodes', 'favoriteActors'];
     if (syncKeys.includes(key)) {
-        // On patiente 1,5 seconde avant d'envoyer pour éviter d'inonder Firebase 
-        // si vous cochez 10 épisodes très vite d'affilée.
         clearTimeout(window.firebaseSyncTimeout);
         window.firebaseSyncTimeout = setTimeout(() => {
             syncToCloud();
