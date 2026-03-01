@@ -1,0 +1,92 @@
+// firebase-config.js
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCldfmyF2qg8_CzYURFvVm35u194-o89MU",
+  authDomain: "cinemovie-56c80.firebaseapp.com",
+  projectId: "cinemovie-56c80",
+  storageBucket: "cinemovie-56c80.firebasestorage.app",
+  messagingSenderId: "696343882738",
+  appId: "1:696343882738:web:d692272c00a90828ed996b",
+  measurementId: "G-BVTND3XNWS"
+};
+
+// Initialisation Firebase
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+// On crée un ID unique pour cet appareil s'il n'existe pas encore
+let userId = localStorage.getItem('userId');
+if (!userId) {
+    userId = 'user_' + Math.random().toString(36).substr(2, 9);
+    localStorage.setItem('userId', userId);
+}
+
+// Fonction pour uploader vos listes vers le Cloud
+async function syncToCloud() {
+    try {
+        const userData = {
+            watchlist: JSON.parse(localStorage.getItem('watchlist') || '[]'),
+            watchedMovies: JSON.parse(localStorage.getItem('watchedMovies') || '[]'),
+            watchedSeries: JSON.parse(localStorage.getItem('watchedSeries') || '[]'),
+            watchedEpisodes: JSON.parse(localStorage.getItem('watchedEpisodes') || '{}'),
+            favoriteActors: JSON.parse(localStorage.getItem('favoriteActors') || '[]')
+        };
+        const docRef = doc(db, "utilisateurs", userId);
+        await setDoc(docRef, userData, { merge: true });
+        console.log("☁️ Sauvegarde Firebase réussie !");
+    } catch (error) {
+        console.error("Erreur de sauvegarde Firebase :", error);
+    }
+}
+
+// Fonction pour télécharger vos listes depuis le Cloud au démarrage
+async function fetchFromCloud() {
+    try {
+        const docRef = doc(db, "utilisateurs", userId);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+            const data = docSnap.data();
+            
+            // On désactive temporairement le "Snoop" pour ne pas créer de boucle
+            window.isFetchingFromCloud = true;
+            if (data.watchlist) localStorage.setItem('watchlist', JSON.stringify(data.watchlist));
+            if (data.watchedMovies) localStorage.setItem('watchedMovies', JSON.stringify(data.watchedMovies));
+            if (data.watchedSeries) localStorage.setItem('watchedSeries', JSON.stringify(data.watchedSeries));
+            if (data.watchedEpisodes) localStorage.setItem('watchedEpisodes', JSON.stringify(data.watchedEpisodes));
+            if (data.favoriteActors) localStorage.setItem('favoriteActors', JSON.stringify(data.favoriteActors));
+            window.isFetchingFromCloud = false;
+
+            console.log("☁️ Données Firebase chargées !");
+            // On ordonne à l'application de s'actualiser avec les nouvelles données
+            window.dispatchEvent(new CustomEvent('view-changed', { detail: { tab: 'home' } }));
+        }
+    } catch (error) {
+        console.error("Erreur de récupération Firebase :", error);
+    }
+}
+
+// --- LA MAGIE : Le "Snoop" (Mise sur écoute du LocalStorage) ---
+const originalSetItem = localStorage.setItem;
+localStorage.setItem = function(key, value) {
+    // 1. On sauvegarde normalement dans le téléphone (pour la rapidité)
+    originalSetItem.apply(this, arguments);
+    
+    // 2. Si on est en train de télécharger depuis le cloud, on s'arrête là
+    if (window.isFetchingFromCloud) return;
+
+    // 3. Si c'est une liste de films/séries, on synchronise avec Firebase !
+    const syncKeys = ['watchlist', 'watchedMovies', 'watchedSeries', 'watchedEpisodes', 'favoriteActors'];
+    if (syncKeys.includes(key)) {
+        // On patiente 1,5 seconde avant d'envoyer pour éviter d'inonder Firebase 
+        // si vous cochez 10 épisodes très vite d'affilée.
+        clearTimeout(window.firebaseSyncTimeout);
+        window.firebaseSyncTimeout = setTimeout(() => {
+            syncToCloud();
+        }, 1500);
+    }
+};
+
+// Exécution automatique au lancement de l'application
+fetchFromCloud();
