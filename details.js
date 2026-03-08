@@ -913,12 +913,17 @@ function updateAwardsUI(data) {
 function initializeWatchlistButton(mediaId) {
     const btn = document.getElementById('watchlist-button');
     if(btn) {
+        // On met à jour l'apparence initiale du bouton
         updateWatchlistButton(mediaId);
-        const newBtn = btn.cloneNode(true);
-        btn.parentNode.replaceChild(newBtn, btn);
-        newBtn.addEventListener('click', () => toggleWatchlist(mediaId));
+        
+        // Correction : au lieu de cloner et détacher l'élément du DOM, 
+        // on assigne directement l'événement au bouton existant.
+        btn.onclick = function(e) {
+            e.preventDefault(); // Empêche tout comportement par défaut
+            toggleWatchlist(mediaId);
+        };
     }
-}
+    }
 
 async function toggleWatchlist(mediaId) {
     const mediaIdNum = parseInt(mediaId, 10);
