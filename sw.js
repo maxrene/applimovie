@@ -1,7 +1,6 @@
 // sw.js
 // VERSION V11 - ACTIVATION DU MODE HORS LIGNE ET CACHE DYNAMIQUE
-const CACHE_NAME = 'cinematch-v11-offline-capable';
-
+const CACHE_NAME = 'cinematch-v12-offline-capable';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
