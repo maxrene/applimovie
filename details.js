@@ -224,17 +224,28 @@ function updateUI(data, type, isLocal) {
     document.getElementById('media-year').textContent = data.year;
     document.getElementById('media-synopsis').textContent = data.synopsis;
 
-    // Gestion Note (Page Film: media-imdb, Page Série: media-rating)
-    const imdbEl = document.getElementById('media-imdb');
-    if(imdbEl) imdbEl.textContent = data.imdb;
-    
-    const ratingEl = document.getElementById('media-rating');
-    if(ratingEl) ratingEl.textContent = data.imdb; // On affiche la même note (TMDB ou IMDb)
-
-    const rtEl = document.getElementById('media-rt');
-    if(rtEl && data.rottenTomatoes !== 'xx') {
-        rtEl.textContent = data.rottenTomatoes.includes('%') ? data.rottenTomatoes : data.rottenTomatoes + '%';
+    // --- NOUVELLE GESTION DES NOTES (IMDb + Rotten Tomatoes fixes) ---
+    const targetEl = document.getElementById('media-imdb') || document.getElementById('media-rating');
+    if (targetEl) {
+        const ratingContainer = targetEl.parentElement;
+        ratingContainer.className = "flex items-center gap-3"; // On gère l'espacement
+        
+        // Note temporaire TMDB en attendant OMDb (ou "--" si rien)
+        const tempScore = (data.imdb && data.imdb !== 'xx' && data.imdb !== 'N/A') ? data.imdb : '--';
+        
+        ratingContainer.innerHTML = `
+            <div class="flex items-center gap-1">
+                <span class="bg-[#f5c518] text-black text-[10px] font-bold px-1 rounded-sm tracking-wide">IMDb</span>
+                <span id="score-imdb" class="text-gray-200 font-bold text-sm">${tempScore}</span>
+            </div>
+            <span class="text-gray-500 text-sm">•</span>
+            <div class="flex items-center gap-1.5">
+                <img src="https://www.clipartmax.com/png/middle/50-503753_rotten-tomatoes-logo-png.png" alt="Rotten Tomatoes" class="w-4 h-4 object-contain">
+                <span id="score-rt" class="text-gray-200 font-bold text-sm">--</span>
+            </div>
+        `;
     }
+    // ------------------------------------------------------------------
 
     if (type === 'movie') {
         const dur = document.getElementById('media-duration');
@@ -1119,8 +1130,8 @@ async function fetchOMDbRatings(imdbId) {
         const data = await res.json();
 
         if (data.Response === "True") {
-            const imdbScore = data.imdbRating && data.imdbRating !== "N/A" ? data.imdbRating : null;
-            let rtScore = null;
+            const imdbScore = data.imdbRating && data.imdbRating !== "N/A" ? data.imdbRating : '--';
+            let rtScore = '--';
 
             // Chercher le pourcentage Rotten Tomatoes dans le tableau Ratings
             if (data.Ratings) {
@@ -1128,42 +1139,12 @@ async function fetchOMDbRatings(imdbId) {
                 if (rt) rtScore = rt.Value;
             }
 
-            // Cibler l'élément de la note existante
-            const targetEl = document.getElementById('media-imdb') || document.getElementById('media-rating');
-            
-            if (targetEl) {
-                // 1. Mettre à jour le score IMDb et remplacer l'étoile par le logo IMDb
-                if (imdbScore) {
-                    targetEl.textContent = imdbScore;
-                    const starIcon = targetEl.previousElementSibling;
-                    if (starIcon && starIcon.textContent.includes('star')) {
-                        starIcon.outerHTML = `<span class="bg-[#f5c518] text-black text-[10px] font-bold px-1 rounded-sm">IMDb</span>`;
-                    }
-                }
+            // On met à jour uniquement les valeurs textuelles
+            const imdbEl = document.getElementById('score-imdb');
+            const rtEl = document.getElementById('score-rt');
 
-                // 2. Créer et injecter le badge Rotten Tomatoes dynamiquement
-                if (rtScore) {
-                    const parentContainer = targetEl.parentElement.parentElement; // Le conteneur global des infos
-                    
-                    // Vérifier qu'on ne l'a pas déjà ajouté
-                    if (parentContainer && !document.getElementById('rt-badge')) {
-                        // Ajouter le point séparateur " • "
-                        const separator = document.createElement('span');
-                        separator.className = 'text-gray-500';
-                        separator.textContent = '•';
-                        parentContainer.appendChild(separator);
-
-                        // Créer le badge (Tomate fraîche 🍅 si >= 60%, sinon Tomate pourrie 🤢)
-                        const rtDiv = document.createElement('div');
-                        rtDiv.id = 'rt-badge';
-                        rtDiv.className = 'flex items-center gap-1';
-                        const isFresh = parseInt(rtScore) >= 60;
-                        
-                        rtDiv.innerHTML = `<span class="text-base">${isFresh ? '🍅' : '🤢'}</span><span class="text-gray-200 font-bold">${rtScore}</span>`;
-                        parentContainer.appendChild(rtDiv);
-                    }
-                }
-            }
+            if (imdbEl) imdbEl.textContent = imdbScore;
+            if (rtEl) rtEl.textContent = rtScore;
         }
     } catch (e) {
         console.error("Erreur OMDb:", e);
