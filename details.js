@@ -240,7 +240,7 @@ function updateUI(data, type, isLocal) {
             </div>
             <span class="text-gray-500 text-sm">•</span>
             <div class="flex items-center gap-1.5">
-                <img src="https://www.clipartmax.com/png/middle/50-503753_rotten-tomatoes-logo-png.png" alt="Rotten Tomatoes" class="w-4 h-4 object-contain">
+                <img src="https://upload.wikimedia.org/wikipedia/commons/5/5b/Rotten_Tomatoes.svg" alt="Rotten Tomatoes" class="w-5 h-5 object-contain">
                 <span id="score-rt" class="text-gray-200 font-bold text-sm">--</span>
             </div>
         `;
