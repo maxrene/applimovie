@@ -71,47 +71,46 @@ async function fetchFromCloud() {
 const originalSetItem = localStorage.setItem;
 localStorage.setItem = function(key, value) {
     
-    // 1. On tente de sauvegarder normalement dans le téléphone
+    // 1. On tente de sauvegarder normalement (en forçant le contexte avec .call)
     try {
-        originalSetItem.apply(this, arguments);
+        originalSetItem.call(localStorage, key, value);
     } catch (error) {
-        // Si la mémoire est pleine, on supprime tout le cache lourd pour faire de la place !
+        // Si la mémoire est pleine, on supprime tout le cache lourd pour faire de la place
         if (error.name === 'QuotaExceededError' || error.message.includes('quota')) {
             console.warn("📦 Mémoire saturée : Nettoyage automatique du cache en cours...");
             
             const keysToRemove = [];
-            // On cherche toutes les données de cache (résumés, acteurs, épisodes complets...)
             for (let i = 0; i < localStorage.length; i++) {
                 const k = localStorage.key(i);
                 if (k && (k.startsWith('movie-details-') || k.startsWith('series-details-'))) {
                     keysToRemove.push(k);
                 }
             }
-            // On les supprime
             keysToRemove.forEach(k => localStorage.removeItem(k));
             
-            // On retente la sauvegarde de la liste maintenant qu'il y a de la place
+            // On retente la sauvegarde
             try {
-                originalSetItem.apply(this, arguments);
-                console.log("✅ Sauvegarde locale réussie après le grand nettoyage.");
+                originalSetItem.call(localStorage, key, value);
             } catch (e2) {
                 console.error("❌ Échec critique de la sauvegarde locale.", e2);
             }
+        } else {
+            console.error("Erreur inattendue :", error);
         }
     }
     
-    // 2. Si on est en train de télécharger depuis le cloud, on s'arrête là
+    // 2. Si on télécharge depuis le cloud, on s'arrête là
     if (window.isFetchingFromCloud) return;
 
-    // 3. Si c'est une liste de films/séries, on synchronise avec Firebase !
+    // 3. On synchronise avec Firebase !
     const syncKeys = ['watchlist', 'watchedMovies', 'watchedSeries', 'watchedEpisodes', 'favoriteActors'];
     if (syncKeys.includes(key)) {
         clearTimeout(window.firebaseSyncTimeout);
         window.firebaseSyncTimeout = setTimeout(() => {
-            syncToCloud();
+            if (typeof syncToCloud === 'function') syncToCloud();
         }, 1500);
     }
 };
 
-// Exécution automatique au lancement de l'application
+// Exécution automatique au lancement
 fetchFromCloud();
