@@ -77,12 +77,12 @@ async function fetchFullFromTMDB(id, type) {
         const formattedData = formatTMDBData(data, type);
         updateUI(formattedData, type, false);
 
-        // --- NOUVEAU : Appel à OMDb en utilisant l'ID IMDb fourni par TMDB ---
+        // --- NOUVEAU : Appel OMDb ---
         if (data.external_ids && data.external_ids.imdb_id) {
             fetchOMDbRatings(data.external_ids.imdb_id);
         }
-        updateStreamingUI(data['watch/providers']?.results || {});
-        
+
+        updateStreamingUI(data['watch/providers']?.results || {});        
 
         if (type === 'tv' && data.seasons) {
             const releasedCount = getReleasedEpisodeCount(data);
@@ -113,12 +113,18 @@ async function fetchUpdates(id, type) {
         // Fetch streaming, credits, and videos in parallel
         const urls = [
             `${BASE_URL}/${type}/${id}/watch/providers?api_key=${TMDB_API_KEY}`,
-            `${BASE_URL}/${type}/${id}/credits?api_key=${TMDB_API_KEY}`
+            `${BASE_URL}/${type}/${id}/credits?api_key=${TMDB_API_KEY}`,
+            `${BASE_URL}/${type}/${id}/external_ids?api_key=${TMDB_API_KEY}`
         ];
-        const [streamingRes, creditsRes] = await Promise.all(urls.map(url => fetch(url)));
+        const [streamingRes, creditsRes, extRes] = await Promise.all(urls.map(url => fetch(url)));
 
         const streamingData = await streamingRes.json();
         updateStreamingUI(streamingData.results || {});
+
+        const extData = await extRes.json();
+        if (extData.imdb_id) {
+            fetchOMDbRatings(extData.imdb_id);
+        }
 
         const creditsData = await creditsRes.json();
 
@@ -1104,44 +1110,62 @@ function updateWatchlistButton(mediaId) {
         text.textContent = 'Ajouter à ma liste';
     }
 }
-// Nouvelle fonction pour récupérer les notes OMDb
+// Fonction pour récupérer les notes OMDb et mettre à jour le HTML dynamiquement
 async function fetchOMDbRatings(imdbId) {
     if (!imdbId) return;
-    
     try {
         const omdbUrl = `https://www.omdbapi.com/?i=${imdbId}&apikey=9472c454`;
         const res = await fetch(omdbUrl);
         const data = await res.json();
 
         if (data.Response === "True") {
-            let imdbScore = data.imdbRating || 'N/A';
-            let rtScore = 'N/A';
+            const imdbScore = data.imdbRating && data.imdbRating !== "N/A" ? data.imdbRating : null;
+            let rtScore = null;
 
-            // OMDb renvoie les notes dans un tableau "Ratings"
-            if (data.Ratings && data.Ratings.length > 0) {
+            // Chercher le pourcentage Rotten Tomatoes dans le tableau Ratings
+            if (data.Ratings) {
                 const rt = data.Ratings.find(r => r.Source === 'Rotten Tomatoes');
-                if (rt) {
-                    rtScore = rt.Value; // Retourne souvent un pourcentage ex: "85%"
-                }
+                if (rt) rtScore = rt.Value;
             }
 
-            // --- MISE À JOUR DE L'INTERFACE ---
+            // Cibler l'élément de la note existante
+            const targetEl = document.getElementById('media-imdb') || document.getElementById('media-rating');
             
-            // Met à jour la note IMDb (pour les films et les séries)
-            const imdbEl = document.getElementById('media-imdb');
-            const ratingEl = document.getElementById('media-rating'); 
-            
-            if (imdbEl && imdbScore !== 'N/A') imdbEl.innerHTML = `IMDb: ${imdbScore}`;
-            if (ratingEl && imdbScore !== 'N/A') ratingEl.innerHTML = `IMDb: ${imdbScore}`;
+            if (targetEl) {
+                // 1. Mettre à jour le score IMDb et remplacer l'étoile par le logo IMDb
+                if (imdbScore) {
+                    targetEl.textContent = imdbScore;
+                    const starIcon = targetEl.previousElementSibling;
+                    if (starIcon && starIcon.textContent.includes('star')) {
+                        starIcon.outerHTML = `<span class="bg-[#f5c518] text-black text-[10px] font-bold px-1 rounded-sm">IMDb</span>`;
+                    }
+                }
 
-            // Met à jour la note Rotten Tomatoes (si l'élément existe dans ton HTML)
-            const rtEl = document.getElementById('media-rt');
-            if (rtEl && rtScore !== 'N/A') {
-                rtEl.innerHTML = `🍅 ${rtScore}`;
-                rtEl.style.display = 'inline-block'; // L'afficher s'il était caché
+                // 2. Créer et injecter le badge Rotten Tomatoes dynamiquement
+                if (rtScore) {
+                    const parentContainer = targetEl.parentElement.parentElement; // Le conteneur global des infos
+                    
+                    // Vérifier qu'on ne l'a pas déjà ajouté
+                    if (parentContainer && !document.getElementById('rt-badge')) {
+                        // Ajouter le point séparateur " • "
+                        const separator = document.createElement('span');
+                        separator.className = 'text-gray-500';
+                        separator.textContent = '•';
+                        parentContainer.appendChild(separator);
+
+                        // Créer le badge (Tomate fraîche 🍅 si >= 60%, sinon Tomate pourrie 🤢)
+                        const rtDiv = document.createElement('div');
+                        rtDiv.id = 'rt-badge';
+                        rtDiv.className = 'flex items-center gap-1';
+                        const isFresh = parseInt(rtScore) >= 60;
+                        
+                        rtDiv.innerHTML = `<span class="text-base">${isFresh ? '🍅' : '🤢'}</span><span class="text-gray-200 font-bold">${rtScore}</span>`;
+                        parentContainer.appendChild(rtDiv);
+                    }
+                }
             }
         }
     } catch (e) {
-        console.error("Erreur lors de la récupération des notes OMDb :", e);
+        console.error("Erreur OMDb:", e);
     }
 }
