@@ -935,42 +935,34 @@ async function toggleWatchlist(mediaId) {
     const isInWatchlist = watchlist.some(item => item.id === mediaIdNum);
     const isWatched = watchedList.includes(mediaIdNum);
 
-    if (isWatched) {
-        watchlist = watchlist.filter(item => item.id !== mediaIdNum);
-        watchedList = watchedList.filter(id => id !== mediaIdNum);
-        localStorage.setItem('watchlist', JSON.stringify(watchlist));
-        localStorage.setItem(watchedListKey, JSON.stringify(watchedList));
-        updateWatchlistButton(mediaId);
-    } else if (isInWatchlist) {
-        // Remove from watchlist when marking as watched
-        watchlist = watchlist.filter(item => item.id !== mediaIdNum);
-        localStorage.setItem('watchlist', JSON.stringify(watchlist));
+    try {
+        if (isWatched) {
+            watchlist = watchlist.filter(item => item.id !== mediaIdNum);
+            watchedList = watchedList.filter(id => id !== mediaIdNum);
+            localStorage.setItem('watchlist', JSON.stringify(watchlist));
+            localStorage.setItem(watchedListKey, JSON.stringify(watchedList));
+            updateWatchlistButton(mediaId);
+        } else if (isInWatchlist) {
+            watchlist = watchlist.filter(item => item.id !== mediaIdNum);
+            localStorage.setItem('watchlist', JSON.stringify(watchlist));
+            watchedList.push(mediaIdNum);
+            localStorage.setItem(watchedListKey, JSON.stringify(watchedList));
+            updateWatchlistButton(mediaId);
 
-        watchedList.push(mediaIdNum);
-        localStorage.setItem(watchedListKey, JSON.stringify(watchedList));
-        updateWatchlistButton(mediaId);
+            if (!isMovie) markAllEpisodesWatched(mediaId);
+        } else {
+            const type = isMovie ? 'movie' : 'serie';
+            watchlist.push({ id: mediaIdNum, type: type, added_at: new Date().toISOString() });
+            localStorage.setItem('watchlist', JSON.stringify(watchlist));
+            updateWatchlistButton(mediaId);
 
-        if (!isMovie) {
-            markAllEpisodesWatched(mediaId);
+            if (window.offlineManager) {
+                window.offlineManager.cacheMedia(mediaIdNum, type);
+            }
         }
-    } else {
-        // Fix: Save the type (movie/serie) to avoid missing metadata issues in Watchlist
-        const type = isMovie ? 'movie' : 'serie';
-        watchlist.push({ id: mediaIdNum, type: type, added_at: new Date().toISOString() });
-        localStorage.setItem('watchlist', JSON.stringify(watchlist));
-        updateWatchlistButton(mediaId);
-
-        // TRIGGER OFFLINE CACHING
-        if (window.offlineManager) {
-            window.offlineManager.cacheMedia(mediaIdNum, type);
-            // Optional: Notify user?
-            // const btn = document.getElementById('watchlist-button');
-            // if(btn) {
-            //    const originalText = btn.querySelector('span:last-child').textContent;
-            //    btn.querySelector('span:last-child').textContent = 'Téléchargement...';
-            //    setTimeout(() => btn.querySelector('span:last-child').textContent = originalText, 2000);
-            // }
-        }
+    } catch (error) {
+        console.error("Erreur fatale bouton :", error);
+        alert("Impossible d'ajouter le média, veuillez réessayer.");
     }
 }
 
