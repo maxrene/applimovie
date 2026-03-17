@@ -77,7 +77,12 @@ async function fetchFullFromTMDB(id, type) {
         const formattedData = formatTMDBData(data, type);
         updateUI(formattedData, type, false);
 
+        // --- NOUVEAU : Appel à OMDb en utilisant l'ID IMDb fourni par TMDB ---
+        if (data.external_ids && data.external_ids.imdb_id) {
+            fetchOMDbRatings(data.external_ids.imdb_id);
+        }
         updateStreamingUI(data['watch/providers']?.results || {});
+        
 
         if (type === 'tv' && data.seasons) {
             const releasedCount = getReleasedEpisodeCount(data);
