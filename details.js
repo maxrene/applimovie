@@ -1099,3 +1099,44 @@ function updateWatchlistButton(mediaId) {
         text.textContent = 'Ajouter à ma liste';
     }
 }
+// Nouvelle fonction pour récupérer les notes OMDb
+async function fetchOMDbRatings(imdbId) {
+    if (!imdbId) return;
+    
+    try {
+        const omdbUrl = `https://www.omdbapi.com/?i=${imdbId}&apikey=9472c454`;
+        const res = await fetch(omdbUrl);
+        const data = await res.json();
+
+        if (data.Response === "True") {
+            let imdbScore = data.imdbRating || 'N/A';
+            let rtScore = 'N/A';
+
+            // OMDb renvoie les notes dans un tableau "Ratings"
+            if (data.Ratings && data.Ratings.length > 0) {
+                const rt = data.Ratings.find(r => r.Source === 'Rotten Tomatoes');
+                if (rt) {
+                    rtScore = rt.Value; // Retourne souvent un pourcentage ex: "85%"
+                }
+            }
+
+            // --- MISE À JOUR DE L'INTERFACE ---
+            
+            // Met à jour la note IMDb (pour les films et les séries)
+            const imdbEl = document.getElementById('media-imdb');
+            const ratingEl = document.getElementById('media-rating'); 
+            
+            if (imdbEl && imdbScore !== 'N/A') imdbEl.innerHTML = `IMDb: ${imdbScore}`;
+            if (ratingEl && imdbScore !== 'N/A') ratingEl.innerHTML = `IMDb: ${imdbScore}`;
+
+            // Met à jour la note Rotten Tomatoes (si l'élément existe dans ton HTML)
+            const rtEl = document.getElementById('media-rt');
+            if (rtEl && rtScore !== 'N/A') {
+                rtEl.innerHTML = `🍅 ${rtScore}`;
+                rtEl.style.display = 'inline-block'; // L'afficher s'il était caché
+            }
+        }
+    } catch (e) {
+        console.error("Erreur lors de la récupération des notes OMDb :", e);
+    }
+}
