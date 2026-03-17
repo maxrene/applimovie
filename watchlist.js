@@ -513,7 +513,31 @@ document.addEventListener('alpine:init', () => {
             if (item.isWatched || (item.apiDetails && watchedCount > 0 && watchedCount >= totalEpisodes)) {
                  // LA CORRECTION DES GUILLEMETS EST ICI : "'all'"
                  const checkButton = this.createCheckButtonHTML(item.id, true, 'serie', "'all'");
-                 return ` <div class="relative flex items-center gap-4 p-4 hover:bg-white/5 transition-colors rounded-lg"> <a href="serie.html?id=${item.id}" class="w-24 flex-shrink-0"> <div class="relative w-full aspect-[2/3] rounded-lg overflow-hidden"> <img src="${item.posterUrl}" class="w-full h-full object-cover"> <div class="absolute inset-0 flex items-center justify-center bg-black/60"> <span class="material-symbols-outlined text-white">visibility</span> </div> </div> </a> <div class="flex-1 min-w-0"> <div class="flex justify-between items-start"> <h3 class="font-bold text-lg text-white line-clamp-3 leading-tight">${item.title}</h3> ${checkButton} </div> <p class="text-sm text-gray-400">${String(item.year).split(' - ')[0]} • ${item.genres[0]}</p> <p class="text-xs text-green-500 mt-2 font-medium">Série terminée</p> </div> </div>`;
+                 
+                 // --- NOUVELLE LOGIQUE POUR LE STATUT DE LA SÉRIE ---
+                 let statusText = "Série à jour";
+                 let textColorClass = "text-green-500";
+                 
+                 if (item.apiDetails) {
+                     // Si la série est officiellement terminée ou annulée
+                     if (item.apiDetails.status === 'Ended' || item.apiDetails.status === 'Canceled') {
+                         statusText = "Série terminée";
+                     } 
+                     // Si la série est en cours et qu'une date de prochain épisode est connue
+                     else if (item.apiDetails.next_episode_to_air && item.apiDetails.next_episode_to_air.air_date) {
+                         const dateObj = new Date(item.apiDetails.next_episode_to_air.air_date);
+                         // Formater le mois et l'année en français (ex: "mars 2026")
+                         const month = dateObj.toLocaleString('fr-FR', { month: 'long' });
+                         const year = dateObj.getFullYear();
+                         statusText = `Série à jour - prochain épisode en ${month} ${year}`;
+                         textColorClass = "text-blue-400"; // Optionnel : changer la couleur pour différencier d'une série totalement finie
+                     }
+                 }
+                 // ---------------------------------------------------
+
+                 const genreText = item.genres && item.genres.length > 0 ? item.genres[0] : '';
+
+                 return ` <div class="relative flex items-center gap-4 p-4 hover:bg-white/5 transition-colors rounded-lg"> <a href="serie.html?id=${item.id}" class="w-24 flex-shrink-0"> <div class="relative w-full aspect-[2/3] rounded-lg overflow-hidden"> <img src="${item.posterUrl}" class="w-full h-full object-cover"> <div class="absolute inset-0 flex items-center justify-center bg-black/60"> <span class="material-symbols-outlined text-white">visibility</span> </div> </div> </a> <div class="flex-1 min-w-0"> <div class="flex justify-between items-start"> <h3 class="font-bold text-lg text-white line-clamp-3 leading-tight">${item.title}</h3> ${checkButton} </div> <p class="text-sm text-gray-400">${String(item.year).split(' - ')[0]} • ${genreText}</p> <p class="text-xs ${textColorClass} mt-2 font-medium">${statusText}</p> </div> </div>`;
             }
 
             if (watchedCount > 0 && item.apiDetails && !item.apiDetails.error) {
