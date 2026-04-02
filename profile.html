@@ -48,9 +48,10 @@
             <p class="text-slate-500 dark:text-slate-400 text-base">@alexdoe</p>
         </div>
 
-        <div class="px-4 flex flex-col gap-8 mt-8 pb-8">
+        <div class="px-4 flex flex-col gap-6 mt-8 pb-8">
+            
             <div class="flex flex-col gap-2">
-                <h3 class="text-lg font-bold pb-2">Preferences</h3>
+                <h3 class="text-lg font-bold pb-2">Préférences</h3>
                 <div class="flex flex-col gap-1 bg-slate-200/50 dark:bg-slate-800/20 rounded-xl p-2">
                     <button @click="showCountryModal = true" class="flex items-center gap-4 p-3 rounded-lg hover:bg-slate-300/50 dark:hover:bg-slate-700/30 transition-colors w-full text-left">
                         <div class="flex items-center justify-center rounded-lg bg-slate-300 dark:bg-slate-800 shrink-0 size-10 text-slate-900 dark:text-white"><span class="material-symbols-outlined">public</span></div>
@@ -76,8 +77,39 @@
                         </div>
                         <span class="material-symbols-outlined text-slate-400">chevron_right</span>
                     </a>
+                    
+                    <button @click="clearCache()" class="flex items-center gap-4 p-3 rounded-lg hover:bg-slate-300/50 dark:hover:bg-slate-700/30 transition-colors w-full text-left text-red-500">
+                        <div class="flex items-center justify-center rounded-lg bg-red-500/10 shrink-0 size-10"><span class="material-symbols-outlined">delete</span></div>
+                        <div class="flex flex-col flex-1">
+                            <p class="text-base font-normal">Vider le cache</p>
+                            <p class="text-slate-500 dark:text-slate-400 text-xs">Forcer la mise à jour des données et images</p>
+                        </div>
+                        <span class="material-symbols-outlined text-slate-400">chevron_right</span>
+                    </button>
                 </div>
             </div>
+
+            <div class="flex flex-col gap-2">
+                <h3 class="text-lg font-bold pb-2">Sauvegarde des données</h3>
+                <div class="flex flex-col gap-1 bg-slate-200/50 dark:bg-slate-800/20 rounded-xl p-2">
+                    <button onclick="exportData()" class="flex items-center gap-4 p-3 rounded-lg hover:bg-slate-300/50 dark:hover:bg-slate-700/30 transition-colors w-full text-left text-primary">
+                        <div class="flex items-center justify-center rounded-lg bg-primary/10 shrink-0 size-10"><span class="material-symbols-outlined">download</span></div>
+                        <div class="flex flex-col flex-1">
+                            <p class="text-base font-normal">Exporter mes listes</p>
+                            <p class="text-slate-500 dark:text-slate-400 text-xs">Créer une sauvegarde sur cet appareil</p>
+                        </div>
+                    </button>
+                    <label class="flex items-center gap-4 p-3 rounded-lg hover:bg-slate-300/50 dark:hover:bg-slate-700/30 transition-colors w-full text-left text-green-500 cursor-pointer">
+                        <div class="flex items-center justify-center rounded-lg bg-green-500/10 shrink-0 size-10"><span class="material-symbols-outlined">upload</span></div>
+                        <div class="flex flex-col flex-1">
+                            <p class="text-base font-normal">Restaurer une sauvegarde</p>
+                            <p class="text-slate-500 dark:text-slate-400 text-xs">Importer un fichier précédent</p>
+                        </div>
+                        <input type="file" id="importFile" class="hidden" accept=".json" onchange="importData(event)">
+                    </label>
+                </div>
+            </div>
+
         </div>
     </main>
 
@@ -123,11 +155,92 @@
             get countryName() { return this.country === 'FR' ? 'France' : 'Irlande'; },
             get platformCount() { return getSafeLocalStorage('selectedPlatforms', []).length; },
             get actorCount() { return getSafeLocalStorage('favoriteActors', []).length; },
-            setCountry(code) { this.country = code; localStorage.setItem('userRegion', code); this.showCountryModal = false; }
+            setCountry(code) { this.country = code; localStorage.setItem('userRegion', code); this.showCountryModal = false; },
+            
+            // Fonction Vider le Cache
+            async clearCache() {
+                if (!confirm("Voulez-vous vraiment vider le cache ? Vos listes seront conservées, mais l'application devra re-télécharger les affiches et détails des films.")) return;
+
+                const keysToKeep = [
+                    'watchlist', 'watchedMovies', 'watchedSeries', 'watchedEpisodes', 
+                    'favoriteActors', 'selectedPlatforms', 'userRegion', 'userId', 'previousSearches'
+                ];
+                
+                const keysToRemove = [];
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (!keysToKeep.includes(key)) {
+                        keysToRemove.push(key);
+                    }
+                }
+                keysToRemove.forEach(k => localStorage.removeItem(k));
+
+                if ('caches' in window) {
+                    try {
+                        const cacheNames = await caches.keys();
+                        await Promise.all(cacheNames.map(name => caches.delete(name)));
+                    } catch(e) {
+                        console.error("Erreur lors du nettoyage du cache API", e);
+                    }
+                }
+
+                if ('serviceWorker' in navigator) {
+                    const registrations = await navigator.serviceWorker.getRegistrations();
+                    for (let registration of registrations) {
+                        await registration.unregister();
+                    }
+                }
+
+                alert("Cache vidé avec succès ! L'application va redémarrer.");
+                window.location.reload(true); 
+            }
         }));
     });
+
     if ('serviceWorker' in navigator) { window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js')); }
+
+    // Scripts pour l'Export/Import
+    function exportData() {
+        const data = {
+            watchlist: localStorage.getItem('watchlist'),
+            watchedMovies: localStorage.getItem('watchedMovies'),
+            watchedSeries: localStorage.getItem('watchedSeries'),
+            watchedEpisodes: localStorage.getItem('watchedEpisodes'),
+            favoriteActors: localStorage.getItem('favoriteActors'),
+            selectedPlatforms: localStorage.getItem('selectedPlatforms')
+        };
+        const blob = new Blob([JSON.stringify(data)], {type: 'application/json'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `CineMatch_Sauvegarde_${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    }
+
+    function importData(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const data = JSON.parse(e.target.result);
+                if(data.watchlist) localStorage.setItem('watchlist', data.watchlist);
+                if(data.watchedMovies) localStorage.setItem('watchedMovies', data.watchedMovies);
+                if(data.watchedSeries) localStorage.setItem('watchedSeries', data.watchedSeries);
+                if(data.watchedEpisodes) localStorage.setItem('watchedEpisodes', data.watchedEpisodes);
+                if(data.favoriteActors) localStorage.setItem('favoriteActors', data.favoriteActors);
+                if(data.selectedPlatforms) localStorage.setItem('selectedPlatforms', data.selectedPlatforms);
+                alert('🎉 Tes données ont été restaurées avec succès !');
+                window.location.reload();
+            } catch(err) {
+                alert('❌ Erreur : Fichier de sauvegarde invalide ou corrompu.');
+                console.error(err);
+            }
+        };
+        reader.readAsText(file);
+    }
 </script>
-<script type="module" src="firebase-config.js"></script>
 </body>
 </html>
