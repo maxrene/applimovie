@@ -10,7 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
             id: 'prime', 
             apiId: 119, 
             name: 'Prime Video', 
-            logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/ca/Amazon_Prime_Video_logo_%282024%29.svg/1024px-Amazon_Prime_Video_logo_%282024%29.svg.png' 
+            logoUrl: 'https://logo.clearbit.com/primevideo.com' 
         },
         { 
             id: 'disney', 
@@ -22,7 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
             id: 'apple', 
             apiId: 350, 
             name: 'Apple TV+', 
-            logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/ad/AppleTVLogo.svg/768px-AppleTVLogo.svg.png' 
+            logoUrl: 'https://logo.clearbit.com/tv.apple.com' 
         },
         { 
             id: 'canal', 
