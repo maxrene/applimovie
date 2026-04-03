@@ -38,6 +38,47 @@ let isCastExpanded = false;
 const userRegion = localStorage.getItem('userRegion') || 'FR';
 const myPlatformIds = getSafeLocalStorage('selectedPlatforms', []);
 
+// --- CHARGEMENT DES AWARDS VIA FIREBASE ---
+async function loadAwardsData() {
+  try {
+    // On utilise la version 10.8.1 (identique à firebase-config.js)
+    const { getFirestore, collection, getDocs } = await import("https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js");
+    const db = getFirestore();
+    const awardsCollection = collection(db, "awards");
+
+    // On récupère tous les documents de la collection "awards"
+    const snapshot = await getDocs(awardsCollection);
+    const dictionnaireAwards = {};
+
+    if (!snapshot.empty) {
+      snapshot.forEach((document) => {
+        const fiche = document.data();
+
+        // On reconstruit le dictionnaire avec le format attendu par ton application
+        dictionnaireAwards[fiche.tmdb_id] = {
+          title: fiche.nom_oeuvre,
+          year: fiche.annee,
+          nominations: fiche.nominations,
+          wins: fiche.victoires,
+          type: fiche.type === "film" ? "movie" : "tv"
+        };
+      });
+
+      window.awardsData = dictionnaireAwards;
+      console.log("🏆 Données des Awards chargées depuis Firebase (Collection) !");
+    } else {
+      console.log("Aucune donnée d'awards trouvée en base.");
+      window.awardsData = {};
+    }
+  } catch (error) {
+    console.error("❌ Erreur lors de la récupération des awards :", error);
+    window.awardsData = {};
+  }
+}
+
+// On stocke la promesse de chargement pour pouvoir l'attendre avant d'afficher
+const awardsLoadedPromise = loadAwardsData();
+
 document.addEventListener('DOMContentLoaded', async () => {
     const urlParams = new URLSearchParams(window.location.search);
     const mediaId = urlParams.get('id');
@@ -266,7 +307,9 @@ function updateUI(data, type, isLocal) {
 
     if (data.cast && data.cast.length > 0) updateCastUI(data.cast);
     updatePersonUI(data.director, type);
-    updateAwardsUI(data);
+
+    // Attendre le chargement des awards avant de mettre à jour l'UI
+    awardsLoadedPromise.then(() => updateAwardsUI(data));
 
     if (type === 'movie' && data.similarMovies) {
         updateSimilarMoviesUI(data.similarMovies);
