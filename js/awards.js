@@ -238,3 +238,28 @@ window.awardsData = {
   "688": { "title": "The West Wing", "year": "1999", "nominations": 95, "wins": 26, "type": "tv" },
   "1398": { "title": "The Sopranos", "year": "1999", "nominations": 112, "wins": 21, "type": "tv" }
 };
+import { getFirestore, collection, addDoc } from "firebase/firestore";
+
+const db = getFirestore();
+
+// Le livreur adapté pour ton dictionnaire
+async function envoyerSurFirebase() {
+  const dossierAwards = collection(db, "awards");
+
+  // Cette ligne transforme ton dictionnaire '{' en une liste classique '['
+  const listePourLeLivreur = Object.values(window.awardsData);
+
+  // Le livreur prend chaque fiche et l'envoie sur Firebase
+  for (const award of listePourLeLivreur) { 
+    try {
+      await addDoc(dossierAwards, award);
+      console.log("Un award a été envoyé !");
+    } catch (erreur) {
+      console.error("Oups, un problème :", erreur);
+    }
+  }
+  console.log("Terminé ! Va vérifier sur Firebase !");
+}
+
+// On donne l'ordre au livreur de démarrer
+envoyerSurFirebase();
