@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html class="dark" lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport"/>
+  <title>Awards</title>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Spline+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+  <script>
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: { "primary": "#ea2a33", "background-light": "#f8f6f6", "background-dark": "#211111" },
+          fontFamily: { "display": ["Spline Sans"] },
+        },
+      },
+    }
+  </script>
+  <style>
+      body { height: 100dvh; overflow: hidden; }
+      [x-cloak] { display: none !important; }
+      .material-symbols-outlined.filled { font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+  </style>
+  <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <script src="config.js"></script>
+</head>
+<body class="bg-background-light dark:bg-background-dark font-display text-gray-900 dark:text-white" x-data="awardsPage">
+
+<div class="flex flex-col h-screen">
+  <!-- Header -->
+  <header class="flex-shrink-0 flex items-center p-4 pb-2 justify-between sticky top-0 bg-background-light dark:bg-background-dark z-10">
+    <button onclick="history.back()" class="text-slate-900 dark:text-white flex size-12 shrink-0 items-center"><span class="material-symbols-outlined">arrow_back</span></button>
+    <h2 class="text-lg font-bold leading-tight flex-1 text-center">Awards</h2>
+    <div class="size-12"></div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="flex-1 overflow-y-auto scroll-smooth px-4 pb-20 relative">
+
+    <!-- Search / Add New Award -->
+    <div class="sticky top-0 z-10 bg-background-light dark:bg-background-dark py-4">
+      <div class="relative">
+        <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">search</span>
+        <input x-model="searchQuery" @keydown.enter="searchTMDB" type="text" placeholder="Ajouter un film / série..." class="w-full bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-xl pl-10 pr-12 py-3 border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-primary shadow-sm" />
+        <button @click="searchTMDB" class="absolute right-2 top-1/2 -translate-y-1/2 bg-primary text-white rounded-lg p-1.5 hover:bg-red-600 transition">
+          <span class="material-symbols-outlined text-sm">add</span>
+        </button>
+      </div>
+
+      <!-- Search Results Dropdown -->
+      <div x-show="searchResults.length > 0" @click.away="searchResults = []" class="absolute left-0 right-0 mt-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl z-50 max-h-64 overflow-y-auto" x-cloak>
+        <template x-for="item in searchResults" :key="item.id">
+          <button @click="openAddModal(item)" class="w-full text-left px-4 py-3 border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition flex items-center justify-between">
+            <div class="flex flex-col">
+              <span class="font-medium text-sm" x-text="item.title || item.name"></span>
+              <span class="text-xs text-gray-500" x-text="(item.release_date || item.first_air_date || '').split('-')[0]"></span>
+            </div>
+            <span class="text-xs px-2 py-1 bg-gray-100 dark:bg-gray-600 rounded text-gray-600 dark:text-gray-300 uppercase" x-text="item.media_type === 'movie' ? 'Film' : 'Série'"></span>
+          </button>
+        </template>
+      </div>
+    </div>
+
+    <!-- Loading State -->
+    <div x-show="loading" class="flex justify-center items-center py-10" x-cloak>
+      <span class="material-symbols-outlined animate-spin text-primary text-3xl">progress_activity</span>
+    </div>
+
+    <!-- Lists -->
+    <div x-show="!loading" x-cloak>
+      <!-- Films Section -->
+      <h3 class="text-xl font-bold mt-4 mb-3 border-b border-gray-200 dark:border-gray-800 pb-2">Films</h3>
+      <div class="flex flex-col gap-3">
+        <template x-for="item in movies" :key="item.id">
+          <div @click="openEditModal(item)" class="bg-white dark:bg-gray-800 rounded-xl p-4 flex justify-between items-center shadow-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-750 border border-gray-100 dark:border-gray-800 transition">
+            <div class="flex flex-col">
+              <span class="font-bold text-gray-900 dark:text-white" x-text="item.title"></span>
+              <span class="text-sm text-gray-500" x-text="item.year"></span>
+            </div>
+            <div class="flex gap-4 text-sm font-medium">
+              <div class="flex items-center gap-1 text-yellow-500"><span class="material-symbols-outlined filled text-lg">trophy</span> <span x-text="item.wins"></span></div>
+              <div class="flex items-center gap-1 text-gray-400"><span class="material-symbols-outlined text-lg">stars</span> <span x-text="item.nominations"></span></div>
+            </div>
+          </div>
+        </template>
+        <div x-show="movies.length === 0" class="text-gray-500 text-sm py-2">Aucun film enregistré.</div>
+      </div>
+
+      <!-- Series Section -->
+      <h3 class="text-xl font-bold mt-8 mb-3 border-b border-gray-200 dark:border-gray-800 pb-2">Séries</h3>
+      <div class="flex flex-col gap-3">
+        <template x-for="item in series" :key="item.id">
+          <div @click="openEditModal(item)" class="bg-white dark:bg-gray-800 rounded-xl p-4 flex justify-between items-center shadow-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-750 border border-gray-100 dark:border-gray-800 transition">
+            <div class="flex flex-col">
+              <span class="font-bold text-gray-900 dark:text-white" x-text="item.title"></span>
+              <span class="text-sm text-gray-500" x-text="item.year"></span>
+            </div>
+            <div class="flex gap-4 text-sm font-medium">
+              <div class="flex items-center gap-1 text-yellow-500"><span class="material-symbols-outlined filled text-lg">trophy</span> <span x-text="item.wins"></span></div>
+              <div class="flex items-center gap-1 text-gray-400"><span class="material-symbols-outlined text-lg">stars</span> <span x-text="item.nominations"></span></div>
+            </div>
+          </div>
+        </template>
+        <div x-show="series.length === 0" class="text-gray-500 text-sm py-2">Aucune série enregistrée.</div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Edit/Add Modal -->
+  <div x-show="showModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" x-cloak x-transition.opacity>
+    <div @click.away="closeModal" class="bg-white dark:bg-[#1a1a1a] w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden p-6 relative">
+      <button @click="closeModal" class="absolute top-4 right-4 text-gray-400 hover:text-white"><span class="material-symbols-outlined">close</span></button>
+
+      <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-1" x-text="selectedItem ? selectedItem.title : ''"></h3>
+      <p class="text-sm text-gray-500 mb-6" x-text="selectedItem ? selectedItem.year : ''"></p>
+
+      <div class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-400 mb-1">Nominations</label>
+          <div class="flex items-center">
+            <button @click="editData.nominations = Math.max(0, editData.nominations - 1)" class="bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white w-10 h-10 rounded-l-lg flex items-center justify-center hover:bg-gray-300 dark:hover:bg-gray-600 transition"><span class="material-symbols-outlined">remove</span></button>
+            <input type="number" x-model.number="editData.nominations" class="w-full h-10 text-center bg-gray-100 dark:bg-gray-800 border-0 focus:ring-0 text-gray-900 dark:text-white font-bold" min="0">
+            <button @click="editData.nominations++" class="bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white w-10 h-10 rounded-r-lg flex items-center justify-center hover:bg-gray-300 dark:hover:bg-gray-600 transition"><span class="material-symbols-outlined">add</span></button>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-400 mb-1">Victoires (Wins)</label>
+          <div class="flex items-center">
+            <button @click="editData.wins = Math.max(0, editData.wins - 1)" class="bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white w-10 h-10 rounded-l-lg flex items-center justify-center hover:bg-gray-300 dark:hover:bg-gray-600 transition"><span class="material-symbols-outlined">remove</span></button>
+            <input type="number" x-model.number="editData.wins" class="w-full h-10 text-center bg-gray-100 dark:bg-gray-800 border-0 focus:ring-0 text-gray-900 dark:text-white font-bold" min="0">
+            <button @click="editData.wins++" class="bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white w-10 h-10 rounded-r-lg flex items-center justify-center hover:bg-gray-300 dark:hover:bg-gray-600 transition"><span class="material-symbols-outlined">add</span></button>
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-8 flex gap-3">
+        <button @click="closeModal" class="flex-1 py-3 text-sm font-medium text-gray-600 dark:text-gray-300 bg-gray-200 dark:bg-gray-800 rounded-xl hover:bg-gray-300 dark:hover:bg-gray-700 transition">Annuler</button>
+        <button @click="saveAward" class="flex-1 py-3 text-sm font-bold text-white bg-primary rounded-xl hover:bg-red-600 transition" x-text="saving ? '...' : 'Enregistrer'" :disabled="saving"></button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script type="module">
+  import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+  import { app } from "./firebase-config.js";
+
+  const db = getFirestore(app);
+
+  document.addEventListener('alpine:init', () => {
+    Alpine.data('awardsPage', () => ({
+      awards: {},
+      movies: [],
+      series: [],
+      loading: true,
+
+      searchQuery: '',
+      searchResults: [],
+
+      showModal: false,
+      selectedItem: null,
+      editData: { nominations: 0, wins: 0, type: 'movie' },
+      saving: false,
+
+      async init() {
+        await this.loadAwards();
+      },
+
+      async loadAwards() {
+        this.loading = true;
+        try {
+          const docRef = doc(db, "app_data", "awards");
+          const docSnap = await getDoc(docRef);
+          if (docSnap.exists()) {
+            this.awards = docSnap.data();
+          } else {
+            this.awards = {};
+          }
+          this.sortAndFilterAwards();
+        } catch (error) {
+          console.error("Error loading awards:", error);
+        }
+        this.loading = false;
+      },
+
+      sortAndFilterAwards() {
+        const list = Object.entries(this.awards).map(([id, data]) => ({ id, ...data }));
+
+        // Sort by year desc, then title
+        list.sort((a, b) => {
+          if (b.year !== a.year) return b.year - a.year;
+          return a.title.localeCompare(b.title);
+        });
+
+        this.movies = list.filter(item => item.type === 'movie');
+        this.series = list.filter(item => item.type === 'tv');
+      },
+
+      async searchTMDB() {
+        if (!this.searchQuery.trim()) return;
+
+        try {
+          // Use global API key if available, fallback to a default if not (from config.js)
+          const apiKey = window.TMDB_API_KEY || 'f1b07b5d2ac7a9f55c5b49a93b18bd33';
+          const response = await fetch(`https://api.themoviedb.org/3/search/multi?api_key=${apiKey}&query=${encodeURIComponent(this.searchQuery)}&language=fr-FR`);
+          const data = await response.json();
+          this.searchResults = data.results.filter(item => item.media_type === 'movie' || item.media_type === 'tv');
+        } catch (error) {
+          console.error("Search error:", error);
+        }
+      },
+
+      openAddModal(tmdbItem) {
+        this.searchResults = [];
+        this.searchQuery = '';
+
+        const id = String(tmdbItem.id);
+        const type = tmdbItem.media_type;
+        const title = type === 'movie' ? tmdbItem.title : tmdbItem.name;
+        const dateStr = type === 'movie' ? tmdbItem.release_date : tmdbItem.first_air_date;
+        const year = dateStr ? parseInt(dateStr.split('-')[0]) : null;
+
+        this.selectedItem = { id, title, year, type };
+
+        // Populate existing data if any
+        if (this.awards[id]) {
+          this.editData = {
+            nominations: this.awards[id].nominations || 0,
+            wins: this.awards[id].wins || 0,
+            type: this.awards[id].type || type
+          };
+        } else {
+          this.editData = { nominations: 0, wins: 0, type };
+        }
+
+        this.showModal = true;
+      },
+
+      openEditModal(awardItem) {
+        this.selectedItem = { ...awardItem };
+        this.editData = {
+          nominations: awardItem.nominations || 0,
+          wins: awardItem.wins || 0,
+          type: awardItem.type
+        };
+        this.showModal = true;
+      },
+
+      closeModal() {
+        this.showModal = false;
+        setTimeout(() => {
+          this.selectedItem = null;
+          this.editData = { nominations: 0, wins: 0, type: 'movie' };
+        }, 300);
+      },
+
+      async saveAward() {
+        if (!this.selectedItem) return;
+        this.saving = true;
+
+        const id = this.selectedItem.id;
+        const newData = {
+          title: this.selectedItem.title,
+          year: this.selectedItem.year,
+          type: this.editData.type,
+          nominations: parseInt(this.editData.nominations) || 0,
+          wins: parseInt(this.editData.wins) || 0
+        };
+
+        try {
+          const docRef = doc(db, "app_data", "awards");
+          await setDoc(docRef, { [id]: newData }, { merge: true });
+
+          // Update local state
+          this.awards[id] = newData;
+          this.sortAndFilterAwards();
+          this.closeModal();
+        } catch (error) {
+          console.error("Error saving award:", error);
+          alert("Erreur lors de la sauvegarde.");
+        } finally {
+          this.saving = false;
+        }
+      }
+    }));
+  });
+</script>
+</body>
+</html>
