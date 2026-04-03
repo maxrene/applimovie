@@ -10,7 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
             id: 'prime', 
             apiId: 119, 
             name: 'Prime Video', 
-            logoUrl: 'https://logo.clearbit.com/primevideo.com' 
+            logoUrl: 'https://www.citypng.com/public/uploads/preview/amazon-prime-ios-app-icon-701751695133984u2yuon8nlu.png' 
         },
         { 
             id: 'disney', 
