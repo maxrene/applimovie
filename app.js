@@ -374,6 +374,7 @@ window.lancerMigrationAwards = async function() {
   try {
     const { doc, setDoc } = await import("https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js");
     const { db } = await import("./firebase-config.js");
+    const docRef = doc(db, "app_data", "awards");
     
     const initialAwardsData = {
         "1054867": { "title": "The Battle of Baktan Cross", "year": 2025, "nominations": 8, "wins": 4, "type": "movie" },
