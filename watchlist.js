@@ -72,9 +72,9 @@ document.addEventListener('alpine:init', () => {
 
         availablePlatforms: [
             { id: 'netflix', logoUrl: 'https://images.ctfassets.net/4cd45et68cgf/Rx83JoRDMkYNlMC9MKzcB/2b14d5a59fc3937afd3f03191e19502d/Netflix-Symbol.png?w=700&h=456' },
-            { id: 'prime', logoUrl: 'https://logo.clearbit.com/primevideo.com' }, // <-- MODIFIÉ
+            { id: 'prime', logoUrl: 'https://www.citypng.com/public/uploads/preview/amazon-prime-ios-app-icon-701751695133984u2yuon8nlu.png' }, // <-- MODIFIÉ
             { id: 'disney', logoUrl: 'https://platform.theverge.com/wp-content/uploads/sites/2/chorus/uploads/chorus_asset/file/25357066/Disney__Logo_March_2024.png?quality=90&strip=all&crop=0,0,100,100' },
-            { id: 'apple', logoUrl: 'https://logo.clearbit.com/tv.apple.com' }, // <-- MODIFIÉ            
+            { id: 'apple', logoUrl: 'https://images.seeklogo.com/logo-png/31/2/apple-tv-logo-png_seeklogo-314167.png' }, // <-- MODIFIÉ            
             { id: 'canal', logoUrl: 'https://static1.purepeople.com/articles/0/46/23/10/@/6655765-logo-de-la-chaine-canal-1200x0-2.png' },
             { id: 'paramount', logoUrl: 'https://images.seeklogo.com/logo-png/39/1/paramount-logo-png_seeklogo-397501.png' },
             { id: 'max', logoUrl: 'https://logo.clearbit.com/max.com' },
