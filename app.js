@@ -1,30 +1,5 @@
-import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-
-async function loadAwardsData() {
-  const db = getFirestore();
-  const docRef = doc(db, "app_data", "awards");
-  
-  try {
-    const docSnap = await getDoc(docRef);
-    if (docSnap.exists()) {
-      // On stocke tout dans window.awardsData comme avant
-      window.awardsData = docSnap.data();
-      console.log("Données des Awards chargées depuis Firebase !");
-    } else {
-      console.log("Aucune donnée d'awards trouvée.");
-      window.awardsData = {};
-    }
-  } catch (error) {
-    console.error("Erreur lors de la récupération des awards :", error);
-    window.awardsData = {}; // Sécurité en cas d'erreur
-  }
-}
-
-// Appelez cette fonction au démarrage de votre app
-loadAwardsData().then(() => {
-  // Lancer le reste de votre application ici (affichage des films, etc.)
-});
-// app.js
+// 1. TOUS LES IMPORTS DOIVENT ÊTRE TOUT EN HAUT
+import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 const BASE_URL = 'https://api.themoviedb.org/3';
 const IMG_BASE_POSTER = 'https://image.tmdb.org/t/p/w500';
@@ -47,24 +22,44 @@ function getMediaStatusGlobal(id, type) {
     return null;
 }
 
+// 2. FONCTION DE CHARGEMENT DES AWARDS DEPUIS FIREBASE
+async function loadAwardsData() {
+  const db = getFirestore();
+  const docRef = doc(db, "app_data", "awards");
+  
+  try {
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+      window.awardsData = docSnap.data();
+      console.log("🏆 Données des Awards chargées depuis Firebase !");
+    } else {
+      console.log("Aucune donnée d'awards trouvée.");
+      window.awardsData = {};
+    }
+  } catch (error) {
+    console.error("Erreur lors de la récupération des awards :", error);
+    window.awardsData = {}; 
+  }
+}
+
+// On lance le chargement des awards
+loadAwardsData();
+
+// 3. LOGIQUE DE L'APPLICATION (ALPINE.JS)
 document.addEventListener('alpine:init', () => {
     // -------------------------------------------------------------------------
     // APP SHELL
     // -------------------------------------------------------------------------
     Alpine.data('app', () => ({
-        activeTab: 'home', // 'home' | 'popular' | 'search' | 'watchlist'
+        activeTab: 'home', 
         userRegion: localStorage.getItem('userRegion') || 'FR',
 
         init() {
-            // Restore tab from history state if needed or default to home
-            // For now, simpler is better.
-            // Flag logic moved to data binding in HTML
+            // Initialisation
         },
 
         switchTab(tab) {
             this.activeTab = tab;
-            // Dispatch event for components to refresh their data
-            // Use setTimeout to allow x-show to toggle first if needed
             setTimeout(() => {
                 window.dispatchEvent(new CustomEvent('view-changed', { detail: { tab: tab } }));
             }, 50);
@@ -79,10 +74,8 @@ document.addEventListener('alpine:init', () => {
         lastUpdate: Date.now(),
 
         async init() {
-            // Initial Load
             await this.fetchAndDisplayContent();
 
-            // SPA view change
             window.addEventListener('view-changed', (e) => {
                 if (!e.detail || e.detail.tab === 'home') {
                     this.updateMediaStatuses();
@@ -94,7 +87,6 @@ document.addEventListener('alpine:init', () => {
                 this.updateMediaStatuses();
                 this.loadContinueWatching();
 
-                // Check if content is stale (> 12 hours)
                 const lastFetch = localStorage.getItem('lastHomeFetch');
                 const now = Date.now();
                 const twelveHours = 12 * 60 * 60 * 1000;
@@ -219,8 +211,6 @@ document.addEventListener('alpine:init', () => {
             const watchedEpisodes = getSafeLocalStorage('watchedEpisodes', {});
             const seriesInProgress = {};
 
-            // 1. Group watched episodes by series ID
-            // Format: { "seriesId": [episodeId1, episodeId2], ... }
             for (const seriesId in watchedEpisodes) {
                 if (watchedEpisodes[seriesId] && watchedEpisodes[seriesId].length > 0) {
                     seriesInProgress[seriesId] = true;
@@ -233,7 +223,6 @@ document.addEventListener('alpine:init', () => {
                 return;
             }
 
-            // 2. Fetch all series data concurrently
             const MAX_SEASONS_TO_APPEND = 20;
             const seasonsToAppend = Array.from({ length: MAX_SEASONS_TO_APPEND }, (_, i) => `season/${i + 1}`).join(',');
 
@@ -244,7 +233,6 @@ document.addEventListener('alpine:init', () => {
 
             const seriesToDisplay = [];
 
-            // 3. Process each fetched series
             for (const seriesDetails of results) {
                 if (!seriesDetails) continue;
 
@@ -265,7 +253,6 @@ document.addEventListener('alpine:init', () => {
                     totalEpisodes += seasonDetail.episodes.length;
 
                     for (const episode of seasonDetail.episodes) {
-                        // Check if this episode ID is in the watched list for this series
                         const isWatched = watchedEpisodes[seriesIdStr] && watchedEpisodes[seriesIdStr].includes(episode.id);
 
                         if (isWatched) {
@@ -276,7 +263,6 @@ document.addEventListener('alpine:init', () => {
                                 nextEpisode = episode;
                                 foundNext = true;
                             } else {
-                                // Episode not yet aired, stop showing this series in "Continue Watching"
                                 foundNext = true;
                                 nextEpisode = null;
                             }
@@ -290,7 +276,6 @@ document.addEventListener('alpine:init', () => {
                 }
             }
 
-            // 4. Render
             const container = document.getElementById('continue-watching-container');
             const section = document.getElementById('continue-watching-section');
 
@@ -301,15 +286,12 @@ document.addEventListener('alpine:init', () => {
                     const timeA = seriesLastWatchedDate[a.series.id] || 0;
                     const timeB = seriesLastWatchedDate[b.series.id] || 0;
 
-                    // If both have timestamps, newest first
                     if (timeA > 0 && timeB > 0) {
                         return timeB - timeA;
                     }
-                    // If only one has timestamp, it comes first
                     if (timeA > 0) return -1;
                     if (timeB > 0) return 1;
 
-                    // Fallback to progress for items without timestamp
                     return b.progress - a.progress;
                 });
 
@@ -323,14 +305,11 @@ document.addEventListener('alpine:init', () => {
         async fetchAndDisplayContent() {
             this.isLoading = true;
             try {
-                // 0. Continue Watching
                 this.loadContinueWatching();
 
-                // 1. Fetch Popular
                 const popularContent = await this.fetchAPI('trending/all/week?language=fr-FR');
                 this.renderContent('popular-container', popularContent, 'popular');
 
-                // 1b. Fetch Favorite Actors
                 const favoriteActors = getSafeLocalStorage('favoriteActors', []);
                 const favoriteActorsSection = document.getElementById('favorite-actors-section');
 
@@ -348,7 +327,6 @@ document.addEventListener('alpine:init', () => {
                     if(favoriteActorsSection) favoriteActorsSection.style.display = 'none';
                 }
 
-                // 2. Fetch Platforms
                  const platforms = [
                     { id: 8, name: 'Netflix', containerId: 'netflix-container', sectionId: 'netflix-section' },
                     { id: 119, name: 'Prime Video', containerId: 'prime-video-container', sectionId: 'prime-video-section' },
@@ -381,7 +359,6 @@ document.addEventListener('alpine:init', () => {
         },
 
         updateMediaStatuses() {
-            // Re-use logic for live update
             document.querySelectorAll('#home-view .media-card-link').forEach(card => {
                 const id = Number(card.dataset.id);
                 const type = card.dataset.type;
@@ -400,15 +377,14 @@ document.addEventListener('alpine:init', () => {
         }
     }));
 });
-import { getFirestore, doc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-async function migrateAwardsToFirebase() {
+// 4. MIGRATION - ATTACHÉE À WINDOW POUR NE PAS SE LANCER TOUTE SEULE
+window.lancerMigrationAwards = async function() {
   const db = getFirestore();
   
-  // Vos données complètes (Historique + 2026)
   const initialAwardsData = {
     // --- NOUVEAUTÉS 2026 (Oscars) ---
-    "1054867": { "title": "One Battle After Another", "year": 2025, "nominations": 13, "wins": 6, "type": "movie" },
+    "1054867": { "title": "One Battle After Another", "year": 2025, "nominations": 12, "wins": 6, "type": "movie" },
     "1233413": { "title": "Sinners", "year": 2025, "nominations": 7, "wins": 4, "type": "movie" },
     "858024": { "title": "Hamnet", "year": 2025, "nominations": 4, "wins": 1, "type": "movie" },
     "1078605": { "title": "Weapons", "year": 2025, "nominations": 3, "wins": 1, "type": "movie" },
@@ -634,10 +610,10 @@ async function migrateAwardsToFirebase() {
     "4608": { "title": "30 Rock", "year": "2006", "nominations": 103, "wins": 16, "type": "tv" },
     "1405": { "title": "Dexter", "year": "2006", "nominations": 24, "wins": 4, "type": "tv" },
     "2316": { "title": "The Office", "year": "2005", "nominations": 42, "wins": 5, "type": "tv" },
-    "1416": { "title": "Grey's Anatomy", "year": "2005", "nominations": 39, "wins": 5, "type": "tv" },
+    "1416": { "title": "Grey's Anatomy", "year": 2005, "nominations": 39, "wins": 5, "type": "tv" },
     "4607": { "title": "Lost", "year": "2004", "nominations": 54, "wins": 10, "type": "tv" },
     "1408": { "title": "House", "year": "2004", "nominations": 25, "wins": 5, "type": "tv" },
-    "693": { "title": "Desperate Housewives", "year": "2004", "nominations": 33, "wins": 7, "type": "tv" },
+    "693": { "title": "Desperate Housewives", "year": 2004, "nominations": 33, "wins": 7, "type": "tv" },
     "4589": { "title": "Arrested Development", "year": "2003", "nominations": 25, "wins": 6, "type": "tv" },
     "1438": { "title": "The Wire", "year": "2002", "nominations": 2, "wins": 0, "type": "tv" },
     "1973": { "title": "24", "year": "2001", "nominations": 68, "wins": 20, "type": "tv" },
@@ -646,15 +622,14 @@ async function migrateAwardsToFirebase() {
     "688": { "title": "The West Wing", "year": "1999", "nominations": 95, "wins": 26, "type": "tv" },
     "1398": { "title": "The Sopranos", "year": "1999", "nominations": 112, "wins": 21, "type": "tv" }
   };
-
+  
   try {
+    console.log("Démarrage de la migration...");
     const docRef = doc(db, "app_data", "awards");
     await setDoc(docRef, initialAwardsData);
-    console.log("✅ Migration terminée avec succès !");
+    console.log("✅ Migration terminée avec succès ! Vous pouvez maintenant supprimer la fonction 'window.lancerMigrationAwards' de app.js.");
+    alert("Migration terminée avec succès !");
   } catch (error) {
     console.error("❌ Erreur lors de la migration :", error);
   }
-}
-
-// Lancer la migration
-migrateAwardsToFirebase();
+};
