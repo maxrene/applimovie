@@ -22,7 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
             id: 'apple', 
             apiId: 350, 
             name: 'Apple TV+', 
-            logoUrl: 'https://logo.clearbit.com/tv.apple.com' 
+            logoUrl: 'https://images.seeklogo.com/logo-png/31/2/apple-tv-logo-png_seeklogo-314167.png' 
         },
         { 
             id: 'canal', 
