@@ -7,7 +7,7 @@ const IMG_BASE_PROFILE = 'https://image.tmdb.org/t/p/w185';
 
 const CUSTOM_PLATFORMS = {
     8: { name: 'Netflix', url: 'https://images.ctfassets.net/4cd45et68cgf/Rx83JoRDMkYNlMC9MKzcB/2b14d5a59fc3937afd3f03191e19502d/Netflix-Symbol.png?w=700&h=456' },
-    119: { name: 'Prime Video', url: 'https://logo.clearbit.com/primevideo.com' },
+    119: { name: 'Prime Video', url: 'https://www.citypng.com/public/uploads/preview/amazon-prime-ios-app-icon-701751695133984u2yuon8nlu.png' },
     337: { name: 'Disney+', url: 'https://platform.theverge.com/wp-content/uploads/sites/2/chorus/uploads/chorus_asset/file/25357066/Disney__Logo_March_2024.png?quality=90&strip=all&crop=0,0,100,100' },
     350: { name: 'Apple TV+', url: 'https://logo.clearbit.com/tv.apple.com' },
     392: { name: 'Canal+', url: 'https://static1.purepeople.com/articles/0/46/23/10/@/6655765-logo-de-la-chaine-canal-1200x0-2.png' },
