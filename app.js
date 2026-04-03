@@ -1,3 +1,29 @@
+import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+async function loadAwardsData() {
+  const db = getFirestore();
+  const docRef = doc(db, "app_data", "awards");
+  
+  try {
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+      // On stocke tout dans window.awardsData comme avant
+      window.awardsData = docSnap.data();
+      console.log("Données des Awards chargées depuis Firebase !");
+    } else {
+      console.log("Aucune donnée d'awards trouvée.");
+      window.awardsData = {};
+    }
+  } catch (error) {
+    console.error("Erreur lors de la récupération des awards :", error);
+    window.awardsData = {}; // Sécurité en cas d'erreur
+  }
+}
+
+// Appelez cette fonction au démarrage de votre app
+loadAwardsData().then(() => {
+  // Lancer le reste de votre application ici (affichage des films, etc.)
+});
 // app.js
 
 const BASE_URL = 'https://api.themoviedb.org/3';
