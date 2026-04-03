@@ -23,6 +23,7 @@
       [x-cloak] { display: none !important; }
       .material-symbols-outlined.filled { font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
   </style>
+  <!-- Alpine chargé avec defer -->
   <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
   <script src="config.js"></script>
 </head>
@@ -163,14 +164,9 @@
 
 </div>
 
-<script type="module">
-  // On importe 'collection' et 'getDocs' pour pouvoir lire toute ta collection
-  import { getFirestore, collection, getDocs, doc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-  import { app } from "./firebase-config.js";
-
-  const db = getFirestore(app);
-
-  const initAwardsPage = () => {
+<!-- Script NORMAL (sans type="module") pour s'assurer que ça se lance avant qu'Alpine ait fini -->
+<script>
+  document.addEventListener('alpine:init', () => {
     Alpine.data('awardsPage', () => ({
       awards: {},
       movies: [],
@@ -185,22 +181,43 @@
       selectedItem: null,
       editData: { nominations: 0, wins: 0, type: 'movie' },
       saving: false,
+      
+      // On stockera les outils Firebase ici une fois chargés
+      db: null,
+      fbCollection: null,
+      fbGetDocs: null,
+      fbDoc: null,
+      fbSetDoc: null,
 
       async init() {
-        await this.loadAwards();
+        try {
+          // 1. Importation dynamique (évite les conflits de timing avec Alpine)
+          const firebaseModule = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+          const configModule = await import("./firebase-config.js");
+          
+          this.db = firebaseModule.getFirestore(configModule.app);
+          this.fbCollection = firebaseModule.collection;
+          this.fbGetDocs = firebaseModule.getDocs;
+          this.fbDoc = firebaseModule.doc;
+          this.fbSetDoc = firebaseModule.setDoc;
+
+          // 2. Maintenant qu'on a Firebase, on charge les données
+          await this.loadAwards();
+        } catch (error) {
+          console.error("Erreur critique lors de l'initialisation de Firebase ou du chargement:", error);
+          this.loading = false;
+        }
       },
 
       async loadAwards() {
         this.loading = true;
         try {
-          // On va chercher tous les documents dans la COLLECTION "awards"
-          const awardsCollection = collection(db, "awards");
-          const querySnapshot = await getDocs(awardsCollection);
+          const awardsCollection = this.fbCollection(this.db, "awards");
+          const querySnapshot = await this.fbGetDocs(awardsCollection);
           
           const loadedAwards = {};
           querySnapshot.forEach((document) => {
             const data = document.data();
-            // On récupère l'ID (tmdb_id) s'il est dans les données, sinon on prend l'ID du document Firebase
             const id = data.tmdb_id || document.id; 
             loadedAwards[id] = data;
           });
@@ -208,7 +225,7 @@
           this.awards = loadedAwards;
           this.sortAndFilterAwards();
         } catch (error) {
-          console.error("Error loading awards:", error);
+          console.error("Erreur pendant le chargement des awards:", error);
         }
         this.loading = false;
       },
@@ -313,9 +330,8 @@
         };
 
         try {
-          // On sauvegarde directement dans la collection "awards" avec l'ID du film
-          const docRef = doc(db, "awards", id);
-          await setDoc(docRef, newData, { merge: true });
+          const docRef = this.fbDoc(this.db, "awards", id);
+          await this.fbSetDoc(docRef, newData, { merge: true });
 
           this.awards[id] = newData;
           this.sortAndFilterAwards();
@@ -328,13 +344,7 @@
         }
       }
     }));
-  };
-
-  if (window.Alpine) {
-    initAwardsPage();
-  } else {
-    document.addEventListener('alpine:init', initAwardsPage);
-  }
+  });
 </script>
 </body>
 </html>
