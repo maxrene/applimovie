@@ -1,4 +1,12 @@
 window.awardsData = {
+  // --- NOUVEAUTÉS 2026 (Oscars) ---
+  "1054867": { "title": "One Battle After Another", "year": 2025, "nominations": 8, "wins": 4, "type": "movie" },
+  "1233413": { "title": "Sinners", "year": 2025, "nominations": 7, "wins": 4, "type": "movie" },
+  "858024": { "title": "Hamnet", "year": 2025, "nominations": 4, "wins": 1, "type": "movie" },
+  "1078605": { "title": "Weapons", "year": 2025, "nominations": 3, "wins": 1, "type": "movie" },
+  "1124566": { "title": "Sentimental Value", "year": 2025, "nominations": 2, "wins": 1, "type": "movie" },
+  "803796": { "title": "KPop Demon Hunters", "year": 2025, "nominations": 1, "wins": 1, "type": "movie" },
+
   // --- FILMS (Oscars) ---
   "872585": { "title": "Oppenheimer", "year": 2023, "nominations": 13, "wins": 7, "type": "movie" },
   "792307": { "title": "Poor Things", "year": 2023, "nominations": 11, "wins": 4, "type": "movie" },
@@ -157,7 +165,15 @@ window.awardsData = {
   "462": { "title": "Erin Brockovich", "year": 2000, "nominations": 5, "wins": 1, "type": "movie" },
   "392": { "title": "Chocolat", "year": 2000, "nominations": 5, "wins": 0, "type": "movie" },
 
-  // --- SERIES (Emmys) ---
+  // --- NOUVEAUTÉS 2026 (Séries) ---
+  "999007": { "title": "The Pitt", "year": "2025", "nominations": 5, "wins": 3, "type": "tv" },
+  "999008": { "title": "The Studio", "year": "2025", "nominations": 6, "wins": 4, "type": "tv" },
+  "999009": { "title": "Adolescence", "year": "2025", "nominations": 4, "wins": 3, "type": "tv" },
+  "999010": { "title": "Pluribus", "year": "2025", "nominations": 3, "wins": 1, "type": "tv" },
+  "999011": { "title": "The Diplomat", "year": "2023", "nominations": 2, "wins": 1, "type": "tv" },
+  "999012": { "title": "Dying for Sex", "year": "2025", "nominations": 2, "wins": 1, "type": "tv" },
+
+  // --- SERIES (Emmys / Golden Globes / SAG) ---
   "126308": { "title": "Shōgun", "year": "2024", "nominations": 25, "wins": 18, "type": "tv" },
   "242311": { "title": "Baby Reindeer", "year": "2024", "nominations": 11, "wins": 6, "type": "tv" },
   "46648": { "title": "True Detective", "year": "2024", "nominations": 19, "wins": 1, "type": "tv" },
@@ -169,7 +185,7 @@ window.awardsData = {
   "95480": { "title": "Slow Horses", "year": "2022", "nominations": 15, "wins": 1, "type": "tv" },
   "76331": { "title": "Succession", "year": "2018", "nominations": 75, "wins": 19, "type": "tv" },
   "100088": { "title": "The Last of Us", "year": "2023", "nominations": 24, "wins": 8, "type": "tv" },
-  "122226": { "title": "Hacks", "year": "2021", "nominations": 48, "wins": 9, "type": "tv" },
+  "122226": { "title": "Hacks", "year": "2021", "nominations": 52, "wins": 10, "type": "tv" }, // Mis à jour avec les chiffres de 2026 !
   "105248": { "title": "Beef", "year": "2023", "nominations": 13, "wins": 8, "type": "tv" },
   "111803": { "title": "The White Lotus", "year": "2021", "nominations": 43, "wins": 15, "type": "tv" },
   "125935": { "title": "Abbott Elementary", "year": "2021", "nominations": 15, "wins": 4, "type": "tv" },
