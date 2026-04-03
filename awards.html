@@ -169,7 +169,8 @@
 
   const db = getFirestore(app);
 
-  document.addEventListener('alpine:init', () => {
+  // On encapsule la définition du composant dans une fonction
+  const initAwardsPage = () => {
     Alpine.data('awardsPage', () => ({
       awards: {},
       movies: [],
@@ -218,9 +219,11 @@
           tmdb_id: data.tmdb_id || id
         }));
 
-        // Sort by year desc, then title
+        // Sort by year desc, then title (Sécurisé pour les années vides)
         list.sort((a, b) => {
-          if (b.year !== a.year) return b.year - a.year;
+          const yearA = a.year || 0;
+          const yearB = b.year || 0;
+          if (yearB !== yearA) return yearB - yearA;
           return a.title.localeCompare(b.title);
         });
 
@@ -233,7 +236,6 @@
         if (!this.searchQuery.trim()) return;
 
         try {
-          // Use global API key if available, fallback to a default if not (from config.js)
           const apiKey = window.TMDB_API_KEY || 'f1b07b5d2ac7a9f55c5b49a93b18bd33';
           const response = await fetch(`https://api.themoviedb.org/3/search/multi?api_key=${apiKey}&query=${encodeURIComponent(this.searchQuery)}&language=fr-FR`);
           const data = await response.json();
@@ -323,7 +325,15 @@
         }
       }
     }));
-  });
+  };
+
+  // VÉRIFICATION DE ROBUSTESSE: Si Alpine est déjà chargé, on lance l'init directement
+  if (window.Alpine) {
+    initAwardsPage();
+  } else {
+    // Sinon, on attend que l'événement soit déclenché
+    document.addEventListener('alpine:init', initAwardsPage);
+  }
 </script>
 </body>
 </html>
