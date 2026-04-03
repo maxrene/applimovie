@@ -164,12 +164,12 @@
 </div>
 
 <script type="module">
-  import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+  // On importe 'collection' et 'getDocs' pour pouvoir lire toute ta collection
+  import { getFirestore, collection, getDocs, doc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
   import { app } from "./firebase-config.js";
 
   const db = getFirestore(app);
 
-  // On encapsule la définition du composant dans une fonction
   const initAwardsPage = () => {
     Alpine.data('awardsPage', () => ({
       awards: {},
@@ -193,13 +193,19 @@
       async loadAwards() {
         this.loading = true;
         try {
-          const docRef = doc(db, "app_data", "awards");
-          const docSnap = await getDoc(docRef);
-          if (docSnap.exists()) {
-            this.awards = docSnap.data();
-          } else {
-            this.awards = {};
-          }
+          // On va chercher tous les documents dans la COLLECTION "awards"
+          const awardsCollection = collection(db, "awards");
+          const querySnapshot = await getDocs(awardsCollection);
+          
+          const loadedAwards = {};
+          querySnapshot.forEach((document) => {
+            const data = document.data();
+            // On récupère l'ID (tmdb_id) s'il est dans les données, sinon on prend l'ID du document Firebase
+            const id = data.tmdb_id || document.id; 
+            loadedAwards[id] = data;
+          });
+          
+          this.awards = loadedAwards;
           this.sortAndFilterAwards();
         } catch (error) {
           console.error("Error loading awards:", error);
@@ -208,7 +214,6 @@
       },
 
       sortAndFilterAwards() {
-        // Map Firestore keys to our internal component keys for display
         const list = Object.entries(this.awards).map(([id, data]) => ({
           id: id,
           title: data.nom_oeuvre || data.title || 'Inconnu',
@@ -219,7 +224,6 @@
           tmdb_id: data.tmdb_id || id
         }));
 
-        // Sort by year desc, then title (Sécurisé pour les années vides)
         list.sort((a, b) => {
           const yearA = a.year || 0;
           const yearB = b.year || 0;
@@ -257,7 +261,6 @@
 
         this.selectedItem = { id, title, year, type };
 
-        // Populate existing data if any
         if (this.awards[id]) {
           this.editData = {
             nominations: this.awards[id].nominations || 0,
@@ -310,10 +313,10 @@
         };
 
         try {
-          const docRef = doc(db, "app_data", "awards");
-          await setDoc(docRef, { [id]: newData }, { merge: true });
+          // On sauvegarde directement dans la collection "awards" avec l'ID du film
+          const docRef = doc(db, "awards", id);
+          await setDoc(docRef, newData, { merge: true });
 
-          // Update local state
           this.awards[id] = newData;
           this.sortAndFilterAwards();
           this.closeModal();
@@ -327,11 +330,9 @@
     }));
   };
 
-  // VÉRIFICATION DE ROBUSTESSE: Si Alpine est déjà chargé, on lance l'init directement
   if (window.Alpine) {
     initAwardsPage();
   } else {
-    // Sinon, on attend que l'événement soit déclenché
     document.addEventListener('alpine:init', initAwardsPage);
   }
 </script>
