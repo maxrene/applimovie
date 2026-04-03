@@ -13,8 +13,8 @@ const firebaseConfig = {
 };
 
 // Initialisation Firebase
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
+export const app = initializeApp(firebaseConfig);
+export const db = getFirestore(app);
 
 // On crée un ID unique pour cet appareil s'il n'existe pas encore
 let userId = localStorage.getItem('userId');
