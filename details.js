@@ -55,7 +55,8 @@ async function loadAwardsData() {
         const fiche = document.data();
 
         // On reconstruit le dictionnaire avec le format attendu par ton application
-        dictionnaireAwards[fiche.tmdb_id] = {
+        const idKey = fiche.tmdb_id ? String(fiche.tmdb_id) : document.id;
+        dictionnaireAwards[idKey] = {
           title: fiche.nom_oeuvre,
           year: fiche.annee,
           nominations: fiche.nominations,
@@ -945,7 +946,7 @@ function updateAwardsUI(data) {
     let nominations = 0;
     let awardName = '';
 
-    const externalAwardInfo = window.awardsData && window.awardsData[data.id];
+    const externalAwardInfo = window.awardsData && (window.awardsData[data.id] || window.awardsData[String(data.id)]);
 
     if (externalAwardInfo) {
         wins = externalAwardInfo.wins;
