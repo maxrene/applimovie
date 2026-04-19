@@ -119,8 +119,41 @@
     <div @click.away="closeModal" class="bg-white dark:bg-[#1a1a1a] w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden p-6 relative">
       <button @click="closeModal" class="absolute top-4 right-4 text-gray-400 hover:text-white"><span class="material-symbols-outlined">close</span></button>
 
-      <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-1" x-text="selectedItem ? selectedItem.title : ''"></h3>
+      <div class="flex items-center gap-2 mb-1">
+        <h3 class="text-xl font-bold text-gray-900 dark:text-white" x-text="selectedItem ? selectedItem.title : ''"></h3>
+        <a x-show="selectedItem && selectedItem.id && selectedItem.id !== 'new'"
+           :href="editData.type === 'movie' || editData.type === 'film' ? 'film.html?id=' + selectedItem.id : (editData.type === 'tv' || editData.type === 'serie' ? 'serie.html?id=' + selectedItem.id : 'person.html?id=' + selectedItem.id)"
+           class="text-primary hover:text-red-400 transition"
+           title="Voir la fiche détaillée">
+          <span class="material-symbols-outlined text-lg">open_in_new</span>
+        </a>
+      </div>
       <p class="text-sm text-gray-500 mb-6" x-text="selectedItem ? selectedItem.year : ''"></p>
+
+      <!-- TMDB Search Field -->
+      <div class="mb-6 relative">
+        <label class="block text-sm font-medium text-gray-400 mb-1">Rechercher et lier un(e) <span x-text="editData.type === 'movie' || editData.type === 'film' ? 'Film' : (editData.type === 'tv' || editData.type === 'serie' ? 'Série' : 'Acteur')"></span></label>
+        <div class="relative">
+          <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">search</span>
+          <input type="text" x-model="searchQuery" @input.debounce.500ms="fetchSearchResults" placeholder="Titre..." class="w-full pl-10 pr-4 py-2 bg-gray-100 dark:bg-gray-800 border-0 rounded-xl focus:ring-1 focus:ring-primary text-gray-900 dark:text-white text-sm placeholder-gray-500">
+          <div x-show="isSearching" class="absolute right-3 top-1/2 -translate-y-1/2">
+            <span class="material-symbols-outlined animate-spin text-primary text-sm">progress_activity</span>
+          </div>
+        </div>
+
+        <!-- Search Results Dropdown -->
+        <div x-show="searchResults.length > 0" @click.away="searchResults = []" class="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-100 dark:border-gray-700 overflow-hidden max-h-48 overflow-y-auto" x-transition x-cloak>
+          <template x-for="result in searchResults" :key="result.id">
+            <div @click="selectSearchResult(result)" class="p-3 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer border-b border-gray-100 dark:border-gray-700 last:border-0 flex items-center gap-3">
+              <img :src="result.poster_path ? 'https://image.tmdb.org/t/p/w92' + result.poster_path : (result.profile_path ? 'https://image.tmdb.org/t/p/w45' + result.profile_path : 'https://placehold.co/40x60')" class="w-10 h-14 object-cover rounded bg-gray-200 dark:bg-gray-900">
+              <div class="flex-1 min-w-0">
+                <div class="text-sm font-bold text-gray-900 dark:text-white truncate" x-text="result.title || result.name"></div>
+                <div class="text-xs text-gray-500" x-text="result.release_date ? result.release_date.substring(0,4) : (result.first_air_date ? result.first_air_date.substring(0,4) : '')"></div>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
 
       <div class="space-y-4">
         <div>
@@ -167,6 +200,10 @@
       editData: { nominations: 0, wins: 0, type: 'movie' },
       saving: false,
       
+      searchQuery: '',
+      searchResults: [],
+      isSearching: false,
+
       // On stockera les outils Firebase ici une fois chargés
       db: null,
       fbCollection: null,
@@ -239,7 +276,7 @@
       },
 
       openEditModal(awardItem) {
-        this.selectedItem = { ...awardItem };
+        this.selectedItem = { ...awardItem, original_id: awardItem.id };
         this.editData = {
           nominations: awardItem.nominations || 0,
           wins: awardItem.wins || 0,
@@ -253,14 +290,68 @@
         setTimeout(() => {
           this.selectedItem = null;
           this.editData = { nominations: 0, wins: 0, type: 'movie' };
+          this.searchQuery = '';
+          this.searchResults = [];
         }, 300);
+      },
+
+      async fetchSearchResults() {
+        if (this.searchQuery.length <= 2) {
+          this.searchResults = [];
+          return;
+        }
+
+        this.isSearching = true;
+        try {
+          const type = this.editData.type;
+          let searchType = 'movie';
+          if (type === 'serie' || type === 'tv') searchType = 'tv';
+          if (type === 'acteur' || type === 'person') searchType = 'person';
+
+          const url = `https://api.themoviedb.org/3/search/${searchType}?api_key=${TMDB_API_KEY}&language=fr-FR&query=${encodeURIComponent(this.searchQuery)}&include_adult=false`;
+
+          const response = await fetch(url);
+          if (!response.ok) throw new Error("TMDB Search Error");
+
+          const data = await response.json();
+          this.searchResults = data.results.slice(0, 5); // Limit to 5 results
+        } catch (error) {
+          console.error("Search error:", error);
+        } finally {
+          this.isSearching = false;
+        }
+      },
+
+      selectSearchResult(result) {
+        let typeMap = this.editData.type;
+        if (typeMap === 'movie') typeMap = 'film';
+        if (typeMap === 'tv') typeMap = 'serie';
+        if (typeMap === 'person') typeMap = 'acteur';
+
+        // Update selected item info
+        const title = result.title || result.name;
+        let year = null;
+        if (result.release_date) year = result.release_date.split('-')[0];
+        if (result.first_air_date) year = result.first_air_date.split('-')[0];
+
+        this.selectedItem = {
+          ...this.selectedItem,
+          id: result.id,
+          title: title,
+          year: year
+        };
+
+        // We update editData as well in case type needs synchronization,
+        // but here we just need to update ID and reset search
+        this.searchQuery = '';
+        this.searchResults = [];
       },
 
       async saveAward() {
         if (!this.selectedItem) return;
         this.saving = true;
 
-        const id = this.selectedItem.id;
+        const id = String(this.selectedItem.id); // Ensure string ID for map
 
         let typeMap = this.editData.type;
         if (typeMap === 'movie') typeMap = 'film';
@@ -277,10 +368,31 @@
         };
 
         try {
-          const docRef = this.fbDoc(this.db, "awards", id);
-          await this.fbSetDoc(docRef, newData, { merge: true });
+          // Keep existing document data if it's there
+          const existingData = this.awards[id] || {};
+          const mergedData = { ...existingData, ...newData };
 
-          this.awards[id] = newData;
+          const docRef = this.fbDoc(this.db, "awards", id);
+          await this.fbSetDoc(docRef, newData, { merge: true }); // Need to send newData
+
+          // Important: If we changed the ID via search, we must delete the old record
+          // to prevent duplicates and orphaned data.
+          if (this.selectedItem.original_id && String(this.selectedItem.original_id) !== id) {
+            const oldId = String(this.selectedItem.original_id);
+            try {
+              // import deleteDoc dynamically here if not done in init, or use generic logic.
+              // Instead of importing, we can just delete from memory and rely on SetDoc.
+              // To cleanly delete from Firebase we need deleteDoc.
+              const firebaseModule = await import("https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js");
+              await firebaseModule.deleteDoc(this.fbDoc(this.db, "awards", oldId));
+              delete this.awards[oldId];
+            } catch (e) {
+              console.error("Error deleting old record", e);
+            }
+          }
+
+          // Update memory with merged data
+          this.awards[id] = mergedData;
           this.sortAndFilterAwards();
           this.closeModal();
         } catch (error) {
