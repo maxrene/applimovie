@@ -41,11 +41,32 @@
         <div class="size-12"></div>
     </header>
 
-    <main class="flex-1 overflow-y-auto scroll-smooth">
-        <div class="flex flex-col items-center mt-4">
-            <div class="bg-center bg-no-repeat bg-cover rounded-full h-32 w-32 shadow-lg" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuCjZKd_FSd2dk2btvPDx_P2v2jX4hU3uU0IusAkKNulead5csuWjGOPxvdiPmyT5Mcqfb4c35ITjI1yN2JhQEhSDHZCGr8zmBpA3sJWMKLEqMhwlFOgLyscNKR9dCrGbGpMFHNwe_QwAu8fNAWVfPShEs43FfI6MZEVhpXjsPXRtPq-AXLquWWb0XhjnUbyaHTiImcxNf4oT4DX8WptDN7L3o6tw-BEoojjVhYJoxDvRDui26EUNy23YHn39izz-kRsn2bGOE-hhfG4");'></div>
-            <p class="text-[22px] font-bold mt-4">Alex Doe</p>
-            <p class="text-slate-500 dark:text-slate-400 text-base">@alexdoe</p>
+    <main class="flex-1 overflow-y-auto scroll-smooth" x-data="userAuth()">
+        <!-- Google Auth UI -->
+        <div class="flex flex-col items-center mt-4 px-4">
+            <template x-if="user">
+                <div class="flex flex-col items-center">
+                    <img :src="user.photoURL || 'icons/icon-192.png'" alt="Profil" class="rounded-full h-32 w-32 shadow-lg object-cover border-4 border-slate-200 dark:border-slate-800">
+                    <p class="text-[22px] font-bold mt-4 text-center" x-text="user.displayName || 'Utilisateur Google'"></p>
+                    <p class="text-green-500 dark:text-green-400 text-sm flex items-center gap-1 mt-1"><span class="material-symbols-outlined text-[16px]">cloud_done</span> Données synchronisées</p>
+                    <button @click="logout()" class="mt-4 px-6 py-2 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-full text-sm font-medium hover:bg-slate-300 dark:hover:bg-slate-700 transition-colors">
+                        Se déconnecter
+                    </button>
+                </div>
+            </template>
+            <template x-if="!user">
+                <div class="flex flex-col items-center w-full max-w-sm">
+                    <div class="bg-center bg-no-repeat bg-cover rounded-full h-32 w-32 shadow-lg bg-slate-200 dark:bg-slate-800 flex items-center justify-center">
+                        <span class="material-symbols-outlined text-5xl text-slate-400 dark:text-slate-600">person</span>
+                    </div>
+                    <p class="text-[22px] font-bold mt-4 text-center">Invité(e)</p>
+                    <p class="text-slate-500 dark:text-slate-400 text-sm mt-1 text-center mb-4">Vos données sont uniquement sauvegardées sur cet appareil.</p>
+                    <button @click="login()" :disabled="isLoading" class="flex items-center justify-center gap-3 w-full bg-white dark:bg-slate-800 text-slate-700 dark:text-white font-medium py-3 px-4 rounded-xl shadow-sm border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors disabled:opacity-50">
+                        <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" class="w-5 h-5">
+                        <span x-text="isLoading ? 'Connexion en cours...' : 'Se connecter pour synchroniser'"></span>
+                    </button>
+                </div>
+            </template>
         </div>
 
         <div class="px-4 flex flex-col gap-6 mt-8 pb-8">
@@ -156,8 +177,52 @@
 </div>
 
 <script src="js/utils.js"></script>
+<script type="module" src="firebase-config.js"></script>
 <script>
     document.addEventListener('alpine:init', () => {
+        Alpine.data('userAuth', () => ({
+            user: window.firebaseUser || null,
+            isLoading: false,
+            init() {
+                // Listen to the custom event dispatched by firebase-config.js
+                window.addEventListener('auth-state-changed', (e) => {
+                    this.user = e.detail.user;
+                    this.isLoading = false;
+                });
+
+                // If it was already loaded before Alpine initialized
+                if (window.firebaseUser) {
+                    this.user = window.firebaseUser;
+                }
+            },
+            async login() {
+                this.isLoading = true;
+                try {
+                    if (window.signInWithGoogle) {
+                        await window.signInWithGoogle();
+                    } else {
+                        console.error("Firebase Auth not fully loaded yet.");
+                        this.isLoading = false;
+                    }
+                } catch (error) {
+                    console.error("Erreur de connexion :", error);
+                    this.isLoading = false;
+                    alert("Erreur lors de la connexion. Veuillez réessayer.");
+                }
+            },
+            async logout() {
+                if (confirm("Voulez-vous vraiment vous déconnecter ? Vous reviendrez à vos listes locales hors-ligne.")) {
+                    try {
+                        if (window.signOutGoogle) {
+                            await window.signOutGoogle();
+                        }
+                    } catch (error) {
+                        console.error("Erreur de déconnexion :", error);
+                    }
+                }
+            }
+        }));
+
         Alpine.data('userProfile', () => ({
             showCountryModal: false,
             country: localStorage.getItem('userRegion') || 'FR',
