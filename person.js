@@ -69,7 +69,7 @@ function personProfile() {
                 return;
             }
 
-            const url = `${BASE_URL}/person/${personId}?api_key=${TMDB_API_KEY}&language=en-US&append_to_response=movie_credits,tv_credits`;
+            const url = `${BASE_URL}/person/${personId}?api_key=${TMDB_API_KEY}&language=fr-FR&append_to_response=movie_credits,tv_credits`;
 
             try {
                 const response = await fetch(url);
@@ -78,6 +78,10 @@ function personProfile() {
                 }
                 const data = await response.json();
                 this.processData(data);
+
+                // Re-check favorite in case name/profile_path needs updating (optional)
+                // But mainly to ensure isFavorite is consistent
+                this.checkIfFavorite(data.id);
             } catch (error) {
                 console.error(error);
             } finally {
@@ -119,7 +123,7 @@ function personProfile() {
         },
 
         get bioText() {
-            const fullBio = this.person.biography || "No biography available.";
+            const fullBio = this.person.biography || "Biographie non disponible.";
             const bioMaxLength = 300;
 
             if (this.isBioExpanded || fullBio.length <= bioMaxLength) {
