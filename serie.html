@@ -92,9 +92,13 @@
 
 
             <div class="flex items-center gap-3 mb-8">
-                <button id="watchlist-button" class="w-full flex items-center justify-center gap-2 rounded-xl bg-white text-black py-3 font-bold transition-transform active:scale-95">
+                <button id="watchlist-button" class="flex-1 flex items-center justify-center gap-2 rounded-xl bg-white text-black py-3 font-bold transition-transform active:scale-95">
                     <span class="material-symbols-outlined filled">add</span>
                     <span>Ajouter à ma liste</span>
+                </button>
+                <button id="next-episode-button" class="flex-1 flex items-center justify-center gap-2 rounded-xl bg-gray-800 text-white border border-gray-700 py-3 font-bold transition-transform active:scale-95" style="display: none;">
+                    <span class="material-symbols-outlined filled text-green-400">check</span>
+                    <span id="next-episode-text">Épisode vu</span>
                 </button>
             </div>
             
