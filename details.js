@@ -111,11 +111,22 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 async function fetchFullFromTMDB(id, type) {
     try {
-        const url = `${BASE_URL}/${type}/${id}?api_key=${TMDB_API_KEY}&append_to_response=credits,watch/providers,similar,external_ids,videos`;
+        let appendOptions = 'credits,watch/providers,similar,external_ids,videos';
+        if (type === 'tv') {
+            const MAX_SEASONS_TO_APPEND = 15;
+            const seasonsToAppend = Array.from({ length: MAX_SEASONS_TO_APPEND }, (_, i) => `season/${i + 1}`).join(',');
+            appendOptions += `,${seasonsToAppend}`;
+        }
+
+        const url = `${BASE_URL}/${type}/${id}?api_key=${TMDB_API_KEY}&append_to_response=${appendOptions}`;
         const res = await fetch(url);
         if (!res.ok) throw new Error("Erreur TMDB");
         const data = await res.json();
         
+        if (type === 'tv') {
+            window.currentSeriesData = data;
+        }
+
         const formattedData = formatTMDBData(data, type);
         updateUI(formattedData, type, false);
 
@@ -192,9 +203,13 @@ async function fetchUpdates(id, type) {
 
             updateSimilarMoviesUI(similarMovies);
         } else if (type === 'tv') {
-            const seriesDetailsUrl = `${BASE_URL}/tv/${id}?api_key=${TMDB_API_KEY}&append_to_response=credits`;
+            const MAX_SEASONS_TO_APPEND = 15;
+            const seasonsToAppend = Array.from({ length: MAX_SEASONS_TO_APPEND }, (_, i) => `season/${i + 1}`).join(',');
+            const seriesDetailsUrl = `${BASE_URL}/tv/${id}?api_key=${TMDB_API_KEY}&append_to_response=credits,${seasonsToAppend}`;
             const seriesDetailsRes = await fetch(seriesDetailsUrl);
             const seriesDetailsData = await seriesDetailsRes.json();
+
+            window.currentSeriesData = seriesDetailsData;
 
             // Update Date & Status
             const firstAirDate = seriesDetailsData.first_air_date;
@@ -668,6 +683,7 @@ async function handleSeasonCheck(seriesId, seasonNumber, seasonCard, totalEpisod
     }
 
     updateWatchlistButton(seriesId);
+    updateNextEpisodeButton(seriesId);
     updateSeasonWatchedStatus(seasonCard);
 }
 
@@ -872,6 +888,7 @@ function toggleEpisodeWatchedStatus(seriesId, episodeId, totalEpisodes, icon) {
             updateWatchlistButton(seriesId);
         }
     }
+    updateNextEpisodeButton(seriesId);
 }
 
 function formatTMDBData(data, type) {
@@ -981,6 +998,7 @@ function initializeWatchlistButton(mediaId) {
     if(btn) {
         // On met à jour l'apparence initiale du bouton
         updateWatchlistButton(mediaId);
+        updateNextEpisodeButton(mediaId);
         
         // Correction : au lieu de cloner et détacher l'élément du DOM, 
         // on assigne directement l'événement au bouton existant.
@@ -1026,6 +1044,7 @@ async function toggleWatchlist(mediaId) {
                 window.offlineManager.cacheMedia(mediaIdNum, type);
             }
         }
+        updateNextEpisodeButton(mediaId);
     } catch (error) {
         console.error("Erreur fatale bouton :", error);
         alert("Impossible d'ajouter le média, veuillez réessayer.");
@@ -1131,6 +1150,131 @@ function getReleasedEpisodeCount(data) {
     return total;
 }
 
+function determineNextEpisode(seriesId) {
+    if (!window.currentSeriesData) return null;
+
+    const seriesDetails = window.currentSeriesData;
+    const watchedEpisodes = getSafeLocalStorage('watchedEpisodes', {});
+    const seriesIdStr = String(seriesId);
+
+    let totalEpisodes = 0;
+    let watchedCount = 0;
+    let nextEpisode = null;
+    let foundNext = false;
+
+    const seasons = seriesDetails.seasons ? seriesDetails.seasons.sort((a, b) => a.season_number - b.season_number) : [];
+
+    for (const season of seasons) {
+        if (season.season_number === 0) continue;
+
+        const seasonDetail = seriesDetails[`season/${season.season_number}`];
+        if (!seasonDetail || !seasonDetail.episodes) continue;
+
+        totalEpisodes += seasonDetail.episodes.length;
+
+        for (const episode of seasonDetail.episodes) {
+            const isWatched = watchedEpisodes[seriesIdStr] && watchedEpisodes[seriesIdStr].includes(episode.id);
+
+            if (isWatched) {
+                watchedCount++;
+            } else if (!foundNext) {
+                const today = new Date().toISOString().split('T')[0];
+                if (episode.air_date && episode.air_date <= today) {
+                    nextEpisode = episode;
+                    foundNext = true;
+                } else {
+                    foundNext = true;
+                    nextEpisode = null;
+                }
+            }
+        }
+    }
+
+    return { nextEpisode, totalEpisodes, watchedCount };
+}
+
+function updateNextEpisodeButton(seriesId) {
+    const btn = document.getElementById('next-episode-button');
+    if (!btn) return;
+
+    const mediaIdNum = parseInt(seriesId, 10);
+    const watchlist = getSafeLocalStorage('watchlist', []);
+    const isInWatchlist = watchlist.some(item => item.id === mediaIdNum);
+
+    if (!isInWatchlist || !window.currentSeriesData) {
+        btn.style.display = 'none';
+        return;
+    }
+
+    const { nextEpisode, totalEpisodes, watchedCount } = determineNextEpisode(seriesId);
+
+    if (nextEpisode) {
+        btn.style.display = 'flex';
+
+        const textSpan = btn.querySelector('#next-episode-text');
+        if (textSpan) {
+            const seasonNum = String(nextEpisode.season_number).padStart(2, '0');
+            const epNum = String(nextEpisode.episode_number).padStart(2, '0');
+            textSpan.textContent = `S${seasonNum}E${epNum} vu`;
+        }
+
+        btn.onclick = function(e) {
+            e.preventDefault();
+            markEpisodeAsWatched(seriesId, nextEpisode.id, totalEpisodes);
+        };
+    } else {
+        btn.style.display = 'none';
+    }
+}
+
+async function markEpisodeAsWatched(seriesId, episodeId, totalEpisodes) {
+    let watchedEpisodes = getSafeLocalStorage('watchedEpisodes', {});
+    const seriesIdStr = String(seriesId);
+    if (!watchedEpisodes[seriesIdStr]) watchedEpisodes[seriesIdStr] = [];
+
+    if (!watchedEpisodes[seriesIdStr].includes(episodeId)) {
+        watchedEpisodes[seriesIdStr].push(episodeId);
+        localStorage.setItem('watchedEpisodes', JSON.stringify(watchedEpisodes));
+
+        // Update last watched timestamp
+        let seriesLastWatchedDate = getSafeLocalStorage('seriesLastWatchedDate', {});
+        seriesLastWatchedDate[seriesIdStr] = Date.now();
+        localStorage.setItem('seriesLastWatchedDate', JSON.stringify(seriesLastWatchedDate));
+
+        const watchedCount = watchedEpisodes[seriesIdStr].length;
+        let watchedList = getSafeLocalStorage('watchedSeries', []);
+        const seriesIdNum = parseInt(seriesId, 10);
+
+        if (totalEpisodes && watchedCount >= totalEpisodes) {
+            if (!watchedList.includes(seriesIdNum)) {
+                watchedList.push(seriesIdNum);
+                localStorage.setItem('watchedSeries', JSON.stringify(watchedList));
+            }
+        }
+
+        // Refresh UI
+        updateWatchlistButton(seriesId);
+        updateNextEpisodeButton(seriesId);
+
+        // Trigger visually update on rendered UI elements
+        const icon = document.querySelector(`.episode-tick-icon[data-episode-id="${episodeId}"]`);
+        if (icon) {
+            icon.textContent = 'check_circle';
+            icon.classList.remove('text-gray-500');
+            icon.classList.add('text-green-400');
+            const seasonCard = icon.closest('.season-card');
+            updateSeasonWatchedStatus(seasonCard);
+        } else {
+            // Even if not expanded, check if season ticks need update
+            const seasonCards = document.querySelectorAll('.season-card');
+            seasonCards.forEach(card => {
+                checkSeasonStatus(seriesId, card.dataset.seasonNumber, card);
+            });
+        }
+    }
+}
+
+
 function updateWatchlistButton(mediaId) {
     const btn = document.getElementById('watchlist-button');
     if(!btn) return;
@@ -1148,7 +1292,20 @@ function updateWatchlistButton(mediaId) {
     
     btn.className = "flex-1 flex items-center justify-center gap-2 rounded-xl py-3 font-bold transition-transform active:scale-95 text-black";
     
-    if(isWatched) {
+    let isUpToDate = false;
+    if (isInWatchlist && !isMovie && window.currentSeriesData) {
+        const { nextEpisode, totalEpisodes, watchedCount } = determineNextEpisode(mediaId);
+        if (!nextEpisode && watchedCount > 0 && window.currentSeriesData.status === 'Returning Series') {
+            isUpToDate = true;
+        }
+    }
+
+    if (isUpToDate) {
+        btn.classList.remove('bg-white', 'text-black');
+        btn.classList.add('bg-primary', 'text-white');
+        icon.textContent = 'check';
+        text.textContent = 'À jour';
+    } else if(isWatched) {
         btn.classList.remove('bg-white', 'text-black');
         btn.classList.add('bg-green-500', 'text-white');
         icon.textContent = 'check_circle';
