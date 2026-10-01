@@ -1,6 +1,6 @@
 // sw.js
-// VERSION V13 - ACTIVATION DU MODE HORS LIGNE, CACHE DYNAMIQUE ET NETTOYAGE AUTO
-const CACHE_NAME = 'cinematch-v13-offline-capable';
+// VERSION V14 - ACTIVATION DU MODE HORS LIGNE, CACHE DYNAMIQUE ET NETTOYAGE AUTO
+const CACHE_NAME = 'cinematch-v14-offline-capable';
 const MAX_IMAGES = 150; // Nombre maximum d'images à conserver en mémoire
 
 const ASSETS_TO_CACHE = [
@@ -99,5 +99,9 @@ self.addEventListener('fetch', (event) => {
     return; // On arrête l'exécution ici pour les requêtes d'images
   }
 
-  voici la page serie actuelle. J'aimerais ajouter l'option assez rapidement de marquer les épisodes vus.Aujourd'hui il y a la liste des épisodes mais j'aimerais pouvoir en haut cliquer sur un bouton et marquer "vu" pas sur toute la série mais sur les épisodes (en affichant à quel épisode j'en suis)
+  // 2. STRATÉGIE "RÉSEAU D'ABORD" POUR LE RESTE (HTML, JS, API)
+  // Permet d'avoir une application toujours à jour si une connexion est disponible
+  event.respondWith(
+    fetch(event.request).catch(() => caches.match(event.request))
+  );
 });

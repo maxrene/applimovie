@@ -74,7 +74,7 @@ document.addEventListener('alpine:init', () => {
             { id: 'netflix', logoUrl: 'https://images.ctfassets.net/4cd45et68cgf/Rx83JoRDMkYNlMC9MKzcB/2b14d5a59fc3937afd3f03191e19502d/Netflix-Symbol.png?w=700&h=456' },
             { id: 'prime', logoUrl: 'https://www.citypng.com/public/uploads/preview/amazon-prime-ios-app-icon-701751695133984u2yuon8nlu.png' }, // <-- MODIFIÉ
             { id: 'disney', logoUrl: 'https://platform.theverge.com/wp-content/uploads/sites/2/chorus/uploads/chorus_asset/file/25357066/Disney__Logo_March_2024.png?quality=90&strip=all&crop=0,0,100,100' },
-            { id: 'apple', logoUrl: 'https://images.seeklogo.com/logo-png/31/2/apple-tv-logo-png_seeklogo-314167.png' }, // <-- MODIFIÉ            
+            { id: 'apple', logoUrl: 'https://image.tmdb.org/t/p/original/9icYBfYFcwgCbky5VdGUIKJ4C5i.png' },
             { id: 'canal', logoUrl: 'https://static1.purepeople.com/articles/0/46/23/10/@/6655765-logo-de-la-chaine-canal-1200x0-2.png' },
             { id: 'paramount', logoUrl: 'https://images.seeklogo.com/logo-png/39/1/paramount-logo-png_seeklogo-397501.png' },
             { id: 'max', logoUrl: 'https://logo.clearbit.com/max.com' },
@@ -211,9 +211,17 @@ document.addEventListener('alpine:init', () => {
             this.enrichedWatchlist = watchlistWithMediaData;
             this.renderMedia(); 
 
+            const watchedEpisodes = JSON.parse(localStorage.getItem('watchedEpisodes')) || {};
             const itemsToFetch = this.enrichedWatchlist.filter(item => {
                 const cacheKey = (item.type === 'movie') ? `movie-details-${item.id}` : `series-details-${item.id}`;
-                return !this.getCachedData(cacheKey, false); 
+                const cached = this.getCachedData(cacheKey, false);
+                if (!cached) return true;
+                if (item.type !== 'movie' && (watchedEpisodes[item.id] || []).length > 0 && Array.isArray(cached.seasons)) {
+                    const today = new Date().toISOString().split('T')[0];
+                    const missingEpisodes = cached.seasons.some(s => s.season_number > 0 && (!s.air_date || s.air_date <= today) && !Array.isArray(s.episodes));
+                    if (missingEpisodes) return true;
+                }
+                return false;
             });
 
             if (itemsToFetch.length === 0) return;
@@ -305,8 +313,15 @@ document.addEventListener('alpine:init', () => {
 
         async fetchFullSeriesDetails(seriesId) {
             const cacheKey = `series-details-${seriesId}`;
+            const watchedEpisodes = JSON.parse(localStorage.getItem('watchedEpisodes')) || {};
+            const seriesWatched = watchedEpisodes[seriesId] || [];
             const cachedData = this.getCachedData(cacheKey);
-            if (cachedData) return cachedData;
+            if (cachedData) {
+                const today = new Date().toISOString().split('T')[0];
+                const needsMoreSeasons = seriesWatched.length > 0 && Array.isArray(cachedData.seasons) &&
+                    cachedData.seasons.some(s => s.season_number > 0 && (!s.air_date || s.air_date <= today) && !Array.isArray(s.episodes));
+                if (!needsMoreSeasons) return cachedData;
+            }
             try {
                 const seriesRes = await apiQueue.add(() =>
                     fetch(`https://api.themoviedb.org/3/tv/${seriesId}?api_key=${TMDB_API_KEY}&append_to_response=watch/providers`)
@@ -315,10 +330,7 @@ document.addEventListener('alpine:init', () => {
 
                 const seriesData = await seriesRes.json();
 
-                const watchedEpisodes = JSON.parse(localStorage.getItem('watchedEpisodes')) || {};
-                const seriesWatched = watchedEpisodes[seriesId] || [];
-
-                let seasonsToFetch = seriesData.seasons.filter(s => s.season_number > 0);
+                let seasonsToFetch = (seriesData.seasons || []).filter(s => s.season_number > 0);
 
                 if (seriesWatched.length === 0) {
                     seasonsToFetch = seasonsToFetch.filter(s => s.season_number === 1);
@@ -331,21 +343,24 @@ document.addEventListener('alpine:init', () => {
                     )
                 );
 
-                const seasonsWithEpisodes = await Promise.all(seasonPromises);
-        seriesData.seasons = seasonsWithEpisodes.filter(s => s);
+                const seasonsWithEpisodes = (await Promise.all(seasonPromises)).filter(Boolean);
+                const fetchedByNumber = new Map(seasonsWithEpisodes.map(s => [s.season_number, s]));
+                seriesData.seasons = (seriesData.seasons || [])
+                    .filter(s => s.season_number > 0)
+                    .map(s => fetchedByNumber.get(s.season_number) ? { ...s, ...fetchedByNumber.get(s.season_number) } : s);
 
-        // On isole la mise en cache pour ne pas faire planter l'affichage si le stockage mobile est plein
-        try { 
-            this.setCachedData(cacheKey, seriesData); 
-        } catch (cacheError) { 
-            console.warn("Stockage local saturé, impossible de mettre la série en cache."); 
-        }
-        
-        return seriesData;
-    } catch (e) {
-        return this.getCachedData(cacheKey, true) || null;
-    }
-},
+                // On isole la mise en cache pour ne pas faire planter l'affichage si le stockage mobile est plein
+                try { 
+                    this.setCachedData(cacheKey, seriesData); 
+                } catch (cacheError) { 
+                    console.warn("Stockage local saturé, impossible de mettre la série en cache."); 
+                }
+                
+                return seriesData;
+            } catch (e) {
+                return this.getCachedData(cacheKey, true) || null;
+            }
+        },
 
         get filteredMedia() {
             const type = this.subTab === 'movie' ? 'movie' : 'serie';
@@ -621,14 +636,16 @@ document.addEventListener('alpine:init', () => {
 
              if (!item.apiDetails.seasons) return this.createUnwatchedTVItemHTML(item);
 
+             const today = new Date().toISOString().split('T')[0];
              const sortedSeasons = item.apiDetails.seasons.filter(s => s.season_number > 0).sort((a, b) => a.season_number - b.season_number);
 
              for (const season of sortedSeasons) {
                  if (!season.episodes || !Array.isArray(season.episodes)) continue;
 
-                 const sortedEpisodes = season.episodes.sort((a, b) => a.episode_number - b.episode_number);
+                 const sortedEpisodes = [...season.episodes].sort((a, b) => a.episode_number - b.episode_number);
                  for (const episode of sortedEpisodes) {
-                     if (!seriesWatchedEpisodes.has(episode.id)) {
+                     const isReleased = episode.air_date ? episode.air_date <= today : (!season.air_date || season.air_date <= today);
+                     if (isReleased && !seriesWatchedEpisodes.has(episode.id)) {
                          nextEpisode = episode;
                          currentSeasonForProgress = season;
                          break;
@@ -639,10 +656,14 @@ document.addEventListener('alpine:init', () => {
 
              if (!nextEpisode || !currentSeasonForProgress) return this.createUnwatchedTVItemHTML(item);
 
-             const seasonEpisodeIds = new Set(currentSeasonForProgress.episodes.map(e => e.id));
+             const releasedSeasonEpisodes = currentSeasonForProgress.episodes.filter(e =>
+                 e.air_date ? e.air_date <= today : (!currentSeasonForProgress.air_date || currentSeasonForProgress.air_date <= today)
+             );
+             const seasonEpisodeIds = new Set(releasedSeasonEpisodes.map(e => e.id));
              const seasonWatchedCount = [...seriesWatchedEpisodes].filter(id => seasonEpisodeIds.has(id)).length;
-             const remainingInSeason = currentSeasonForProgress.episodes.length - seasonWatchedCount;
-             const totalProgress = (seriesWatchedEpisodes.size / item.apiDetails.number_of_episodes) * 100;
+             const remainingInSeason = Math.max(0, releasedSeasonEpisodes.length - seasonWatchedCount);
+             const totalReleased = this.getReleasedEpisodeCount(item.apiDetails) || item.apiDetails.number_of_episodes || 1;
+             const totalProgress = Math.min(100, (seriesWatchedEpisodes.size / totalReleased) * 100);
              const platformsHTML = this.createPlatformIconsHTML(item.dynamicProviders);
              const totalSeasons = item.apiDetails.number_of_seasons;
              const startYear = String(item.year).split(' - ')[0];

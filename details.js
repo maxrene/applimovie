@@ -9,7 +9,7 @@ const CUSTOM_PLATFORMS = {
     8: { name: 'Netflix', url: 'https://images.ctfassets.net/4cd45et68cgf/Rx83JoRDMkYNlMC9MKzcB/2b14d5a59fc3937afd3f03191e19502d/Netflix-Symbol.png?w=700&h=456' },
     119: { name: 'Prime Video', url: 'https://www.citypng.com/public/uploads/preview/amazon-prime-ios-app-icon-701751695133984u2yuon8nlu.png' },
     337: { name: 'Disney+', url: 'https://platform.theverge.com/wp-content/uploads/sites/2/chorus/uploads/chorus_asset/file/25357066/Disney__Logo_March_2024.png?quality=90&strip=all&crop=0,0,100,100' },
-    350: { name: 'Apple TV+', url: 'https://images.seeklogo.com/logo-png/31/2/apple-tv-logo-png_seeklogo-314167.png' },
+    350: { name: 'Apple TV+', url: 'https://image.tmdb.org/t/p/original/9icYBfYFcwgCbky5VdGUIKJ4C5i.png' },
     392: { name: 'Canal+', url: 'https://static1.purepeople.com/articles/0/46/23/10/@/6655765-logo-de-la-chaine-canal-1200x0-2.png' },
     531: { name: 'Paramount+', url: 'https://images.seeklogo.com/logo-png/39/1/paramount-logo-png_seeklogo-397501.png' },
     1899: { name: 'Max', url: 'https://logo.clearbit.com/max.com' },
@@ -140,6 +140,7 @@ async function fetchFullFromTMDB(id, type) {
         if (type === 'tv' && data.seasons) {
             const releasedCount = getReleasedEpisodeCount(data);
             updateSeasonsUI(data.seasons, id, releasedCount);
+            syncSeriesStateFromEpisodes(id);
         }
 
         // Caching for Home/Popular views
@@ -262,6 +263,7 @@ async function fetchUpdates(id, type) {
             if (seriesDetailsData.seasons) {
                 const releasedCount = getReleasedEpisodeCount(seriesDetailsData);
                 updateSeasonsUI(seriesDetailsData.seasons, id, releasedCount);
+                syncSeriesStateFromEpisodes(id);
             }
         }
 
@@ -501,6 +503,17 @@ function updatePersonUI(person, type) {
     if (roleText) roleText.textContent = role;
 }
 
+function isEpisodeReleased(episode, season = null) {
+    const today = new Date().toISOString().split('T')[0];
+    if (episode && episode.air_date) {
+        return episode.air_date <= today;
+    }
+    if (season && season.air_date) {
+        return season.air_date <= today;
+    }
+    return true;
+}
+
 function updateSeasonWatchedStatus(seasonCard) {
     if (!seasonCard) return;
 
@@ -516,7 +529,9 @@ function updateSeasonWatchedStatus(seasonCard) {
 
     // Only update right tick logic
     if (episodeIcons.length > 0) {
-        const allWatched = Array.from(episodeIcons).every(icon => icon.textContent.trim() === 'check_circle');
+        const releasedIcons = Array.from(episodeIcons).filter(icon => icon.dataset.released !== 'false');
+        const targetIcons = releasedIcons.length > 0 ? releasedIcons : Array.from(episodeIcons);
+        const allWatched = targetIcons.length > 0 && targetIcons.every(icon => icon.textContent.trim() === 'check_circle');
         const rightTick = seasonCard.querySelector('.season-tick-action');
 
         if (rightTick) {
@@ -536,30 +551,50 @@ function updateSeasonWatchedStatus(seasonCard) {
 
 async function checkSeasonStatus(seriesId, seasonNumber, seasonCard) {
     try {
+        const rightTick = seasonCard.querySelector('.season-tick-action');
         let watchedEpisodes = getSafeLocalStorage('watchedEpisodes', {});
-        let seriesWatched = watchedEpisodes[seriesId] || [];
+        let seriesWatched = watchedEpisodes[String(seriesId)] || [];
 
-        // Optimization: If series has NO watched episodes, skip fetch
-        if (seriesWatched.length === 0) return;
+        // If series has NO watched episodes, ensure tick is unchecked and skip fetch
+        if (seriesWatched.length === 0) {
+            if (rightTick) {
+                rightTick.textContent = 'radio_button_unchecked';
+                rightTick.classList.remove('text-green-400');
+                rightTick.classList.add('text-gray-500');
+                rightTick.style.transform = 'none';
+            }
+            return;
+        }
 
-        const url = `${BASE_URL}/tv/${seriesId}/season/${seasonNumber}?api_key=${TMDB_API_KEY}`;
-        const res = await fetch(url);
-        if (!res.ok) return;
-        const data = await res.json();
+        let data = window.currentSeriesData && window.currentSeriesData[`season/${seasonNumber}`];
+        if (!data) {
+            const url = `${BASE_URL}/tv/${seriesId}/season/${seasonNumber}?api_key=${TMDB_API_KEY}`;
+            const res = await fetch(url);
+            if (!res.ok) return;
+            data = await res.json();
+            if (window.currentSeriesData) {
+                window.currentSeriesData[`season/${seasonNumber}`] = data;
+            }
+        }
 
         const episodes = data.episodes || [];
         if (episodes.length === 0) return;
 
-        const allWatched = episodes.every(ep => seriesWatched.includes(ep.id));
+        const releasedEpisodes = episodes.filter(ep => isEpisodeReleased(ep, data));
+        const targetEpisodes = releasedEpisodes.length > 0 ? releasedEpisodes : episodes;
+        const allWatched = targetEpisodes.every(ep => seriesWatched.includes(ep.id));
 
-        if (allWatched) {
-             const rightTick = seasonCard.querySelector('.season-tick-action');
-             if(rightTick) {
+        if (rightTick) {
+            rightTick.style.transform = 'none';
+            if (allWatched) {
                 rightTick.textContent = 'check_circle';
                 rightTick.classList.remove('text-gray-500');
                 rightTick.classList.add('text-green-400');
-                rightTick.style.transform = 'none';
-             }
+            } else {
+                rightTick.textContent = 'radio_button_unchecked';
+                rightTick.classList.remove('text-green-400');
+                rightTick.classList.add('text-gray-500');
+            }
         }
     } catch (e) {
         console.error("Error checking season status", e);
@@ -569,24 +604,32 @@ async function checkSeasonStatus(seriesId, seasonNumber, seasonCard) {
 async function handleSeasonCheck(seriesId, seasonNumber, seasonCard, totalEpisodes) {
     const episodesContainer = seasonCard.querySelector('.episodes-container');
     const tick = seasonCard.querySelector('.season-tick-action');
+    const seriesIdStr = String(seriesId);
 
     // 1. Ensure Episodes are Loaded (Fetch if needed)
     if (!episodesContainer.dataset.loaded) {
         tick.textContent = 'hourglass_empty'; // Loading indicator
         try {
-            const url = `${BASE_URL}/tv/${seriesId}/season/${seasonNumber}?api_key=${TMDB_API_KEY}`;
-            const res = await fetch(url);
-            if (!res.ok) throw new Error('Failed to fetch season details');
-            const seasonDetails = await res.json();
+            let seasonDetails = window.currentSeriesData && window.currentSeriesData[`season/${seasonNumber}`];
+            if (!seasonDetails) {
+                const url = `${BASE_URL}/tv/${seriesId}/season/${seasonNumber}?api_key=${TMDB_API_KEY}`;
+                const res = await fetch(url);
+                if (!res.ok) throw new Error('Failed to fetch season details');
+                seasonDetails = await res.json();
+                if (window.currentSeriesData) {
+                    window.currentSeriesData[`season/${seasonNumber}`] = seasonDetails;
+                }
+            }
             const episodes = seasonDetails.episodes || [];
 
             // Render hidden (just to populate DOM and check IDs)
             if (episodes.length > 0) {
-                 const watchedEpisodes = getSafeLocalStorage('watchedEpisodes', {});
-                 const seriesWatchedEpisodes = watchedEpisodes[seriesId] || [];
+                const watchedEpisodes = getSafeLocalStorage('watchedEpisodes', {});
+                const seriesWatchedEpisodes = watchedEpisodes[seriesIdStr] || [];
 
-                 const episodesListHTML = episodes.map(episode => {
+                const episodesListHTML = episodes.map(episode => {
                     const isChecked = seriesWatchedEpisodes.includes(episode.id);
+                    const isReleased = isEpisodeReleased(episode, seasonDetails);
                     return `
                         <div class="flex items-center gap-3 p-3 border-t border-white/5 hover:bg-white/5 transition-colors">
                             <span class="text-xs font-mono text-gray-500 w-6 text-center">${episode.episode_number}</span>
@@ -594,7 +637,7 @@ async function handleSeasonCheck(seriesId, seasonNumber, seasonCard, totalEpisod
                                 <p class="text-sm font-medium text-white truncate">${episode.name}</p>
                                 <p class="text-[10px] text-gray-500">${episode.runtime ? episode.runtime + 'm' : ''}</p>
                             </div>
-                            <span class="material-symbols-outlined !text-xl cursor-pointer episode-tick-icon ${isChecked ? 'text-green-400' : 'text-gray-500'}" data-episode-id="${episode.id}">${isChecked ? 'check_circle' : 'radio_button_unchecked'}</span>
+                            <span class="material-symbols-outlined !text-xl cursor-pointer episode-tick-icon ${isChecked ? 'text-green-400' : 'text-gray-500'}" data-episode-id="${episode.id}" data-released="${isReleased}">${isChecked ? 'check_circle' : 'radio_button_unchecked'}</span>
                         </div>`;
                 }).join('');
 
@@ -615,31 +658,34 @@ async function handleSeasonCheck(seriesId, seasonNumber, seasonCard, totalEpisod
         }
     }
 
-    // 2. Determine Action: Mark All or Unmark All
-    const episodeIcons = episodesContainer.querySelectorAll('.episode-tick-icon');
-    const allCurrentlyWatched = Array.from(episodeIcons).every(icon => icon.textContent.trim() === 'check_circle');
+    // 2. Determine Action: Mark All Released or Unmark All
+    const episodeIcons = Array.from(episodesContainer.querySelectorAll('.episode-tick-icon'));
+    const releasedIcons = episodeIcons.filter(icon => icon.dataset.released !== 'false');
+    const targetIcons = releasedIcons.length > 0 ? releasedIcons : episodeIcons;
+    const allCurrentlyWatched = targetIcons.length > 0 && targetIcons.every(icon => icon.textContent.trim() === 'check_circle');
 
-    // If all are currently watched (GREEN), we want to UNWATCH all.
-    // If mixed or none are watched (GREY), we want to WATCH all.
+    // If all released are currently watched (GREEN), we want to UNWATCH all.
+    // If mixed or none are watched (GREY), we want to WATCH all released.
     const shouldMarkWatched = !allCurrentlyWatched;
 
     let watchedEpisodes = getSafeLocalStorage('watchedEpisodes', {});
-    if (!watchedEpisodes[seriesId]) watchedEpisodes[seriesId] = [];
+    if (!watchedEpisodes[seriesIdStr]) watchedEpisodes[seriesIdStr] = [];
 
     episodeIcons.forEach(icon => {
         const epId = parseInt(icon.dataset.episodeId, 10);
+        const isTarget = targetIcons.includes(icon);
 
-        if (shouldMarkWatched) {
-            if (!watchedEpisodes[seriesId].includes(epId)) {
-                watchedEpisodes[seriesId].push(epId);
+        if (shouldMarkWatched && isTarget) {
+            if (!watchedEpisodes[seriesIdStr].includes(epId)) {
+                watchedEpisodes[seriesIdStr].push(epId);
             }
             icon.textContent = 'check_circle';
             icon.classList.remove('text-gray-500');
             icon.classList.add('text-green-400');
-        } else {
-            const idx = watchedEpisodes[seriesId].indexOf(epId);
+        } else if (!shouldMarkWatched) {
+            const idx = watchedEpisodes[seriesIdStr].indexOf(epId);
             if (idx > -1) {
-                watchedEpisodes[seriesId].splice(idx, 1);
+                watchedEpisodes[seriesIdStr].splice(idx, 1);
             }
             icon.textContent = 'radio_button_unchecked';
             icon.classList.remove('text-green-400');
@@ -649,42 +695,15 @@ async function handleSeasonCheck(seriesId, seasonNumber, seasonCard, totalEpisod
 
     // 3. Update Storage & Global State
     if (shouldMarkWatched) {
-        // Add series to Watchlist if adding episodes
-        let watchlist = getSafeLocalStorage('watchlist', []);
-        const seriesIdNum = parseInt(seriesId, 10);
-        if (!watchlist.some(item => item.id === seriesIdNum)) {
-            watchlist.push({ id: seriesIdNum, type: 'serie', added_at: new Date().toISOString() });
-            localStorage.setItem('watchlist', JSON.stringify(watchlist));
-        }
-
-        // Update last watched timestamp for sorting
         let seriesLastWatchedDate = getSafeLocalStorage('seriesLastWatchedDate', {});
-        seriesLastWatchedDate[seriesId] = Date.now();
+        seriesLastWatchedDate[seriesIdStr] = Date.now();
         localStorage.setItem('seriesLastWatchedDate', JSON.stringify(seriesLastWatchedDate));
     }
 
     localStorage.setItem('watchedEpisodes', JSON.stringify(watchedEpisodes));
 
-    // Check global "Vu" status for series
-    const watchedCount = watchedEpisodes[seriesId].length;
-    let watchedList = getSafeLocalStorage('watchedSeries', []);
-    const seriesIdNum = parseInt(seriesId, 10);
-
-    if (totalEpisodes && watchedCount >= totalEpisodes) { // Use >= for safety
-        if (!watchedList.includes(seriesIdNum)) {
-            watchedList.push(seriesIdNum);
-            localStorage.setItem('watchedSeries', JSON.stringify(watchedList));
-        }
-    } else {
-        if (watchedList.includes(seriesIdNum)) {
-            watchedList = watchedList.filter(id => id !== seriesIdNum);
-            localStorage.setItem('watchedSeries', JSON.stringify(watchedList));
-        }
-    }
-
-    updateWatchlistButton(seriesId);
-    updateNextEpisodeButton(seriesId);
     updateSeasonWatchedStatus(seasonCard);
+    syncSeriesStateFromEpisodes(seriesId, totalEpisodes, true);
 }
 
 function updateSeasonsUI(seasons, seriesId, totalEpisodes) {
@@ -740,35 +759,42 @@ function updateSeasonsUI(seasons, seriesId, totalEpisodes) {
         header.addEventListener('click', async () => {
             const card = header.closest('.season-card');
             const episodesContainer = card.querySelector('.episodes-container');
-            const arrow = card.querySelector('.material-symbols-outlined');
+            const arrow = card.querySelector('.material-symbols-outlined:not(.season-tick-action)');
             const seasonNumber = card.dataset.seasonNumber;
 
             const cardIsOpen = card.classList.contains('open');
 
             if (cardIsOpen) {
                 card.classList.remove('open');
-                arrow.style.transform = 'rotate(0deg)';
+                if (arrow) arrow.style.transform = 'rotate(0deg)';
             } else {
                 card.classList.add('open');
-                arrow.style.transform = 'rotate(180deg)';
+                if (arrow) arrow.style.transform = 'rotate(180deg)';
                 
                 if (!episodesContainer.dataset.loaded) {
                     episodesContainer.innerHTML = '<div class="p-4 text-center"><div class="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full mx-auto"></div></div>';
                     try {
-                        const url = `${BASE_URL}/tv/${seriesId}/season/${seasonNumber}?api_key=${TMDB_API_KEY}`;
-                        const res = await fetch(url);
-                        if (!res.ok) throw new Error('Failed to fetch season details');
-                        const seasonDetails = await res.json();
+                        let seasonDetails = window.currentSeriesData && window.currentSeriesData[`season/${seasonNumber}`];
+                        if (!seasonDetails) {
+                            const url = `${BASE_URL}/tv/${seriesId}/season/${seasonNumber}?api_key=${TMDB_API_KEY}`;
+                            const res = await fetch(url);
+                            if (!res.ok) throw new Error('Failed to fetch season details');
+                            seasonDetails = await res.json();
+                            if (window.currentSeriesData) {
+                                window.currentSeriesData[`season/${seasonNumber}`] = seasonDetails;
+                            }
+                        }
 
                         const episodes = seasonDetails.episodes;
                         if (!episodes || episodes.length === 0) {
                             episodesContainer.innerHTML = '<div class="p-4 text-gray-400 text-sm">Aucun épisode.</div>';
                         } else {
                             const watchedEpisodes = getSafeLocalStorage('watchedEpisodes', {});
-                            const seriesWatchedEpisodes = watchedEpisodes[seriesId] || [];
+                            const seriesWatchedEpisodes = watchedEpisodes[String(seriesId)] || [];
 
                             const episodesListHTML = episodes.map(episode => {
                                 const isChecked = seriesWatchedEpisodes.includes(episode.id);
+                                const isReleased = isEpisodeReleased(episode, seasonDetails);
                                 return `
                                     <div class="flex items-center gap-3 p-3 border-t border-white/5 hover:bg-white/5 transition-colors">
                                         <span class="text-xs font-mono text-gray-500 w-6 text-center">${episode.episode_number}</span>
@@ -776,7 +802,7 @@ function updateSeasonsUI(seasons, seriesId, totalEpisodes) {
                                             <p class="text-sm font-medium text-white truncate">${episode.name}</p>
                                             <p class="text-[10px] text-gray-500">${episode.runtime ? episode.runtime + 'm' : ''}</p>
                                         </div>
-                                        <span class="material-symbols-outlined !text-xl cursor-pointer episode-tick-icon ${isChecked ? 'text-green-400' : 'text-gray-500'}" data-episode-id="${episode.id}">${isChecked ? 'check_circle' : 'radio_button_unchecked'}</span>
+                                        <span class="material-symbols-outlined !text-xl cursor-pointer episode-tick-icon ${isChecked ? 'text-green-400' : 'text-gray-500'}" data-episode-id="${episode.id}" data-released="${isReleased}">${isChecked ? 'check_circle' : 'radio_button_unchecked'}</span>
                                     </div>`;
                             }).join('');
 
@@ -838,56 +864,82 @@ function updateVideosUI(videos) {
 
 function toggleEpisodeWatchedStatus(seriesId, episodeId, totalEpisodes, icon) {
     let watchedEpisodes = getSafeLocalStorage('watchedEpisodes', {});
-    if (!watchedEpisodes[seriesId]) watchedEpisodes[seriesId] = [];
+    const seriesIdStr = String(seriesId);
+    if (!watchedEpisodes[seriesIdStr]) watchedEpisodes[seriesIdStr] = [];
 
-    const seriesIdNum = parseInt(seriesId, 10);
-    const episodeIndex = watchedEpisodes[seriesId].indexOf(episodeId);
+    const episodeIndex = watchedEpisodes[seriesIdStr].indexOf(episodeId);
 
     if (episodeIndex > -1) {
-        watchedEpisodes[seriesId].splice(episodeIndex, 1);
+        watchedEpisodes[seriesIdStr].splice(episodeIndex, 1);
         icon.textContent = 'radio_button_unchecked';
         icon.classList.remove('text-green-400');
         icon.classList.add('text-gray-500');
     } else {
-        watchedEpisodes[seriesId].push(episodeId);
+        watchedEpisodes[seriesIdStr].push(episodeId);
         icon.textContent = 'check_circle';
         icon.classList.remove('text-gray-500');
         icon.classList.add('text-green-400');
 
         // Update last watched timestamp for sorting
         let seriesLastWatchedDate = getSafeLocalStorage('seriesLastWatchedDate', {});
-        seriesLastWatchedDate[seriesId] = Date.now();
+        seriesLastWatchedDate[seriesIdStr] = Date.now();
         localStorage.setItem('seriesLastWatchedDate', JSON.stringify(seriesLastWatchedDate));
-    }
-
-    let watchlist = getSafeLocalStorage('watchlist', []);
-    if (!watchlist.some(item => item.id === seriesIdNum)) {
-        watchlist.push({ id: seriesIdNum, type: 'serie', added_at: new Date().toISOString() });
-        localStorage.setItem('watchlist', JSON.stringify(watchlist));
-        updateWatchlistButton(seriesId);
     }
 
     localStorage.setItem('watchedEpisodes', JSON.stringify(watchedEpisodes));
 
     const seasonCard = icon.closest('.season-card');
     updateSeasonWatchedStatus(seasonCard);
+    syncSeriesStateFromEpisodes(seriesId, totalEpisodes, true);
+}
 
-    const watchedCount = watchedEpisodes[seriesId].length;
-    let watchedList = getSafeLocalStorage('watchedSeries', []);
-    
-    if (totalEpisodes && watchedCount >= totalEpisodes) {
-        if (!watchedList.includes(seriesIdNum)) {
-            watchedList.push(seriesIdNum);
-            localStorage.setItem('watchedSeries', JSON.stringify(watchedList));
-            updateWatchlistButton(seriesId);
+function syncSeriesStateFromEpisodes(seriesId, fallbackTotalEpisodes = null, userAction = false) {
+    const seriesIdNum = parseInt(seriesId, 10);
+    const seriesIdStr = String(seriesId);
+
+    const watchedEpisodes = getSafeLocalStorage('watchedEpisodes', {});
+    const seriesWatchedList = watchedEpisodes[seriesIdStr] || [];
+    const watchedCount = seriesWatchedList.length;
+
+    let watchlist = getSafeLocalStorage('watchlist', []);
+    let watchedSeries = getSafeLocalStorage('watchedSeries', []);
+
+    const isInWatchlist = watchlist.some(item => item.id === seriesIdNum);
+    const isMarkedWatched = watchedSeries.includes(seriesIdNum);
+
+    const episodeInfo = window.currentSeriesData ? determineNextEpisode(seriesId) : null;
+    const effectiveTotal = (episodeInfo && episodeInfo.totalReleasedEpisodes > 0)
+        ? episodeInfo.totalReleasedEpisodes
+        : (window.currentSeriesData ? getReleasedEpisodeCount(window.currentSeriesData) : fallbackTotalEpisodes);
+
+    let allReleasedWatched = false;
+    if (episodeInfo && episodeInfo.hasSeasonDetails) {
+        allReleasedWatched = episodeInfo.totalReleasedEpisodes > 0 &&
+            episodeInfo.watchedReleasedCount >= episodeInfo.totalReleasedEpisodes &&
+            !episodeInfo.nextEpisode;
+    } else if (effectiveTotal && effectiveTotal > 0) {
+        allReleasedWatched = watchedCount >= effectiveTotal;
+    }
+
+    // Ensure any series with watched episodes or marked as watched stays in watchlist
+    if ((watchedCount > 0 || isMarkedWatched) && !isInWatchlist) {
+        watchlist.push({ id: seriesIdNum, type: 'serie', added_at: new Date().toISOString() });
+        localStorage.setItem('watchlist', JSON.stringify(watchlist));
+    }
+
+    if (allReleasedWatched) {
+        if (!watchedSeries.includes(seriesIdNum)) {
+            watchedSeries.push(seriesIdNum);
+            localStorage.setItem('watchedSeries', JSON.stringify(watchedSeries));
         }
-    } else {
-        if (watchedList.includes(seriesIdNum)) {
-            watchedList = watchedList.filter(id => id !== seriesIdNum);
-            localStorage.setItem('watchedSeries', JSON.stringify(watchedList));
-            updateWatchlistButton(seriesId);
+    } else if (watchedCount > 0 || userAction) {
+        if (watchedSeries.includes(seriesIdNum)) {
+            watchedSeries = watchedSeries.filter(id => id !== seriesIdNum);
+            localStorage.setItem('watchedSeries', JSON.stringify(watchedSeries));
         }
     }
+
+    updateWatchlistButton(seriesId);
     updateNextEpisodeButton(seriesId);
 }
 
@@ -1007,10 +1059,11 @@ function initializeWatchlistButton(mediaId) {
             toggleWatchlist(mediaId);
         };
     }
-    }
+}
 
 async function toggleWatchlist(mediaId) {
     const mediaIdNum = parseInt(mediaId, 10);
+    const mediaIdStr = String(mediaId);
     const bodyType = document.body.dataset.type;
     const isMovie = bodyType ? bodyType === 'movie' : window.location.pathname.includes('film.html');
     const watchedListKey = isMovie ? 'watchedMovies' : 'watchedSeries';
@@ -1020,30 +1073,84 @@ async function toggleWatchlist(mediaId) {
     const isWatched = watchedList.includes(mediaIdNum);
 
     try {
-        if (isWatched) {
+        if (isMovie) {
+            if (isWatched) {
+                watchlist = watchlist.filter(item => item.id !== mediaIdNum);
+                watchedList = watchedList.filter(id => id !== mediaIdNum);
+                localStorage.setItem('watchlist', JSON.stringify(watchlist));
+                localStorage.setItem(watchedListKey, JSON.stringify(watchedList));
+            } else if (isInWatchlist) {
+                watchlist = watchlist.filter(item => item.id !== mediaIdNum);
+                localStorage.setItem('watchlist', JSON.stringify(watchlist));
+                watchedList.push(mediaIdNum);
+                localStorage.setItem(watchedListKey, JSON.stringify(watchedList));
+            } else {
+                watchlist.push({ id: mediaIdNum, type: 'movie', added_at: new Date().toISOString() });
+                localStorage.setItem('watchlist', JSON.stringify(watchlist));
+                if (window.offlineManager) {
+                    window.offlineManager.cacheMedia(mediaIdNum, 'movie');
+                }
+            }
+            updateWatchlistButton(mediaId);
+            return;
+        }
+
+        // Logique Série TV :
+        // - Si la série est déjà "Vu" ou "À jour" -> on réinitialise tout (retire de la liste, décoche tous les épisodes)
+        // - Si la série est "Dans ma liste" ou "En cours" -> on marque tous les épisodes sortis comme vus ("Vu" / "À jour")
+        // - Si la série n'est pas suivie -> on l'ajoute à "Dans ma liste"
+        const watchedEpisodes = getSafeLocalStorage('watchedEpisodes', {});
+        const watchedCount = (watchedEpisodes[mediaIdStr] || []).length;
+        const episodeInfo = window.currentSeriesData ? determineNextEpisode(mediaId) : null;
+        const allReleasedWatched = episodeInfo && episodeInfo.hasSeasonDetails
+            ? (episodeInfo.totalReleasedEpisodes > 0 && episodeInfo.watchedReleasedCount >= episodeInfo.totalReleasedEpisodes && !episodeInfo.nextEpisode)
+            : false;
+        const isCompleted = isWatched || allReleasedWatched;
+
+        if (isCompleted) {
             watchlist = watchlist.filter(item => item.id !== mediaIdNum);
             watchedList = watchedList.filter(id => id !== mediaIdNum);
-            localStorage.setItem('watchlist', JSON.stringify(watchlist));
-            localStorage.setItem(watchedListKey, JSON.stringify(watchedList));
-            updateWatchlistButton(mediaId);
-        } else if (isInWatchlist) {
-            watchlist = watchlist.filter(item => item.id !== mediaIdNum);
-            localStorage.setItem('watchlist', JSON.stringify(watchlist));
-            watchedList.push(mediaIdNum);
-            localStorage.setItem(watchedListKey, JSON.stringify(watchedList));
-            updateWatchlistButton(mediaId);
+            delete watchedEpisodes[mediaIdStr];
 
-            if (!isMovie) markAllEpisodesWatched(mediaId);
-        } else {
-            const type = isMovie ? 'movie' : 'serie';
-            watchlist.push({ id: mediaIdNum, type: type, added_at: new Date().toISOString() });
             localStorage.setItem('watchlist', JSON.stringify(watchlist));
-            updateWatchlistButton(mediaId);
+            localStorage.setItem(watchedListKey, JSON.stringify(watchedList));
+            localStorage.setItem('watchedEpisodes', JSON.stringify(watchedEpisodes));
+
+            // Réinitialiser visuellement les coches des saisons et épisodes
+            document.querySelectorAll('.season-card').forEach(card => {
+                const rightTick = card.querySelector('.season-tick-action');
+                if (rightTick) {
+                    rightTick.textContent = 'radio_button_unchecked';
+                    rightTick.classList.remove('text-green-400');
+                    rightTick.classList.add('text-gray-500');
+                    rightTick.style.transform = 'none';
+                }
+                card.querySelectorAll('.episode-tick-icon').forEach(icon => {
+                    icon.textContent = 'radio_button_unchecked';
+                    icon.classList.remove('text-green-400');
+                    icon.classList.add('text-gray-500');
+                });
+            });
+        } else if (isInWatchlist || watchedCount > 0) {
+            if (!isInWatchlist) {
+                watchlist.push({ id: mediaIdNum, type: 'serie', added_at: new Date().toISOString() });
+                localStorage.setItem('watchlist', JSON.stringify(watchlist));
+            }
+            if (!watchedList.includes(mediaIdNum)) {
+                watchedList.push(mediaIdNum);
+                localStorage.setItem(watchedListKey, JSON.stringify(watchedList));
+            }
+            await markAllEpisodesWatched(mediaId);
+        } else {
+            watchlist.push({ id: mediaIdNum, type: 'serie', added_at: new Date().toISOString() });
+            localStorage.setItem('watchlist', JSON.stringify(watchlist));
 
             if (window.offlineManager) {
-                window.offlineManager.cacheMedia(mediaIdNum, type);
+                window.offlineManager.cacheMedia(mediaIdNum, 'serie');
             }
         }
+
+        updateWatchlistButton(mediaId);
         updateNextEpisodeButton(mediaId);
     } catch (error) {
         console.error("Erreur fatale bouton :", error);
@@ -1053,30 +1160,44 @@ async function toggleWatchlist(mediaId) {
 
 async function markAllEpisodesWatched(seriesId) {
     try {
-        // 1. Fetch Series Details to get accurate season list
-        const seriesUrl = `${BASE_URL}/tv/${seriesId}?api_key=${TMDB_API_KEY}`;
-        const seriesRes = await fetch(seriesUrl);
-        const seriesData = await seriesRes.json();
+        const seriesIdStr = String(seriesId);
+        let seriesData = window.currentSeriesData;
+        if (!seriesData || !seriesData.seasons) {
+            const seriesUrl = `${BASE_URL}/tv/${seriesId}?api_key=${TMDB_API_KEY}`;
+            const seriesRes = await fetch(seriesUrl);
+            seriesData = await seriesRes.json();
+        }
         const seasons = seriesData.seasons || [];
 
         let watchedEpisodes = getSafeLocalStorage('watchedEpisodes', {});
-        if (!watchedEpisodes[seriesId]) watchedEpisodes[seriesId] = [];
+        if (!watchedEpisodes[seriesIdStr]) watchedEpisodes[seriesIdStr] = [];
 
-        // 2. Fetch all seasons in parallel to get episode IDs
+        // Fetch all seasons in parallel (or reuse already loaded season data)
         const seasonPromises = seasons.map(season => {
-            if(season.season_number === 0) return Promise.resolve(null);
+            if (season.season_number === 0) return Promise.resolve(null);
+            if (window.currentSeriesData && window.currentSeriesData[`season/${season.season_number}`]) {
+                return Promise.resolve(window.currentSeriesData[`season/${season.season_number}`]);
+            }
             return fetch(`${BASE_URL}/tv/${seriesId}/season/${season.season_number}?api_key=${TMDB_API_KEY}`)
-                .then(r => r.json());
+                .then(r => r.json())
+                .then(d => {
+                    if (window.currentSeriesData) {
+                        window.currentSeriesData[`season/${season.season_number}`] = d;
+                    }
+                    return d;
+                });
         });
 
         const allSeasonsData = await Promise.all(seasonPromises);
 
-        // 3. Mark all episodes as watched
+        // Mark all released episodes as watched
         allSeasonsData.forEach(seasonData => {
-            if(!seasonData || !seasonData.episodes) return;
+            if (!seasonData || !seasonData.episodes) return;
             seasonData.episodes.forEach(ep => {
-                if(!watchedEpisodes[seriesId].includes(ep.id)) {
-                    watchedEpisodes[seriesId].push(ep.id);
+                if (isEpisodeReleased(ep, seasonData)) {
+                    if (!watchedEpisodes[seriesIdStr].includes(ep.id)) {
+                        watchedEpisodes[seriesIdStr].push(ep.id);
+                    }
                 }
             });
         });
@@ -1085,27 +1206,34 @@ async function markAllEpisodesWatched(seriesId) {
 
         // Update last watched timestamp for sorting
         let seriesLastWatchedDate = getSafeLocalStorage('seriesLastWatchedDate', {});
-        seriesLastWatchedDate[seriesId] = Date.now();
+        seriesLastWatchedDate[seriesIdStr] = Date.now();
         localStorage.setItem('seriesLastWatchedDate', JSON.stringify(seriesLastWatchedDate));
 
-        // 6. Update Rendered UI (Optimistic)
+        // Update Rendered UI
         const seasonCards = document.querySelectorAll('.season-card');
         seasonCards.forEach(card => {
-            // Update Season Tick
+            const sNum = parseInt(card.dataset.seasonNumber, 10);
+            const seasonObj = seasons.find(s => s.season_number === sNum);
+            const seasonData = window.currentSeriesData && window.currentSeriesData[`season/${sNum}`];
+            const seasonReleased = seasonData && seasonData.episodes
+                ? seasonData.episodes.some(ep => isEpisodeReleased(ep, seasonData))
+                : isEpisodeReleased(null, seasonObj);
+
             const rightTick = card.querySelector('.season-tick-action');
-            if(rightTick) {
+            if (rightTick && seasonReleased) {
                 rightTick.textContent = 'check_circle';
                 rightTick.classList.remove('text-gray-500');
                 rightTick.classList.add('text-green-400');
                 rightTick.style.transform = 'none';
             }
 
-            // Update Episode Ticks if rendered
             const epIcons = card.querySelectorAll('.episode-tick-icon');
             epIcons.forEach(icon => {
-                icon.textContent = 'check_circle';
-                icon.classList.remove('text-gray-500');
-                icon.classList.add('text-green-400');
+                if (icon.dataset.released !== 'false') {
+                    icon.textContent = 'check_circle';
+                    icon.classList.remove('text-gray-500');
+                    icon.classList.add('text-green-400');
+                }
             });
         });
 
@@ -1156,13 +1284,18 @@ function determineNextEpisode(seriesId) {
     const seriesDetails = window.currentSeriesData;
     const watchedEpisodes = getSafeLocalStorage('watchedEpisodes', {});
     const seriesIdStr = String(seriesId);
+    const watchedSet = new Set(watchedEpisodes[seriesIdStr] || []);
 
     let totalEpisodes = 0;
+    let totalReleasedEpisodes = 0;
     let watchedCount = 0;
+    let watchedReleasedCount = 0;
     let nextEpisode = null;
-    let foundNext = false;
+    let hasSeasonDetails = false;
 
-    const seasons = seriesDetails.seasons ? seriesDetails.seasons.sort((a, b) => a.season_number - b.season_number) : [];
+    const seasons = seriesDetails.seasons
+        ? [...seriesDetails.seasons].sort((a, b) => a.season_number - b.season_number)
+        : [];
 
     for (const season of seasons) {
         if (season.season_number === 0) continue;
@@ -1170,27 +1303,46 @@ function determineNextEpisode(seriesId) {
         const seasonDetail = seriesDetails[`season/${season.season_number}`];
         if (!seasonDetail || !seasonDetail.episodes) continue;
 
+        hasSeasonDetails = true;
         totalEpisodes += seasonDetail.episodes.length;
 
-        for (const episode of seasonDetail.episodes) {
-            const isWatched = watchedEpisodes[seriesIdStr] && watchedEpisodes[seriesIdStr].includes(episode.id);
+        const sortedEpisodes = [...seasonDetail.episodes].sort((a, b) => a.episode_number - b.episode_number);
+
+        for (const episode of sortedEpisodes) {
+            const isWatched = watchedSet.has(episode.id);
+            const isReleased = isEpisodeReleased(episode, season);
 
             if (isWatched) {
                 watchedCount++;
-            } else if (!foundNext) {
-                const today = new Date().toISOString().split('T')[0];
-                if (episode.air_date && episode.air_date <= today) {
-                    nextEpisode = episode;
-                    foundNext = true;
-                } else {
-                    foundNext = true;
-                    nextEpisode = null;
+                if (isReleased) watchedReleasedCount++;
+            }
+            if (isReleased) {
+                totalReleasedEpisodes++;
+                if (!isWatched && !nextEpisode) {
+                    nextEpisode = {
+                        ...episode,
+                        season_number: episode.season_number || season.season_number
+                    };
                 }
             }
         }
     }
 
-    return { nextEpisode, totalEpisodes, watchedCount };
+    if (!hasSeasonDetails) {
+        totalReleasedEpisodes = getReleasedEpisodeCount(seriesDetails) || 0;
+        totalEpisodes = totalReleasedEpisodes;
+        watchedCount = watchedSet.size;
+        watchedReleasedCount = watchedCount;
+    }
+
+    return {
+        nextEpisode,
+        totalEpisodes: totalReleasedEpisodes || totalEpisodes,
+        totalReleasedEpisodes,
+        watchedCount,
+        watchedReleasedCount,
+        hasSeasonDetails
+    };
 }
 
 function updateNextEpisodeButton(seriesId) {
@@ -1198,15 +1350,33 @@ function updateNextEpisodeButton(seriesId) {
     if (!btn) return;
 
     const mediaIdNum = parseInt(seriesId, 10);
+    const seriesIdStr = String(seriesId);
     const watchlist = getSafeLocalStorage('watchlist', []);
-    const isInWatchlist = watchlist.some(item => item.id === mediaIdNum);
+    const watchedSeries = getSafeLocalStorage('watchedSeries', []);
+    const watchedEpisodes = getSafeLocalStorage('watchedEpisodes', {});
+    const watchedCount = (watchedEpisodes[seriesIdStr] || []).length;
 
-    if (!isInWatchlist || !window.currentSeriesData) {
+    const isInWatchlist = watchlist.some(item => item.id === mediaIdNum);
+    const isWatched = watchedSeries.includes(mediaIdNum);
+
+    if ((!isInWatchlist && watchedCount === 0) || !window.currentSeriesData) {
         btn.style.display = 'none';
         return;
     }
 
-    const { nextEpisode, totalEpisodes, watchedCount } = determineNextEpisode(seriesId);
+    const episodeInfo = determineNextEpisode(seriesId);
+    if (!episodeInfo) {
+        btn.style.display = 'none';
+        return;
+    }
+
+    const { nextEpisode, totalEpisodes } = episodeInfo;
+
+    // Hide next-episode button if series is marked as watched and no episodes were manually unchecked
+    if (isWatched && watchedCount === 0) {
+        btn.style.display = 'none';
+        return;
+    }
 
     if (nextEpisode) {
         btn.style.display = 'flex';
@@ -1241,21 +1411,6 @@ async function markEpisodeAsWatched(seriesId, episodeId, totalEpisodes) {
         seriesLastWatchedDate[seriesIdStr] = Date.now();
         localStorage.setItem('seriesLastWatchedDate', JSON.stringify(seriesLastWatchedDate));
 
-        const watchedCount = watchedEpisodes[seriesIdStr].length;
-        let watchedList = getSafeLocalStorage('watchedSeries', []);
-        const seriesIdNum = parseInt(seriesId, 10);
-
-        if (totalEpisodes && watchedCount >= totalEpisodes) {
-            if (!watchedList.includes(seriesIdNum)) {
-                watchedList.push(seriesIdNum);
-                localStorage.setItem('watchedSeries', JSON.stringify(watchedList));
-            }
-        }
-
-        // Refresh UI
-        updateWatchlistButton(seriesId);
-        updateNextEpisodeButton(seriesId);
-
         // Trigger visually update on rendered UI elements
         const icon = document.querySelector(`.episode-tick-icon[data-episode-id="${episodeId}"]`);
         if (icon) {
@@ -1271,6 +1426,8 @@ async function markEpisodeAsWatched(seriesId, episodeId, totalEpisodes) {
                 checkSeasonStatus(seriesId, card.dataset.seasonNumber, card);
             });
         }
+
+        syncSeriesStateFromEpisodes(seriesId, totalEpisodes, true);
     }
 }
 
@@ -1279,6 +1436,7 @@ function updateWatchlistButton(mediaId) {
     const btn = document.getElementById('watchlist-button');
     if(!btn) return;
     const mediaIdNum = parseInt(mediaId, 10);
+    const mediaIdStr = String(mediaId);
     const bodyType = document.body.dataset.type;
     const isMovie = bodyType ? bodyType === 'movie' : window.location.pathname.includes('film.html');
     const watchedListKey = isMovie ? 'watchedMovies' : 'watchedSeries';
@@ -1292,28 +1450,64 @@ function updateWatchlistButton(mediaId) {
     
     btn.className = "flex-1 flex items-center justify-center gap-2 rounded-xl py-3 font-bold transition-transform active:scale-95 text-black";
     
-    let isUpToDate = false;
-    if (isInWatchlist && !isMovie && window.currentSeriesData) {
-        const { nextEpisode, totalEpisodes, watchedCount } = determineNextEpisode(mediaId);
-        if (!nextEpisode && watchedCount > 0 && window.currentSeriesData.status === 'Returning Series') {
-            isUpToDate = true;
+    if (isMovie) {
+        if (isWatched) {
+            btn.classList.remove('bg-white', 'text-black');
+            btn.classList.add('bg-green-500', 'text-white');
+            icon.textContent = 'check_circle';
+            text.textContent = 'Vu';
+        } else if (isInWatchlist) {
+            btn.classList.remove('bg-white', 'text-black');
+            btn.classList.add('bg-primary', 'text-white');
+            icon.textContent = 'check';
+            text.textContent = 'Dans ma liste';
+        } else {
+            btn.classList.remove('bg-green-500', 'bg-primary', 'text-white');
+            btn.classList.add('bg-white', 'text-black');
+            icon.textContent = 'add';
+            text.textContent = 'Ajouter à ma liste';
         }
+        return;
     }
 
-    if (isUpToDate) {
-        btn.classList.remove('bg-white', 'text-black');
-        btn.classList.add('bg-primary', 'text-white');
-        icon.textContent = 'check';
-        text.textContent = 'À jour';
-    } else if(isWatched) {
+    // États cohérents pour une Série TV :
+    // 1. "À jour" (vert) : tous les épisodes sortis sont vus et la série est toujours en production ('Returning Series' / 'In Production')
+    // 2. "Vu" (vert) : tous les épisodes sont vus et la série est terminée
+    // 3. "En cours" (rouge) : au moins 1 épisode vu et il reste des épisodes sortis à voir
+    // 4. "Dans ma liste" (rouge) : dans la liste avec 0 épisode vu
+    // 5. "Ajouter à ma liste" (blanc) : non suivie
+    const watchedEpisodes = getSafeLocalStorage('watchedEpisodes', {});
+    const watchedCount = (watchedEpisodes[mediaIdStr] || []).length;
+    const episodeInfo = window.currentSeriesData ? determineNextEpisode(mediaId) : null;
+
+    const isReturning = window.currentSeriesData &&
+        (window.currentSeriesData.status === 'Returning Series' || window.currentSeriesData.status === 'In Production');
+
+    let allReleasedWatched = false;
+    if (episodeInfo && episodeInfo.hasSeasonDetails) {
+        allReleasedWatched = episodeInfo.totalReleasedEpisodes > 0 &&
+            episodeInfo.watchedReleasedCount >= episodeInfo.totalReleasedEpisodes &&
+            !episodeInfo.nextEpisode;
+    } else if (episodeInfo && episodeInfo.totalReleasedEpisodes > 0) {
+        allReleasedWatched = watchedCount >= episodeInfo.totalReleasedEpisodes;
+    }
+
+    const isCompleted = isWatched || allReleasedWatched;
+
+    if (isCompleted) {
         btn.classList.remove('bg-white', 'text-black');
         btn.classList.add('bg-green-500', 'text-white');
         icon.textContent = 'check_circle';
-        text.textContent = 'Vu';
-    } else if(isInWatchlist) {
+        text.textContent = isReturning ? 'À jour' : 'Vu';
+    } else if (watchedCount > 0) {
         btn.classList.remove('bg-white', 'text-black');
         btn.classList.add('bg-primary', 'text-white');
-        icon.textContent = 'check';
+        icon.textContent = 'play_arrow';
+        text.textContent = 'En cours';
+    } else if (isInWatchlist) {
+        btn.classList.remove('bg-white', 'text-black');
+        btn.classList.add('bg-primary', 'text-white');
+        icon.textContent = 'bookmark_added';
         text.textContent = 'Dans ma liste';
     } else {
         btn.classList.remove('bg-green-500', 'bg-primary', 'text-white');
