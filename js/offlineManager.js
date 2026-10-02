@@ -35,7 +35,7 @@ class OfflineManager {
 
         let appendOptions = 'credits,watch/providers,similar,external_ids,videos';
         if (apiType === 'tv') {
-            const seasonsToAppend = Array.from({ length: 18 }, (_, i) => `season/${i + 1}`).join(',');
+            const seasonsToAppend = Array.from({ length: 14 }, (_, i) => `season/${i + 1}`).join(',');
             appendOptions += `,${seasonsToAppend}`;
         }
 

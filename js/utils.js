@@ -208,25 +208,29 @@ window.compactSeriesForCache = function(data) {
     if (!data || data.error) return data;
     const compactSeason = (s) => {
         if (!s) return s;
+        const rawEpisodes = Array.isArray(s.episodes)
+            ? s.episodes
+            : (data[`season/${s.season_number}`] && Array.isArray(data[`season/${s.season_number}`].episodes)
+                ? data[`season/${s.season_number}`].episodes
+                : undefined);
         return {
             id: s.id,
             season_number: s.season_number,
             name: s.name,
             air_date: s.air_date,
-            episode_count: s.episode_count || (s.episodes ? s.episodes.length : 0),
-            episodes: Array.isArray(s.episodes) ? s.episodes.map(e => ({
+            episode_count: s.episode_count || (rawEpisodes ? rawEpisodes.length : 0),
+            episodes: Array.isArray(rawEpisodes) ? rawEpisodes.map(e => ({
                 id: e.id,
                 name: e.name,
                 episode_number: e.episode_number,
                 season_number: e.season_number || s.season_number,
                 air_date: e.air_date,
-                runtime: e.runtime,
-                overview: e.overview ? e.overview.slice(0, 280) : ''
+                runtime: e.runtime
             })) : undefined
         };
     };
 
-    const result = {
+    return {
         id: data.id,
         name: data.name,
         original_name: data.original_name,
@@ -238,7 +242,7 @@ window.compactSeriesForCache = function(data) {
         number_of_seasons: data.number_of_seasons,
         number_of_episodes: data.number_of_episodes,
         vote_average: data.vote_average,
-        overview: data.overview,
+        overview: data.overview ? data.overview.slice(0, 600) : '',
         genres: (data.genres || []).map(g => ({ id: g.id, name: g.name })),
         created_by: (data.created_by || []).slice(0, 2).map(c => ({
             id: c.id, name: c.name, profile_path: c.profile_path
@@ -257,33 +261,12 @@ window.compactSeriesForCache = function(data) {
             episode_number: data.last_episode_to_air.episode_number,
             season_number: data.last_episode_to_air.season_number
         } : null,
-        seasons: Array.isArray(data.seasons) ? data.seasons.map(compactSeason) : [],
+        seasons: Array.isArray(data.seasons)
+            ? data.seasons.filter(s => s && s.season_number > 0).map(compactSeason)
+            : [],
         'watch/providers': window.compactProviders(data['watch/providers']),
-        external_ids: data.external_ids ? { imdb_id: data.external_ids.imdb_id } : undefined,
-        credits: data.credits ? {
-            cast: (data.credits.cast || []).slice(0, 16).map(c => ({
-                id: c.id, name: c.name, character: c.character, profile_path: c.profile_path
-            }))
-        } : undefined,
-        videos: data.videos ? {
-            results: (data.videos.results || []).filter(v => v.site === 'YouTube').slice(0, 5).map(v => ({
-                key: v.key, name: v.name, site: v.site, type: v.type
-            }))
-        } : undefined,
-        similar: data.similar ? {
-            results: (data.similar.results || []).slice(0, 12).map(s => ({
-                id: s.id, title: s.title, name: s.name, poster_path: s.poster_path
-            }))
-        } : undefined
+        external_ids: data.external_ids ? { imdb_id: data.external_ids.imdb_id } : undefined
     };
-
-    Object.keys(data).forEach(k => {
-        if (k.startsWith('season/') && data[k]) {
-            result[k] = compactSeason(data[k]);
-        }
-    });
-
-    return result;
 };
 
 // --- GESTIONNAIRE INTELLIGENT DE QUOTA LOCALSTORAGE (LRU) ---
@@ -293,38 +276,34 @@ localStorage.setItem = function(key, value) {
     try {
         originalSetItem.call(localStorage, key, value);
     } catch (error) {
-        if (error.name === 'QuotaExceededError' || (error.message && error.message.toLowerCase().includes('quota'))) {
-            console.warn("📦 Stockage saturé : nettoyage des entrées de cache les plus anciennes...");
-            const cacheEntries = [];
-            for (let i = 0; i < localStorage.length; i++) {
-                const k = localStorage.key(i);
-                if (k && (k.startsWith('movie-details-') || k.startsWith('series-details-'))) {
-                    let ts = 0;
-                    try {
-                        const parsed = JSON.parse(localStorage.getItem(k));
-                        ts = parsed && parsed.timestamp ? parsed.timestamp : 0;
-                    } catch (e) {}
-                    cacheEntries.push({ key: k, timestamp: ts });
-                }
+        console.warn("📦 Stockage saturé : nettoyage des entrées de cache les plus anciennes...");
+        const cacheEntries = [];
+        for (let i = 0; i < localStorage.length; i++) {
+            const k = localStorage.key(i);
+            if (k && (k.startsWith('movie-details-') || k.startsWith('series-details-'))) {
+                let ts = 0;
+                try {
+                    const parsed = JSON.parse(localStorage.getItem(k));
+                    ts = parsed && parsed.timestamp ? parsed.timestamp : 0;
+                } catch (e) {}
+                cacheEntries.push({ key: k, timestamp: ts });
             }
-            // Trier du plus ancien au plus récent et supprimer la moitié la plus ancienne
-            cacheEntries.sort((a, b) => a.timestamp - b.timestamp);
-            const toDelete = Math.max(5, Math.ceil(cacheEntries.length / 2));
-            cacheEntries.slice(0, toDelete).forEach(entry => localStorage.removeItem(entry.key));
+        }
+        // Trier du plus ancien au plus récent et supprimer la moitié la plus ancienne
+        cacheEntries.sort((a, b) => a.timestamp - b.timestamp);
+        const toDelete = Math.max(5, Math.ceil(cacheEntries.length / 2));
+        cacheEntries.slice(0, toDelete).forEach(entry => localStorage.removeItem(entry.key));
 
+        try {
+            originalSetItem.call(localStorage, key, value);
+        } catch (e2) {
+            // En dernier recours, vider tous les détails cachés
+            cacheEntries.forEach(entry => localStorage.removeItem(entry.key));
             try {
                 originalSetItem.call(localStorage, key, value);
-            } catch (e2) {
-                // En dernier recours, vider tous les détails cachés
-                cacheEntries.forEach(entry => localStorage.removeItem(entry.key));
-                try {
-                    originalSetItem.call(localStorage, key, value);
-                } catch (e3) {
-                    console.error("❌ Échec critique de sauvegarde locale.", e3);
-                }
+            } catch (e3) {
+                console.warn("⚠️ Stockage local plein, l'élément restera uniquement en mémoire vive pour cette session.", key);
             }
-        } else {
-            throw error;
         }
     }
 };

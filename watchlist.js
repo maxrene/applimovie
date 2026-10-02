@@ -41,12 +41,12 @@ class RequestQueue {
     async retry(fn, retries = 3, backoff = 800) {
         try {
             const result = await fn();
-            if (result instanceof Response && result.status === 429) {
-                throw new Error('429');
+            if (result instanceof Response && (result.status === 429 || result.status >= 500)) {
+                throw new Error(String(result.status));
             }
             return result;
         } catch (e) {
-            if ((e.message === '429' || e.name === 'TypeError') && retries > 0) {
+            if (retries > 0) {
                 await new Promise(r => setTimeout(r, backoff));
                 return this.retry(fn, retries - 1, backoff * 2);
             }
@@ -55,10 +55,12 @@ class RequestQueue {
     }
 }
 
-const apiQueue = new RequestQueue(8, 25);
+const apiQueue = new RequestQueue(5, 40);
 
 // Cache mémoire de session pour éviter de parser le localStorage en boucle à chaque clic d'onglet
 const memoryMediaCache = new Map();
+// Déduplication des requêtes réseau en cours pour éviter les doublons lors des synchros Cloud
+const inFlightFetches = new Map();
 
 document.addEventListener('alpine:init', () => {
     Alpine.data('watchlistPage', () => ({
@@ -317,13 +319,22 @@ document.addEventListener('alpine:init', () => {
             const watchedSeries = new Set(getSafeLocalStorage('watchedSeries', []));
             const watchedEpisodes = getSafeLocalStorage('watchedEpisodes', {});
 
+            const existingEnrichedMap = new Map(
+                (this.enrichedWatchlist || [])
+                    .filter(i => i && i.apiDetails && !i.apiDetails.error)
+                    .map(i => [Number(i.id), i.apiDetails])
+            );
+
             const watchlistWithMediaData = this.watchlist.map(item => {
                 const media = (typeof mediaData !== 'undefined') ? mediaData.find(m => m.id === item.id) : null;
                 let base = { ...(media || {}), ...item, apiDetails: null };
 
                 const isMovie = base.type === 'movie';
                 const cacheKey = isMovie ? `movie-details-${base.id}` : `series-details-${base.id}`;
-                const cachedDetails = memoryMediaCache.get(cacheKey) || this.getCachedData(cacheKey, true);
+                const cachedDetails =
+                    existingEnrichedMap.get(Number(base.id)) ||
+                    memoryMediaCache.get(cacheKey) ||
+                    this.getCachedData(cacheKey, true);
 
                 if (cachedDetails) {
                     memoryMediaCache.set(cacheKey, cachedDetails);
@@ -342,7 +353,7 @@ document.addEventListener('alpine:init', () => {
             const itemsToFetch = this.enrichedWatchlist.filter(item => {
                 const isMovie = item.type === 'movie';
                 const cacheKey = isMovie ? `movie-details-${item.id}` : `series-details-${item.id}`;
-                const cached = this.getCachedData(cacheKey, false);
+                const cached = memoryMediaCache.get(cacheKey) || this.getCachedData(cacheKey, false);
                 if (!cached) return true;
 
                 if (!isMovie) {
@@ -380,13 +391,22 @@ document.addEventListener('alpine:init', () => {
 
                 if (item.type === 'serie' || item.type === 'tv') {
                     details = await this.fetchFullSeriesDetails(item.id, isPriority);
+                    if (!details) {
+                        details = await this.fetchMovieDetails(item.id, isPriority);
+                        if (details) item.type = 'movie';
+                    }
                 } else {
                     details = await this.fetchMovieDetails(item.id, isPriority);
+                    if (!details) {
+                        details = await this.fetchFullSeriesDetails(item.id, isPriority);
+                        if (details) item.type = 'serie';
+                    }
                 }
 
-                const index = this.enrichedWatchlist.findIndex(i => i.id === item.id);
+                const index = this.enrichedWatchlist.findIndex(i => Number(i.id) === Number(item.id));
                 if (index !== -1) {
                     if (details) {
+                        this.enrichedWatchlist[index].type = item.type;
                         this.enrichedWatchlist[index] = this.hydrateEnrichedItem(this.enrichedWatchlist[index], details);
                     } else if (!this.enrichedWatchlist[index].apiDetails) {
                         this.enrichedWatchlist[index].apiDetails = { error: true };
@@ -401,6 +421,7 @@ document.addEventListener('alpine:init', () => {
                 const cached = localStorage.getItem(key);
                 if (!cached) return null;
                 const { timestamp, data } = JSON.parse(cached);
+                if (!data || data.error || (!data.title && !data.name)) return null;
                 // Durée de validité portée à 7 jours pour éviter les rechargements lents inutiles
                 const isExpired = (Date.now() - timestamp) > 7 * 24 * 60 * 60 * 1000;
                 return (isExpired && !ignoreExpiration) ? null : data;
@@ -410,38 +431,58 @@ document.addEventListener('alpine:init', () => {
         },
 
         setCachedData(key, rawData, isMovie = true) {
-            const compacted = isMovie
-                ? (window.compactMovieForCache ? window.compactMovieForCache(rawData) : rawData)
-                : (window.compactSeriesForCache ? window.compactSeriesForCache(rawData) : rawData);
+            let compacted = rawData;
+            try {
+                compacted = isMovie
+                    ? (window.compactMovieForCache ? window.compactMovieForCache(rawData) : rawData)
+                    : (window.compactSeriesForCache ? window.compactSeriesForCache(rawData) : rawData);
+            } catch (e) {
+                console.warn('[Watchlist] Erreur lors du compactage du cache:', e);
+            }
             memoryMediaCache.set(key, compacted);
-            const item = { timestamp: Date.now(), data: compacted };
-            localStorage.setItem(key, JSON.stringify(item));
+            try {
+                const item = { timestamp: Date.now(), data: compacted };
+                localStorage.setItem(key, JSON.stringify(item));
+            } catch (e) {
+                console.warn('[Watchlist] Stockage local saturé, élément conservé en mémoire:', key);
+            }
             return compacted;
         },
 
         async fetchMovieDetails(movieId, priority = false) {
             const cacheKey = `movie-details-${movieId}`;
-            const cachedData = this.getCachedData(cacheKey);
+            const cachedData = memoryMediaCache.get(cacheKey) || this.getCachedData(cacheKey);
             if (cachedData) return cachedData;
 
-            try {
-                const res = await apiQueue.add(
-                    () => fetch(`https://api.themoviedb.org/3/movie/${movieId}?api_key=${TMDB_API_KEY}&language=fr-FR&append_to_response=watch/providers`),
-                    priority
-                );
-                if (!res.ok) return this.getCachedData(cacheKey, true) || null;
-                const data = await res.json();
-                return this.setCachedData(cacheKey, data, true);
-            } catch (e) {
-                return this.getCachedData(cacheKey, true) || null;
+            if (inFlightFetches.has(cacheKey)) {
+                return inFlightFetches.get(cacheKey);
             }
+
+            const fetchPromise = (async () => {
+                try {
+                    const res = await apiQueue.add(
+                        () => fetch(`https://api.themoviedb.org/3/movie/${movieId}?api_key=${TMDB_API_KEY}&language=fr-FR&append_to_response=watch/providers`),
+                        priority
+                    );
+                    if (!res.ok) return this.getCachedData(cacheKey, true) || null;
+                    const data = await res.json();
+                    return this.setCachedData(cacheKey, data, true);
+                } catch (e) {
+                    return this.getCachedData(cacheKey, true) || null;
+                } finally {
+                    inFlightFetches.delete(cacheKey);
+                }
+            })();
+
+            inFlightFetches.set(cacheKey, fetchPromise);
+            return fetchPromise;
         },
 
         async fetchFullSeriesDetails(seriesId, priority = false) {
             const cacheKey = `series-details-${seriesId}`;
             const watchedEpisodes = getSafeLocalStorage('watchedEpisodes', {});
             const seriesWatched = watchedEpisodes[seriesId] || [];
-            const cachedData = this.getCachedData(cacheKey);
+            const cachedData = memoryMediaCache.get(cacheKey) || this.getCachedData(cacheKey);
 
             if (cachedData) {
                 const today = new Date().toISOString().split('T')[0];
@@ -450,32 +491,81 @@ document.addEventListener('alpine:init', () => {
                 if (!needsMoreSeasons) return cachedData;
             }
 
-            try {
-                // ASTUCE PERFORMANCE : On récupère la série, les plateformes ET jusqu'à 18 saisons en UNE SEULE requête HTTP !
-                const seasonsAppend = Array.from({ length: 18 }, (_, i) => `season/${i + 1}`).join(',');
-                const seriesRes = await apiQueue.add(
-                    () => fetch(`https://api.themoviedb.org/3/tv/${seriesId}?api_key=${TMDB_API_KEY}&language=fr-FR&append_to_response=watch/providers,${seasonsAppend}`),
-                    priority
-                );
-                if (!seriesRes.ok) return this.getCachedData(cacheKey, true) || null;
-
-                const seriesData = await seriesRes.json();
-
-                // Injecter les épisodes directement dans seriesData.seasons à partir des clés season/X reçues
-                seriesData.seasons = (seriesData.seasons || [])
-                    .filter(s => s.season_number > 0)
-                    .map(s => {
-                        const appendedSeason = seriesData[`season/${s.season_number}`];
-                        if (appendedSeason && Array.isArray(appendedSeason.episodes)) {
-                            return { ...s, episodes: appendedSeason.episodes };
-                        }
-                        return s;
-                    });
-
-                return this.setCachedData(cacheKey, seriesData, false);
-            } catch (e) {
-                return this.getCachedData(cacheKey, true) || null;
+            const flightKey = `${cacheKey}-${seriesWatched.length > 0 ? 'full' : 'init'}`;
+            if (inFlightFetches.has(flightKey)) {
+                return inFlightFetches.get(flightKey);
             }
+
+            const fetchPromise = (async () => {
+                try {
+                    // Pour une série non commencée (0 épisode vu), seule la saison 1 est nécessaire (~20 Ko au lieu de ~1.5 Mo).
+                    // Pour une série en cours, on récupère les 12 premières saisons d'un coup, puis les éventuelles suivantes.
+                    const initialSeasonsCount = seriesWatched.length > 0 ? 12 : 1;
+                    const seasonsAppend = Array.from({ length: initialSeasonsCount }, (_, i) => `season/${i + 1}`).join(',');
+
+                    let seriesRes = await apiQueue.add(
+                        () => fetch(`https://api.themoviedb.org/3/tv/${seriesId}?api_key=${TMDB_API_KEY}&language=fr-FR&append_to_response=watch/providers,${seasonsAppend}`),
+                        priority
+                    );
+
+                    // Fallback de sécurité si append_to_response échoue sur TMDB
+                    if (!seriesRes.ok && seriesRes.status !== 404) {
+                        seriesRes = await apiQueue.add(
+                            () => fetch(`https://api.themoviedb.org/3/tv/${seriesId}?api_key=${TMDB_API_KEY}&language=fr-FR&append_to_response=watch/providers`),
+                            priority
+                        );
+                    }
+
+                    if (!seriesRes.ok) return this.getCachedData(cacheKey, true) || null;
+
+                    const seriesData = await seriesRes.json();
+
+                    // Injecter les épisodes directement dans seriesData.seasons à partir des clés season/X reçues
+                    seriesData.seasons = (seriesData.seasons || [])
+                        .filter(s => s && s.season_number > 0)
+                        .map(s => {
+                            const appendedSeason = seriesData[`season/${s.season_number}`];
+                            if (appendedSeason && Array.isArray(appendedSeason.episodes)) {
+                                return { ...s, episodes: appendedSeason.episodes };
+                            }
+                            return s;
+                        });
+
+                    // Si la série est en cours et possède plus de 12 saisons déjà diffusées, récupérer les saisons manquantes
+                    if (seriesWatched.length > 0 && Array.isArray(seriesData.seasons)) {
+                        const today = new Date().toISOString().split('T')[0];
+                        const missingSeasons = seriesData.seasons.filter(s =>
+                            s.season_number > 0 && (!s.air_date || s.air_date <= today) && !Array.isArray(s.episodes)
+                        );
+                        if (missingSeasons.length > 0) {
+                            const extraSeasons = await Promise.all(
+                                missingSeasons.map(s =>
+                                    apiQueue.add(
+                                        () => fetch(`https://api.themoviedb.org/3/tv/${seriesId}/season/${s.season_number}?api_key=${TMDB_API_KEY}&language=fr-FR`)
+                                            .then(r => r.ok ? r.json() : null)
+                                            .catch(() => null),
+                                        priority
+                                    )
+                                )
+                            );
+                            const extraMap = new Map(extraSeasons.filter(Boolean).map(s => [s.season_number, s.episodes]));
+                            seriesData.seasons = seriesData.seasons.map(s =>
+                                extraMap.has(s.season_number) ? { ...s, episodes: extraMap.get(s.season_number) } : s
+                            );
+                        }
+                    }
+
+                    return this.setCachedData(cacheKey, seriesData, false);
+                } catch (e) {
+                    console.warn(`[Watchlist] Erreur réseau sur la série ${seriesId}:`, e);
+                    return this.getCachedData(cacheKey, true) || null;
+                } finally {
+                    inFlightFetches.delete(flightKey);
+                }
+            })();
+
+            inFlightFetches.set(flightKey, fetchPromise);
+            return fetchPromise;
         },
 
         get filteredMedia() {
@@ -810,6 +900,7 @@ document.addEventListener('alpine:init', () => {
         createUnwatchedTVItemHTML(item) {
             const removeButton = this.createRemoveButtonHTML(item.id, 'serie');
             if (item.apiDetails && item.apiDetails.error) {
+                const fallbackTitle = (item.title && item.title !== 'Chargement...') ? item.title : `Média indisponible (${item.id})`;
                 return `
                 <div class="relative flex items-start gap-4 p-4 hover:bg-white/5 transition-colors rounded-lg">
                     <a href="serie.html?id=${item.id}" class="w-24 flex-shrink-0">
@@ -818,12 +909,18 @@ document.addEventListener('alpine:init', () => {
                         </div>
                     </a>
                     <div class="flex-1 min-w-0">
-                        <div class="flex justify-between items-start">
+                        <div class="flex justify-between items-start gap-2">
                             <a href="serie.html?id=${item.id}" class="block">
-                                <h3 class="font-bold text-base text-white leading-tight">Média indisponible (${item.id})</h3>
+                                <h3 class="font-bold text-base text-white leading-tight">${fallbackTitle}</h3>
                             </a>
-                            ${removeButton}
+                            <div class="flex items-center gap-1 shrink-0">
+                                <button @click.prevent.stop="retryFetchItem(${item.id}, 'serie')" title="Réessayer le chargement" class="flex h-8 w-8 items-center justify-center rounded-full border border-gray-600 text-gray-300 hover:text-white hover:border-primary transition-all">
+                                    <span class="material-symbols-outlined text-[18px]">refresh</span>
+                                </button>
+                                ${removeButton}
+                            </div>
                         </div>
+                        <p class="text-xs text-gray-400 mt-2">Impossible de charger les détails pour le moment.</p>
                     </div>
                 </div>`;
             }
@@ -1050,6 +1147,44 @@ document.addEventListener('alpine:init', () => {
                 item.isWatched = true;
             }
             this.lastStateSignature = this.computeStateSignature();
+            await this.renderMedia();
+
+            // Si la série vient d'être commencée et que seules les données de la saison 1 étaient chargées,
+            // récupérer les saisons suivantes en arrière-plan.
+            if (item && item.apiDetails && Array.isArray(item.apiDetails.seasons)) {
+                const today = new Date().toISOString().split('T')[0];
+                const hasMissingSeasons = item.apiDetails.seasons.some(
+                    s => s.season_number > 0 && (!s.air_date || s.air_date <= today) && !Array.isArray(s.episodes)
+                );
+                if (hasMissingSeasons) {
+                    this.fetchFullSeriesDetails(seriesIdNum, true).then(fullDetails => {
+                        if (fullDetails) {
+                            const idx = this.enrichedWatchlist.findIndex(i => Number(i.id) === seriesIdNum);
+                            if (idx !== -1) {
+                                this.enrichedWatchlist[idx] = this.hydrateEnrichedItem(this.enrichedWatchlist[idx], fullDetails);
+                                this.renderMedia();
+                            }
+                        }
+                    });
+                }
+            }
+        },
+
+        async retryFetchItem(mediaId, type = 'serie') {
+            const idNum = Number(mediaId);
+            const index = this.enrichedWatchlist.findIndex(i => Number(i.id) === idNum);
+            if (index !== -1) {
+                this.enrichedWatchlist[index].apiDetails = null;
+                await this.renderMedia();
+            }
+            const details = (type === 'movie')
+                ? await this.fetchMovieDetails(idNum, true)
+                : await this.fetchFullSeriesDetails(idNum, true);
+            if (details && index !== -1) {
+                this.enrichedWatchlist[index] = this.hydrateEnrichedItem(this.enrichedWatchlist[index], details);
+            } else if (index !== -1) {
+                this.enrichedWatchlist[index].apiDetails = { error: true };
+            }
             await this.renderMedia();
         },
 

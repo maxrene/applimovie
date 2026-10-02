@@ -1,7 +1,7 @@
 // sw.js
-// VERSION V15 - CACHE SHELL ET IMAGES SÉPARÉS, RAPIDITÉ ACCRUE
-const CACHE_NAME = 'cinematch-v15-offline-capable';
-const IMAGE_CACHE_NAME = 'cinematch-images-v15';
+// VERSION V16 - CACHE SHELL ET IMAGES SÉPARÉS, RAPIDITÉ ACCRUE
+const CACHE_NAME = 'cinematch-v16-offline-capable';
+const IMAGE_CACHE_NAME = 'cinematch-images-v16';
 const MAX_IMAGES = 200;
 
 const ASSETS_TO_CACHE = [
@@ -48,7 +48,14 @@ function trimCache(cacheName, maxItems) {
 self.addEventListener('install', (event) => {
   self.skipWaiting();
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS_TO_CACHE))
+    caches.open(CACHE_NAME).then((cache) =>
+      Promise.all(
+        ASSETS_TO_CACHE.map((url) => {
+          const req = url.startsWith('./') ? new Request(url, { cache: 'reload' }) : url;
+          return cache.add(req).catch((err) => console.warn('[SW] Cache add warning:', url, err));
+        })
+      )
+    )
   );
 });
 
@@ -69,6 +76,15 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
   const url = new URL(event.request.url);
+
+  // Ne pas intercepter les appels API externes (TMDB, Firebase, Google Auth) dans le cache statique du SW
+  if (
+    url.hostname.includes('api.themoviedb.org') ||
+    url.hostname.includes('firestore.googleapis.com') ||
+    url.hostname.includes('identitytoolkit.googleapis.com')
+  ) {
+    return;
+  }
 
   // 1. STRATÉGIE "CACHE FIRST" POUR LES IMAGES (dans un cache dédié aux images)
   if (event.request.destination === 'image' || url.href.includes('image.tmdb.org')) {
@@ -91,8 +107,16 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 2. STRATÉGIE "RÉSEAU D'ABORD" AVEC FALLBACK CACHE POUR LE RESTE (HTML, JS, API)
+  // 2. STRATÉGIE "RÉSEAU D'ABORD" AVEC FALLBACK CACHE POUR LE SHELL (HTML, JS, CSS)
   event.respondWith(
-    fetch(event.request).catch(() => caches.match(event.request))
+    fetch(event.request)
+      .then((networkResponse) => {
+        if (networkResponse && networkResponse.ok && url.origin === self.location.origin) {
+          const clone = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+        }
+        return networkResponse;
+      })
+      .catch(() => caches.match(event.request))
   );
 });

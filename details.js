@@ -118,7 +118,7 @@ async function fetchFullFromTMDB(id, type) {
     try {
         let appendOptions = 'credits,watch/providers,similar,external_ids,videos';
         if (type === 'tv') {
-            const MAX_SEASONS_TO_APPEND = 18;
+            const MAX_SEASONS_TO_APPEND = 14;
             const seasonsToAppend = Array.from({ length: MAX_SEASONS_TO_APPEND }, (_, i) => `season/${i + 1}`).join(',');
             appendOptions += `,${seasonsToAppend}`;
         }
@@ -236,7 +236,7 @@ async function fetchUpdates(id, type) {
             .catch(() => {});
 
         if (type === 'tv') {
-            const MAX_SEASONS_TO_APPEND = 18;
+            const MAX_SEASONS_TO_APPEND = 14;
             const seasonsToAppend = Array.from({ length: MAX_SEASONS_TO_APPEND }, (_, i) => `season/${i + 1}`).join(',');
             const seriesDetailsUrl = `${BASE_URL}/tv/${id}?api_key=${TMDB_API_KEY}&language=fr-FR&append_to_response=credits,watch/providers,${seasonsToAppend}`;
             const seriesDetailsRes = await fetch(seriesDetailsUrl);
@@ -1380,12 +1380,15 @@ function determineNextEpisode(seriesId) {
         if (season.season_number === 0) continue;
 
         const seasonDetail = seriesDetails[`season/${season.season_number}`];
-        if (!seasonDetail || !seasonDetail.episodes) continue;
+        const episodesList = Array.isArray(season.episodes)
+            ? season.episodes
+            : (seasonDetail && Array.isArray(seasonDetail.episodes) ? seasonDetail.episodes : null);
+        if (!episodesList) continue;
 
         hasSeasonDetails = true;
-        totalEpisodes += seasonDetail.episodes.length;
+        totalEpisodes += episodesList.length;
 
-        const sortedEpisodes = [...seasonDetail.episodes].sort((a, b) => a.episode_number - b.episode_number);
+        const sortedEpisodes = [...episodesList].sort((a, b) => a.episode_number - b.episode_number);
 
         for (const episode of sortedEpisodes) {
             const isWatched = watchedSet.has(episode.id);

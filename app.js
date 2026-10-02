@@ -268,7 +268,7 @@ document.addEventListener('alpine:init', () => {
                 } catch (e) {}
             }
 
-            const MAX_SEASONS_TO_APPEND = 18;
+            const MAX_SEASONS_TO_APPEND = 12;
             const seasonsToAppend = Array.from({ length: MAX_SEASONS_TO_APPEND }, (_, i) => `season/${i + 1}`).join(',');
             const rawData = await this.fetchAPI(`tv/${id}?language=fr-FR&append_to_response=watch/providers,${seasonsToAppend}`, false);
             if (!rawData) return null;
@@ -279,6 +279,22 @@ document.addEventListener('alpine:init', () => {
                         s.episodes = rawData[`season/${s.season_number}`].episodes;
                     }
                 });
+
+                const today = new Date().toISOString().split('T')[0];
+                const missingSeasons = rawData.seasons.filter(
+                    s => s.season_number > MAX_SEASONS_TO_APPEND && (!s.air_date || s.air_date <= today) && !Array.isArray(s.episodes)
+                );
+                if (missingSeasons.length > 0) {
+                    const extraSeasons = await Promise.all(
+                        missingSeasons.map(s => this.fetchAPI(`tv/${id}/season/${s.season_number}?language=fr-FR`, false))
+                    );
+                    extraSeasons.filter(Boolean).forEach(extra => {
+                        const target = rawData.seasons.find(s => s.season_number === extra.season_number);
+                        if (target && Array.isArray(extra.episodes)) {
+                            target.episodes = extra.episodes;
+                        }
+                    });
+                }
             }
 
             const compacted = window.compactSeriesForCache ? window.compactSeriesForCache(rawData) : rawData;
