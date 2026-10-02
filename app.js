@@ -124,6 +124,17 @@ document.addEventListener('alpine:init', () => {
                     this.fetchAndDisplayContent();
                 }
             });
+
+            window.addEventListener('rt-rating-loaded', (e) => {
+                if (!e.detail || !e.detail.rt) return;
+                const { tmdbId, type, rt } = e.detail;
+                const normType = (type === 'tv' || type === 'serie') ? 'tv' : 'movie';
+                document.querySelectorAll(`#home-view [data-rt-slot="${normType}-${tmdbId}"]`).forEach(slot => {
+                    if (window.createRTBadgeHTML) {
+                        slot.innerHTML = window.createRTBadgeHTML(rt, 'xs');
+                    }
+                });
+            });
         },
 
         async fetchAPI(endpoint, returnsList = true) {
@@ -182,6 +193,7 @@ document.addEventListener('alpine:init', () => {
             const posterRadius = 'rounded-lg';
 
             const isMovie = media.media_type === 'movie' || media.hasOwnProperty('title');
+            const normType = isMovie ? 'movie' : 'tv';
             const title = isMovie ? media.title : media.name;
             const id = media.id;
             const posterPath = media.poster_path;
@@ -210,7 +222,7 @@ document.addEventListener('alpine:init', () => {
                 ? `<div class="absolute top-1 left-1 z-10 bg-black/70 backdrop-blur-sm px-1.5 py-0.5 rounded text-[8px] font-bold text-white uppercase tracking-wider border border-white/10">TV</div>`
                 : '';
 
-            const status = getMediaStatusGlobal(id, isMovie ? 'movie' : 'tv');
+            const status = getMediaStatusGlobal(id, normType);
             let statusIconHTML = '';
             if (status === 'watchlist') {
                 statusIconHTML = `<span class="material-symbols-outlined text-primary text-base">bookmark</span>`;
@@ -218,8 +230,11 @@ document.addEventListener('alpine:init', () => {
                 statusIconHTML = `<span class="material-symbols-outlined text-green-500 text-base">visibility</span>`;
             }
 
+            const cachedRatings = window.getCachedMediaRatings ? window.getCachedMediaRatings(id, normType) : null;
+            const rtBadgeHTML = (cachedRatings?.rt && window.createRTBadgeHTML) ? window.createRTBadgeHTML(cachedRatings.rt, 'xs') : '';
+
             return `
-                <a href="${link}" data-id="${id}" data-type="${isMovie ? 'movie' : 'tv'}" class="flex-shrink-0 ${cardWidth} snap-start group flex flex-col media-card-link">
+                <a href="${link}" data-id="${id}" data-type="${normType}" class="flex-shrink-0 ${cardWidth} snap-start group flex flex-col media-card-link">
                     <div class="relative w-full aspect-[2/3] ${posterRadius} overflow-hidden bg-gray-800 shadow-md">
                         <img src="${posterUrl}" loading="lazy" class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105">
                         ${badgeHTML}
@@ -231,13 +246,14 @@ document.addEventListener('alpine:init', () => {
                         <div class="status-container">${statusIconHTML}</div>
                     </div>
 
-                    <div class="flex items-center gap-1 mt-0.5 text-[10px] text-gray-500 dark:text-gray-400">
+                    <div class="flex items-center gap-1 mt-0.5 text-[10px] text-gray-500 dark:text-gray-400 flex-wrap">
                         <span>${year}</span>
                         <span class="text-gray-400">•</span>
                         <div class="flex items-center gap-0.5 text-yellow-500">
                             <span class="material-symbols-outlined text-[10px] filled">star</span>
                             <span class="text-gray-600 dark:text-gray-300 font-medium">${media.vote_average ? media.vote_average.toFixed(1) : 'N/A'}</span>
                         </div>
+                        <span data-rt-slot="${normType}-${id}" class="inline-flex items-center ml-0.5">${rtBadgeHTML}</span>
                     </div>
                 </a>
             `;
@@ -247,6 +263,25 @@ document.addEventListener('alpine:init', () => {
             const container = document.getElementById(containerId);
             if (!container) return;
             container.innerHTML = content.map(media => this.createMediaCard(media, cardType)).join('');
+
+            // Enrichir en arrière-plan les notes Rotten Tomatoes des premières cartes visibles du carrousel
+            if (window.fetchMediaRatings) {
+                content.slice(0, 8).forEach(media => {
+                    const isMovie = media.media_type === 'movie' || media.hasOwnProperty('title');
+                    const normType = isMovie ? 'movie' : 'tv';
+                    const cached = window.getCachedMediaRatings ? window.getCachedMediaRatings(media.id, normType) : null;
+                    if (!cached || !cached.rt) {
+                        window.fetchMediaRatings({
+                            tmdbId: media.id,
+                            type: normType,
+                            title: isMovie ? media.title : media.name,
+                            originalTitle: isMovie ? media.original_title : media.original_name,
+                            year: (isMovie ? media.release_date : media.first_air_date) || '',
+                            priority: false
+                        });
+                    }
+                });
+            }
         },
 
         async fetchSeriesForContinueWatching(id) {

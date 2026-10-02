@@ -163,9 +163,15 @@ async function fetchFullFromTMDB(id, type) {
         const formattedData = formatTMDBData(data, type);
         updateUI(formattedData, type, false);
 
-        if (data.external_ids && data.external_ids.imdb_id) {
-            fetchOMDbRatings(data.external_ids.imdb_id);
-        }
+        const resolvedImdbId = (data.external_ids && data.external_ids.imdb_id) || data.imdb_id || null;
+        fetchOMDbRatings(resolvedImdbId, {
+            tmdbId: id,
+            type,
+            wikidataId: data.external_ids ? data.external_ids.wikidata_id : null,
+            title: data.title || data.name || '',
+            originalTitle: data.original_title || data.original_name || '',
+            year: (data.release_date || data.first_air_date || '').split('-')[0]
+        });
 
         updateStreamingUI(data['watch/providers']?.results || {});        
 
@@ -207,9 +213,11 @@ async function fetchUpdates(id, type) {
         updateStreamingUI(streamingData.results || {});
 
         const extData = await extRes.json();
-        if (extData.imdb_id) {
-            fetchOMDbRatings(extData.imdb_id);
-        }
+        fetchOMDbRatings(extData.imdb_id || null, {
+            tmdbId: id,
+            type,
+            wikidataId: extData.wikidata_id || null
+        });
 
         const creditsData = await creditsRes.json();
 
@@ -329,25 +337,31 @@ function updateUI(data, type, isLocal) {
     document.getElementById('media-year').textContent = data.year;
     document.getElementById('media-synopsis').textContent = data.synopsis;
 
-    // --- NOUVELLE GESTION DES NOTES (IMDb + Rotten Tomatoes fixes) ---
+    // --- GESTION DES NOTES (IMDb + Rotten Tomatoes multi-sources avec cache) ---
     const targetEl = document.getElementById('media-imdb') || document.getElementById('media-rating');
     if (targetEl) {
         const ratingContainer = targetEl.parentElement;
-        ratingContainer.className = "flex items-center gap-3"; // On gère l'espacement
-        
-        // Note temporaire TMDB en attendant OMDb (ou "--" si rien)
-        const tempScore = (data.imdb && data.imdb !== 'xx' && data.imdb !== 'N/A') ? data.imdb : '--';
-        
+        ratingContainer.className = "flex items-center gap-3";
+
+        const cachedRatings = window.getCachedMediaRatings ? window.getCachedMediaRatings(data.id, type) : null;
+        const tempImdb = cachedRatings?.imdb || ((data.imdb && data.imdb !== 'xx' && data.imdb !== 'N/A') ? data.imdb : '--');
+        const localRt = (data.rottenTomatoes && data.rottenTomatoes !== 'xx' && data.rottenTomatoes !== 'N/A')
+            ? (String(data.rottenTomatoes).includes('%') ? data.rottenTomatoes : `${data.rottenTomatoes}%`)
+            : null;
+        const tempRt = cachedRatings?.rt || localRt || '--';
+        const rtIcon = window.getRTIconUrl ? window.getRTIconUrl(tempRt) : 'https://upload.wikimedia.org/wikipedia/commons/5/5b/Rotten_Tomatoes.svg';
+        const rtHref = cachedRatings?.rtUrl || `https://www.rottentomatoes.com/search?search=${encodeURIComponent(data.title || '')}`;
+
         ratingContainer.innerHTML = `
             <div class="flex items-center gap-1">
                 <span class="bg-[#f5c518] text-black text-[10px] font-bold px-1 rounded-sm tracking-wide">IMDb</span>
-                <span id="score-imdb" class="text-gray-200 font-bold text-sm">${tempScore}</span>
+                <span id="score-imdb" class="text-gray-200 font-bold text-sm">${tempImdb}</span>
             </div>
             <span class="text-gray-500 text-sm">•</span>
-            <div class="flex items-center gap-1.5">
-                <img src="https://upload.wikimedia.org/wikipedia/commons/5/5b/Rotten_Tomatoes.svg" alt="Rotten Tomatoes" class="w-5 h-5 object-contain">
-                <span id="score-rt" class="text-gray-200 font-bold text-sm">--</span>
-            </div>
+            <a id="rt-badge-link" href="${rtHref}" target="_blank" rel="noopener noreferrer" title="Voir sur Rotten Tomatoes" class="flex items-center gap-1.5 hover:opacity-80 transition-opacity">
+                <img id="icon-rt" src="${rtIcon}" onerror="this.onerror=null;this.src='https://upload.wikimedia.org/wikipedia/commons/5/5b/Rotten_Tomatoes.svg'" alt="Rotten Tomatoes" class="w-5 h-5 object-contain">
+                <span id="score-rt" class="text-gray-200 font-bold text-sm">${tempRt}</span>
+            </a>
         `;
     }
     // ------------------------------------------------------------------
@@ -1598,10 +1612,40 @@ function updateWatchlistButton(mediaId) {
         text.textContent = 'Ajouter à ma liste';
     }
 }
-// Fonction pour récupérer les notes OMDb et mettre à jour le HTML dynamiquement
-async function fetchOMDbRatings(imdbId) {
-    if (!imdbId) return;
+// Fonction pour récupérer les notes (IMDb + Rotten Tomatoes multi-sources) et mettre à jour le HTML dynamiquement
+async function fetchOMDbRatings(imdbId, meta = {}) {
     try {
+        if (window.fetchMediaRatings) {
+            const titleEl = document.getElementById('media-title');
+            const yearEl = document.getElementById('media-year');
+            const result = await window.fetchMediaRatings({
+                tmdbId: meta.tmdbId || new URLSearchParams(window.location.search).get('id'),
+                type: meta.type || (document.body.dataset.type === 'movie' ? 'movie' : 'tv'),
+                imdbId,
+                wikidataId: meta.wikidataId || null,
+                title: meta.title || (titleEl ? titleEl.textContent : ''),
+                originalTitle: meta.originalTitle || '',
+                year: meta.year || (yearEl ? yearEl.textContent.split(' ')[0] : ''),
+                priority: true
+            });
+
+            const imdbEl = document.getElementById('score-imdb');
+            const rtEl = document.getElementById('score-rt');
+            const rtIconEl = document.getElementById('icon-rt');
+            const rtLinkEl = document.getElementById('rt-badge-link');
+
+            if (imdbEl && result.imdb) imdbEl.textContent = result.imdb;
+            if (rtEl && result.rt) rtEl.textContent = result.rt;
+            if (rtIconEl && result.rt && window.getRTIconUrl) {
+                rtIconEl.src = window.getRTIconUrl(result.rt);
+            }
+            if (rtLinkEl && result.rtUrl) {
+                rtLinkEl.href = result.rtUrl;
+            }
+            return;
+        }
+
+        if (!imdbId) return;
         const omdbUrl = `https://www.omdbapi.com/?i=${imdbId}&apikey=9472c454`;
         const res = await fetch(omdbUrl);
         const data = await res.json();
@@ -1610,13 +1654,11 @@ async function fetchOMDbRatings(imdbId) {
             const imdbScore = data.imdbRating && data.imdbRating !== "N/A" ? data.imdbRating : '--';
             let rtScore = '--';
 
-            // Chercher le pourcentage Rotten Tomatoes dans le tableau Ratings
             if (data.Ratings) {
                 const rt = data.Ratings.find(r => r.Source === 'Rotten Tomatoes');
                 if (rt) rtScore = rt.Value;
             }
 
-            // On met à jour uniquement les valeurs textuelles
             const imdbEl = document.getElementById('score-imdb');
             const rtEl = document.getElementById('score-rt');
 
@@ -1624,6 +1666,6 @@ async function fetchOMDbRatings(imdbId) {
             if (rtEl) rtEl.textContent = rtScore;
         }
     } catch (e) {
-        console.error("Erreur OMDb:", e);
+        console.error("Erreur OMDb/RT:", e);
     }
 }

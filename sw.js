@@ -1,7 +1,7 @@
 // sw.js
-// VERSION V16 - CACHE SHELL ET IMAGES SÉPARÉS, RAPIDITÉ ACCRUE
-const CACHE_NAME = 'cinematch-v16-offline-capable';
-const IMAGE_CACHE_NAME = 'cinematch-images-v16';
+// VERSION V17 - CACHE SHELL ET IMAGES SÉPARÉS, RAPIDITÉ ACCRUE
+const CACHE_NAME = 'cinematch-v17-offline-capable';
+const IMAGE_CACHE_NAME = 'cinematch-images-v17';
 const MAX_IMAGES = 200;
 
 const ASSETS_TO_CACHE = [
@@ -77,9 +77,14 @@ self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
   const url = new URL(event.request.url);
 
-  // Ne pas intercepter les appels API externes (TMDB, Firebase, Google Auth) dans le cache statique du SW
+  // Ne pas intercepter les appels API externes (TMDB, OMDb, Wikidata, Firebase, Google Auth) dans le cache statique du SW
   if (
     url.hostname.includes('api.themoviedb.org') ||
+    url.hostname.includes('omdbapi.com') ||
+    url.hostname.includes('wikidata.org') ||
+    url.hostname.includes('allorigins.win') ||
+    url.hostname.includes('codetabs.com') ||
+    url.hostname.includes('mdblist.com') ||
     url.hostname.includes('firestore.googleapis.com') ||
     url.hostname.includes('identitytoolkit.googleapis.com')
   ) {

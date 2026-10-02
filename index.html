@@ -248,13 +248,19 @@
                                  <span class="material-symbols-outlined text-green-500 text-[16px]">visibility</span>
                             </template>
                         </div>
-                        <div class="flex items-center gap-1 mt-0.5 text-[10px] text-gray-500 dark:text-gray-400">
+                        <div class="flex items-center gap-1 mt-0.5 text-[10px] text-gray-500 dark:text-gray-400 flex-wrap">
                             <span x-text="item.year"></span>
                             <span class="text-gray-400">•</span>
                             <div class="flex items-center gap-0.5 text-yellow-500">
                                 <span class="material-symbols-outlined text-[10px] filled">star</span>
                                 <span class="text-gray-600 dark:text-gray-300 font-medium" x-text="item.vote_average"></span>
                             </div>
+                            <template x-if="item.rtScore">
+                                <div class="flex items-center gap-0.5 ml-1" title="Rotten Tomatoes">
+                                    <img :src="item.rtIcon" onerror="this.onerror=null;this.src='https://upload.wikimedia.org/wikipedia/commons/5/5b/Rotten_Tomatoes.svg'" class="w-3 h-3 object-contain" alt="RT">
+                                    <span class="text-gray-600 dark:text-gray-200 font-semibold" x-text="item.rtScore"></span>
+                                </div>
+                            </template>
                         </div>
                     </a>
                 </template>

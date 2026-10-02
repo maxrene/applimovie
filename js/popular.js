@@ -91,6 +91,17 @@ document.addEventListener('alpine:init', () => {
                 this.loadUserPlatforms();
             });
 
+            window.addEventListener('rt-rating-loaded', (e) => {
+                if (!e.detail || !e.detail.rt) return;
+                const { tmdbId, type, rt } = e.detail;
+                const normType = (type === 'tv' || type === 'serie') ? 'tv' : 'movie';
+                const target = this.items.find(i => Number(i.id) === Number(tmdbId) && i.media_type === normType);
+                if (target) {
+                    target.rtScore = rt;
+                    target.rtIcon = window.getRTIconUrl ? window.getRTIconUrl(rt) : 'https://upload.wikimedia.org/wikipedia/commons/5/5b/Rotten_Tomatoes.svg';
+                }
+            });
+
             this.loadUserPlatforms();
             this.resetFilters();
             this.fetchGenres();
@@ -369,16 +380,24 @@ document.addEventListener('alpine:init', () => {
                         processedResults = enrichedResults;
                     }
 
-                    const newItems = processedResults.map(item => ({
-                        id: item.id,
-                        title: this.subTab === 'movie' ? item.title : item.name,
-                        poster_path: item.poster_path 
-                            ? `https://image.tmdb.org/t/p/w500${item.poster_path}` 
-                            : 'https://placehold.co/300x450?text=No+Image',
-                        vote_average: item.vote_average ? item.vote_average.toFixed(1) : 'N/A',
-                        year: this.formatYear(item),
-                        media_type: this.subTab
-                    }));
+                    const newItems = processedResults.map(item => {
+                        const cachedRt = window.getCachedMediaRatings ? window.getCachedMediaRatings(item.id, this.subTab) : null;
+                        const rtVal = cachedRt?.rt || null;
+                        return {
+                            id: item.id,
+                            title: this.subTab === 'movie' ? item.title : item.name,
+                            original_title: this.subTab === 'movie' ? item.original_title : item.original_name,
+                            poster_path: item.poster_path 
+                                ? `https://image.tmdb.org/t/p/w500${item.poster_path}` 
+                                : 'https://placehold.co/300x450?text=No+Image',
+                            vote_average: item.vote_average ? item.vote_average.toFixed(1) : 'N/A',
+                            rtScore: rtVal,
+                            rtIcon: (rtVal && window.getRTIconUrl) ? window.getRTIconUrl(rtVal) : 'https://upload.wikimedia.org/wikipedia/commons/5/5b/Rotten_Tomatoes.svg',
+                            year: this.formatYear(item),
+                            rawYear: ((item.release_date || item.first_air_date) || '').split('-')[0],
+                            media_type: this.subTab
+                        };
+                    });
 
                     if (page === 1) {
                         this.items = newItems;
@@ -386,6 +405,21 @@ document.addEventListener('alpine:init', () => {
                         const existingIds = new Set(this.items.map(i => i.id));
                         const filteredNew = newItems.filter(i => !existingIds.has(i.id));
                         this.items = [...this.items, ...filteredNew];
+                    }
+
+                    if (window.fetchMediaRatings) {
+                        newItems.slice(0, 12).forEach(item => {
+                            if (!item.rtScore) {
+                                window.fetchMediaRatings({
+                                    tmdbId: item.id,
+                                    type: item.media_type,
+                                    title: item.title,
+                                    originalTitle: item.original_title,
+                                    year: item.rawYear,
+                                    priority: false
+                                });
+                            }
+                        });
                     }
                     
                     this.currentPage = data.page;

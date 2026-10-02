@@ -165,6 +165,18 @@ document.addEventListener('alpine:init', () => {
                 handleRefreshIfChanged();
             });
 
+            window.addEventListener('rt-rating-loaded', (e) => {
+                if (!e.detail || !e.detail.rt) return;
+                const { tmdbId, type, rt } = e.detail;
+                const normType = (type === 'tv' || type === 'serie') ? 'tv' : 'movie';
+                const slots = document.querySelectorAll(`[data-rt-slot="${normType}-${tmdbId}"]`);
+                slots.forEach(slot => {
+                    if (window.createRTBadgeHTML) {
+                        slot.innerHTML = window.createRTBadgeHTML(rt, 'sm');
+                    }
+                });
+            });
+
             await this.renderMedia();
         },
 
@@ -461,7 +473,7 @@ document.addEventListener('alpine:init', () => {
             const fetchPromise = (async () => {
                 try {
                     const res = await apiQueue.add(
-                        () => fetch(`https://api.themoviedb.org/3/movie/${movieId}?api_key=${TMDB_API_KEY}&language=fr-FR&append_to_response=watch/providers`),
+                        () => fetch(`https://api.themoviedb.org/3/movie/${movieId}?api_key=${TMDB_API_KEY}&language=fr-FR&append_to_response=watch/providers,external_ids`),
                         priority
                     );
                     if (!res.ok) return this.getCachedData(cacheKey, true) || null;
@@ -504,14 +516,14 @@ document.addEventListener('alpine:init', () => {
                     const seasonsAppend = Array.from({ length: initialSeasonsCount }, (_, i) => `season/${i + 1}`).join(',');
 
                     let seriesRes = await apiQueue.add(
-                        () => fetch(`https://api.themoviedb.org/3/tv/${seriesId}?api_key=${TMDB_API_KEY}&language=fr-FR&append_to_response=watch/providers,${seasonsAppend}`),
+                        () => fetch(`https://api.themoviedb.org/3/tv/${seriesId}?api_key=${TMDB_API_KEY}&language=fr-FR&append_to_response=watch/providers,external_ids,${seasonsAppend}`),
                         priority
                     );
 
                     // Fallback de sécurité si append_to_response échoue sur TMDB
                     if (!seriesRes.ok && seriesRes.status !== 404) {
                         seriesRes = await apiQueue.add(
-                            () => fetch(`https://api.themoviedb.org/3/tv/${seriesId}?api_key=${TMDB_API_KEY}&language=fr-FR&append_to_response=watch/providers`),
+                            () => fetch(`https://api.themoviedb.org/3/tv/${seriesId}?api_key=${TMDB_API_KEY}&language=fr-FR&append_to_response=watch/providers,external_ids`),
                             priority
                         );
                     }
@@ -759,16 +771,45 @@ document.addEventListener('alpine:init', () => {
             return `${h}h ${m > 0 ? m + 'm' : ''}`.trim();
         },
 
+        createRatingBadgesHTML(item) {
+            const normType = (item.type === 'tv' || item.type === 'serie') ? 'tv' : 'movie';
+            const cachedRatings = window.getCachedMediaRatings ? window.getCachedMediaRatings(item.id, normType) : null;
+
+            const starScore = cachedRatings?.imdb ||
+                (item.apiDetails?.vote_average ? Number(item.apiDetails.vote_average).toFixed(1) : (item.imdb && item.imdb !== '0' ? item.imdb : ''));
+            const rtScore = cachedRatings?.rt ||
+                ((item.rottenTomatoes && item.rottenTomatoes !== 'xx' && item.rottenTomatoes !== 'N/A') ? item.rottenTomatoes : null);
+
+            if (!rtScore && item.apiDetails && !item.apiDetails.error && window.fetchMediaRatings) {
+                window.fetchMediaRatings({
+                    tmdbId: item.id,
+                    type: normType,
+                    imdbId: item.apiDetails.imdb_id || item.apiDetails.external_ids?.imdb_id || null,
+                    wikidataId: item.apiDetails.external_ids?.wikidata_id || null,
+                    title: item.title || item.apiDetails.title || item.apiDetails.name || '',
+                    originalTitle: item.apiDetails.original_title || item.apiDetails.original_name || '',
+                    year: String(item.year || '').split(' - ')[0],
+                    priority: false
+                });
+            }
+
+            const starHTML = starScore
+                ? `<span class="inline-flex items-center gap-0.5 text-yellow-500 text-xs font-semibold"><span class="material-symbols-outlined text-[12px] filled">star</span>${starScore}</span>`
+                : '';
+            const rtHTML = (rtScore && window.createRTBadgeHTML) ? window.createRTBadgeHTML(rtScore, 'sm') : '';
+
+            return `<span class="inline-flex items-center gap-2 ml-1.5">${starHTML}<span data-rt-slot="${normType}-${item.id}" class="inline-flex items-center">${rtHTML}</span></span>`;
+        },
+
         createMovieItemHTML(item) {
             const link = `film.html?id=${item.id}`;
             const durationStr = item.duration || (item.apiDetails?.runtime ? this.formatDuration(item.apiDetails.runtime) : '');
             const genresStr = item.genres && item.genres.length > 0
                 ? (typeof item.genres[0] === 'string' ? item.genres[0] : item.genres[0].name)
                 : '';
-            const ratingVal = item.apiDetails?.vote_average ? Number(item.apiDetails.vote_average).toFixed(1) : (item.imdb && item.imdb !== '0' ? item.imdb : '');
             const parts = [item.year, genresStr, durationStr].filter(Boolean);
             const metaLine = parts.join(' • ');
-            const ratingBadge = ratingVal ? `<span class="inline-flex items-center gap-0.5 text-yellow-500 text-xs font-semibold ml-2"><span class="material-symbols-outlined text-[12px] filled">star</span>${ratingVal}</span>` : '';
+            const ratingBadge = this.createRatingBadgesHTML(item);
 
             const platformsHTML = this.createPlatformIconsHTML(item.dynamicProviders);
             const availableLine = platformsHTML
@@ -831,6 +872,7 @@ document.addEventListener('alpine:init', () => {
                     ? (typeof item.genres[0] === 'string' ? item.genres[0] : item.genres[0].name)
                     : '';
                 const platformsHTML = this.createPlatformIconsHTML(item.dynamicProviders);
+                const ratingBadge = this.createRatingBadgesHTML(item);
 
                 return `
                 <div class="relative flex items-center gap-4 p-4 hover:bg-white/5 transition-colors rounded-lg">
@@ -852,8 +894,9 @@ document.addEventListener('alpine:init', () => {
                                 ${removeButton}
                             </div>
                         </div>
-                        <div class="flex items-center gap-2 text-xs text-gray-400 mt-1">
+                        <div class="flex items-center flex-wrap gap-2 text-xs text-gray-400 mt-1">
                             <span>${String(item.year || '').split(' - ')[0]}${genreText ? ' • ' + genreText : ''}</span>
+                            ${ratingBadge}
                             ${platformsHTML ? '<span class="text-gray-600">•</span>' : ''}
                             <div class="flex items-center gap-1">${platformsHTML}</div>
                         </div>
@@ -956,7 +999,8 @@ document.addEventListener('alpine:init', () => {
             const platformsHTML = this.createPlatformIconsHTML(item.dynamicProviders);
             const totalSeasons = item.apiDetails.number_of_seasons || item.apiDetails.seasons.length;
             const startYear = String(item.year || '').split(' - ')[0];
-            const infoLine = `<div class="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 mt-1"><span>${totalSeasons} Saison${totalSeasons > 1 ? 's' : ''} • ${startYear}</span>${platformsHTML ? '<span class="text-gray-600">•</span>' : ''}<div class="flex items-center gap-1">${platformsHTML}</div></div>`;
+            const ratingBadge = this.createRatingBadgesHTML(item);
+            const infoLine = `<div class="flex items-center flex-wrap gap-2 text-xs text-gray-500 dark:text-gray-400 mt-1"><span>${totalSeasons} Saison${totalSeasons > 1 ? 's' : ''} • ${startYear}</span>${ratingBadge}${platformsHTML ? '<span class="text-gray-600">•</span>' : ''}<div class="flex items-center gap-1">${platformsHTML}</div></div>`;
             const checkButton = firstEpisode ? this.createCheckButtonHTML(item.id, false, 'tv', firstEpisode.id) : '';
             const nextEpName = firstEpisode ? `S01 E01 - ${firstEpisode.name}` : 'Saison 1 • Épisode 1';
 
@@ -1021,7 +1065,8 @@ document.addEventListener('alpine:init', () => {
             const platformsHTML = this.createPlatformIconsHTML(item.dynamicProviders);
             const totalSeasons = item.apiDetails.number_of_seasons || sortedSeasons.length;
             const startYear = String(item.year || '').split(' - ')[0];
-            const infoLine = `<div class="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 mt-1"><span>${totalSeasons} Saison${totalSeasons > 1 ? 's' : ''} • ${startYear}</span>${platformsHTML ? '<span class="text-gray-600">•</span>' : ''}<div class="flex items-center gap-1">${platformsHTML}</div></div>`;
+            const ratingBadge = this.createRatingBadgesHTML(item);
+            const infoLine = `<div class="flex items-center flex-wrap gap-2 text-xs text-gray-500 dark:text-gray-400 mt-1"><span>${totalSeasons} Saison${totalSeasons > 1 ? 's' : ''} • ${startYear}</span>${ratingBadge}${platformsHTML ? '<span class="text-gray-600">•</span>' : ''}<div class="flex items-center gap-1">${platformsHTML}</div></div>`;
             const checkButton = this.createCheckButtonHTML(item.id, false, 'tv', nextEpisode.id);
             const removeButton = this.createRemoveButtonHTML(item.id, 'serie');
 
