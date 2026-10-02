@@ -2,7 +2,6 @@ const BASE_URL = 'https://api.themoviedb.org/3';
 const IMG_BASE_POSTER = 'https://image.tmdb.org/t/p/w500';
 const IMG_BASE_PROFILE = 'https://image.tmdb.org/t/p/w185';
 
-// On déclare une fonction globale simple
 function personProfile() {
     return {
         person: {
@@ -39,19 +38,17 @@ function personProfile() {
 
         checkIfFavorite(id) {
             const favorites = getSafeLocalStorage('favoriteActors', []);
-            this.isFavorite = favorites.some(actor => actor.id == id);
+            this.isFavorite = favorites.some(actor => Number(actor.id) === Number(id));
         },
 
         toggleFavorite() {
             const favorites = getSafeLocalStorage('favoriteActors', []);
-            const index = favorites.findIndex(actor => actor.id == this.person.id);
+            const index = favorites.findIndex(actor => Number(actor.id) === Number(this.person.id));
 
             if (index > -1) {
-                // Remove
                 favorites.splice(index, 1);
                 this.isFavorite = false;
             } else {
-                // Add
                 favorites.push({
                     id: this.person.id,
                     name: this.person.name,
@@ -69,7 +66,7 @@ function personProfile() {
                 return;
             }
 
-            const url = `${BASE_URL}/person/${personId}?api_key=${TMDB_API_KEY}&language=en-US&append_to_response=movie_credits,tv_credits`;
+            const url = `${BASE_URL}/person/${personId}?api_key=${TMDB_API_KEY}&language=fr-FR&append_to_response=movie_credits,tv_credits`;
 
             try {
                 const response = await fetch(url);
@@ -77,6 +74,18 @@ function personProfile() {
                     throw new Error(`Failed to fetch person details: ${response.statusText}`);
                 }
                 const data = await response.json();
+
+                // Fallback biographie en anglais si la biographie française est vide
+                if (!data.biography || !data.biography.trim()) {
+                    try {
+                        const enRes = await fetch(`${BASE_URL}/person/${personId}?api_key=${TMDB_API_KEY}&language=en-US`);
+                        if (enRes.ok) {
+                            const enData = await enRes.json();
+                            if (enData.biography) data.biography = enData.biography;
+                        }
+                    } catch (e) {}
+                }
+
                 this.processData(data);
             } catch (error) {
                 console.error(error);
@@ -86,11 +95,11 @@ function personProfile() {
         },
 
         processData(data) {
-            document.title = `${data.name} | Actor Profile`;
+            document.title = `${data.name} - CineMatch`;
             this.person = data;
 
-            const films = (data.movie_credits.cast || []).concat(data.movie_credits.crew || []);
-            const series = (data.tv_credits.cast || []).concat(data.tv_credits.crew || []);
+            const films = (data.movie_credits?.cast || []).concat(data.movie_credits?.crew || []);
+            const series = (data.tv_credits?.cast || []).concat(data.tv_credits?.crew || []);
 
             const processedFilms = this.normalizeMedia(films, 'movie');
             const processedSeries = this.normalizeMedia(series, 'tv');
@@ -107,6 +116,7 @@ function personProfile() {
                     uniqueMap.set(id, {
                         id: id,
                         title: type === 'movie' ? (item.title || item.original_title) : (item.name || item.original_name),
+                        role: item.character || item.job || '',
                         poster_path: item.poster_path,
                         date: type === 'movie' ? item.release_date : item.first_air_date,
                         popularity: item.popularity || 0,
@@ -118,8 +128,25 @@ function personProfile() {
             return Array.from(uniqueMap.values());
         },
 
+        getMediaStatus(media) {
+            const id = Number(media.id);
+            const watchedMovies = getSafeLocalStorage('watchedMovies', []);
+            const watchedSeries = getSafeLocalStorage('watchedSeries', []);
+            if (
+                (media.type === 'movie' && watchedMovies.includes(id)) ||
+                (media.type === 'tv' && watchedSeries.includes(id))
+            ) {
+                return 'watched';
+            }
+            const watchlist = getSafeLocalStorage('watchlist', []);
+            if (watchlist.some(w => Number(w.id) === id)) {
+                return 'watchlist';
+            }
+            return null;
+        },
+
         get bioText() {
-            const fullBio = this.person.biography || "No biography available.";
+            const fullBio = this.person.biography || "Aucune biographie disponible.";
             const bioMaxLength = 300;
 
             if (this.isBioExpanded || fullBio.length <= bioMaxLength) {

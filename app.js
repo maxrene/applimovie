@@ -7,32 +7,89 @@ function getMediaStatusGlobal(id, type) {
     const watchedSeries = getSafeLocalStorage('watchedSeries', []);
 
     const isWatched = (type === 'movie' && watchedMovies.includes(Number(id))) ||
-                      (type === 'tv' && watchedSeries.includes(Number(id))) ||
-                      (type === 'serie' && watchedSeries.includes(Number(id)));
+                      ((type === 'tv' || type === 'serie') && watchedSeries.includes(Number(id)));
 
     if (isWatched) return 'watched';
 
     const watchlist = getSafeLocalStorage('watchlist', []);
-    const isInWatchlist = watchlist.some(item => item.id == id);
+    const isInWatchlist = watchlist.some(item => Number(item.id) === Number(id));
     if (isInWatchlist) return 'watchlist';
 
     return null;
 }
 
+// Fonction globale pour cocher rapidement le prochain épisode depuis "Reprendre la lecture"
+window.markNextEpisodeWatched = function (event, seriesId, episodeId, isLastReleasedEpisode) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+    const sIdStr = String(seriesId);
+    const sIdNum = Number(seriesId);
+    const epIdNum = Number(episodeId);
+
+    const watchedEpisodes = getSafeLocalStorage('watchedEpisodes', {});
+    if (!Array.isArray(watchedEpisodes[sIdStr])) {
+        watchedEpisodes[sIdStr] = [];
+    }
+    if (!watchedEpisodes[sIdStr].includes(epIdNum)) {
+        watchedEpisodes[sIdStr].push(epIdNum);
+    }
+    localStorage.setItem('watchedEpisodes', JSON.stringify(watchedEpisodes));
+
+    const seriesLastWatchedDate = getSafeLocalStorage('seriesLastWatchedDate', {});
+    seriesLastWatchedDate[sIdStr] = Date.now();
+    localStorage.setItem('seriesLastWatchedDate', JSON.stringify(seriesLastWatchedDate));
+
+    if (isLastReleasedEpisode) {
+        let watchedSeries = getSafeLocalStorage('watchedSeries', []);
+        if (!watchedSeries.includes(sIdNum)) {
+            watchedSeries.push(sIdNum);
+            localStorage.setItem('watchedSeries', JSON.stringify(watchedSeries));
+        }
+        let watchlist = getSafeLocalStorage('watchlist', []);
+        watchlist = watchlist.filter(item => !(Number(item.id) === sIdNum && (item.type === 'tv' || item.type === 'serie')));
+        localStorage.setItem('watchlist', JSON.stringify(watchlist));
+    }
+
+    window.dispatchEvent(new CustomEvent('watchlist-updated'));
+    window.dispatchEvent(new CustomEvent('view-changed', { detail: { tab: 'home' } }));
+};
+
 // --- 1. LOGIQUE ALPINE.JS ---
 document.addEventListener('alpine:init', () => {
     Alpine.data('app', () => ({
-        activeTab: 'home', 
+        activeTab: 'home',
         userRegion: localStorage.getItem('userRegion') || 'FR',
 
         init() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const tabParam = urlParams.get('tab');
+            if (tabParam && ['home', 'popular', 'search', 'watchlist'].includes(tabParam)) {
+                this.switchTab(tabParam);
+            }
+
+            window.addEventListener('cloud-data-synced', () => {
+                this.userRegion = localStorage.getItem('userRegion') || 'FR';
+            });
         },
 
         switchTab(tab) {
             this.activeTab = tab;
+            // Met à jour l'URL sans recharger la page pour garder l'onglet actif au retour arrière
+            try {
+                const url = new URL(window.location.href);
+                if (tab === 'home') {
+                    url.searchParams.delete('tab');
+                } else {
+                    url.searchParams.set('tab', tab);
+                }
+                window.history.replaceState({}, '', url.toString());
+            } catch (e) {}
+
             setTimeout(() => {
                 window.dispatchEvent(new CustomEvent('view-changed', { detail: { tab: tab } }));
-            }, 50);
+            }, 30);
         }
     }));
 
@@ -48,6 +105,11 @@ document.addEventListener('alpine:init', () => {
                     this.updateMediaStatuses();
                     this.loadContinueWatching();
                 }
+            });
+
+            window.addEventListener('cloud-data-synced', () => {
+                this.updateMediaStatuses();
+                this.loadContinueWatching();
             });
 
             window.addEventListener('pageshow', () => {
@@ -67,39 +129,51 @@ document.addEventListener('alpine:init', () => {
         async fetchAPI(endpoint, returnsList = true) {
             try {
                 const separator = endpoint.includes('?') ? '&' : '?';
-                const apiKey = window.TMDB_API_KEY || ''; 
-                const url = `${BASE_URL}/${endpoint}${separator}api_key=${apiKey}&watch_region=${this.userRegion || 'FR'}`;
+                const apiKey = window.TMDB_API_KEY || '';
+                const region = localStorage.getItem('userRegion') || 'FR';
+                const url = `${BASE_URL}/${endpoint}${separator}api_key=${apiKey}&watch_region=${region}`;
                 const response = await fetch(url);
                 if (!response.ok) throw new Error(`API error: ${response.statusText}`);
                 const data = await response.json();
-                return returnsList ? data.results : data;
+                return returnsList ? (data.results || []) : data;
             } catch (error) {
                 console.error(`Failed to fetch from ${endpoint}:`, error);
                 return returnsList ? [] : null;
             }
         },
 
-        createContinueWatchingCard(series, nextEpisode, progress) {
-            const posterUrl = IMG_BASE_POSTER + series.poster_path;
+        createContinueWatchingCard(series, nextEpisode, progress, isLastReleasedEpisode) {
+            const posterUrl = series.poster_path
+                ? IMG_BASE_POSTER + series.poster_path
+                : 'https://placehold.co/300x450?text=No+Image';
             const link = `serie.html?id=${series.id}`;
 
             const seasonCode = String(nextEpisode.season_number).padStart(2, '0');
             const episodeCode = String(nextEpisode.episode_number).padStart(2, '0');
-            const nextEpisodeString = `S${seasonCode}E${episodeCode} - ${nextEpisode.name}`;
+            const nextEpisodeString = `S${seasonCode}E${episodeCode}${nextEpisode.name ? ' - ' + nextEpisode.name : ''}`;
 
             return `
-                <a href="${link}" data-id="${series.id}" data-type="tv" class="flex-shrink-0 w-32 snap-start group flex flex-col media-card-link">
-                    <div class="relative w-full aspect-[2/3] rounded-lg overflow-hidden bg-gray-800 shadow-md">
-                        <img src="${posterUrl}" loading="lazy" class="w-full h-full object-cover">
-                        <div class="absolute bottom-0 left-0 right-0 h-1 bg-gray-700/50 backdrop-blur-sm">
-                            <div class="h-full bg-primary" style="width: ${progress}%"></div>
+                <div class="flex-shrink-0 w-32 snap-start group flex flex-col relative">
+                    <a href="${link}" data-id="${series.id}" data-type="tv" class="flex flex-col media-card-link">
+                        <div class="relative w-full aspect-[2/3] rounded-lg overflow-hidden bg-gray-800 shadow-md">
+                            <img src="${posterUrl}" loading="lazy" class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105">
+                            <button
+                                onclick="window.markNextEpisodeWatched(event, ${series.id}, ${nextEpisode.id}, ${Boolean(isLastReleasedEpisode)})"
+                                title="Marquer S${seasonCode}E${episodeCode} comme vu"
+                                class="absolute bottom-2.5 right-1.5 z-20 flex items-center gap-0.5 px-2 py-1 rounded-full bg-black/80 hover:bg-primary text-white text-[10px] font-bold border border-white/20 shadow-lg backdrop-blur-sm transition-colors active:scale-95">
+                                <span class="material-symbols-outlined text-[13px]">check</span>
+                                <span>S${seasonCode}E${episodeCode}</span>
+                            </button>
+                            <div class="absolute bottom-0 left-0 right-0 h-1.5 bg-gray-700/70 backdrop-blur-sm">
+                                <div class="h-full bg-primary transition-all duration-300" style="width: ${Math.min(100, Math.max(0, progress))}%"></div>
+                            </div>
                         </div>
-                    </div>
-                    <div class="mt-2">
-                        <p class="text-xs font-bold text-gray-900 dark:text-white truncate leading-tight">${series.name}</p>
-                        <p class="text-[10px] font-semibold text-primary truncate leading-tight mt-0.5">${nextEpisodeString}</p>
-                    </div>
-                </a>
+                        <div class="mt-2">
+                            <p class="text-xs font-bold text-gray-900 dark:text-white truncate leading-tight">${series.name}</p>
+                            <p class="text-[10px] font-semibold text-primary truncate leading-tight mt-0.5">${nextEpisodeString}</p>
+                        </div>
+                    </a>
+                </div>
             `;
         },
 
@@ -171,20 +245,58 @@ document.addEventListener('alpine:init', () => {
 
         renderContent(containerId, content, cardType = 'platform') {
             const container = document.getElementById(containerId);
-            if(!container) return;
+            if (!container) return;
             container.innerHTML = content.map(media => this.createMediaCard(media, cardType)).join('');
+        },
+
+        async fetchSeriesForContinueWatching(id) {
+            const cacheKey = `series-details-${id}`;
+            const cachedRaw = localStorage.getItem(cacheKey);
+            const ONE_DAY = 24 * 60 * 60 * 1000;
+
+            if (cachedRaw) {
+                try {
+                    const parsed = JSON.parse(cachedRaw);
+                    const payload = parsed.data || parsed;
+                    const isRecent = parsed.timestamp && (Date.now() - parsed.timestamp < ONE_DAY);
+                    if (payload && Array.isArray(payload.seasons) && (isRecent || !navigator.onLine)) {
+                        const hasSeasonEpisodes = payload.seasons.some(s => s.season_number > 0 && Array.isArray(s.episodes));
+                        if (hasSeasonEpisodes) {
+                            return payload;
+                        }
+                    }
+                } catch (e) {}
+            }
+
+            const MAX_SEASONS_TO_APPEND = 18;
+            const seasonsToAppend = Array.from({ length: MAX_SEASONS_TO_APPEND }, (_, i) => `season/${i + 1}`).join(',');
+            const rawData = await this.fetchAPI(`tv/${id}?language=fr-FR&append_to_response=watch/providers,${seasonsToAppend}`, false);
+            if (!rawData) return null;
+
+            if (Array.isArray(rawData.seasons)) {
+                rawData.seasons.forEach(s => {
+                    if (s.season_number > 0 && rawData[`season/${s.season_number}`]?.episodes) {
+                        s.episodes = rawData[`season/${s.season_number}`].episodes;
+                    }
+                });
+            }
+
+            const compacted = window.compactSeriesForCache ? window.compactSeriesForCache(rawData) : rawData;
+            try {
+                localStorage.setItem(cacheKey, JSON.stringify({
+                    timestamp: Date.now(),
+                    data: compacted
+                }));
+            } catch (e) {}
+
+            return compacted;
         },
 
         async loadContinueWatching() {
             const watchedEpisodes = getSafeLocalStorage('watchedEpisodes', {});
-            const seriesInProgress = {};
-
-            for (const seriesId in watchedEpisodes) {
-                if (watchedEpisodes[seriesId] && watchedEpisodes[seriesId].length > 0) {
-                    seriesInProgress[seriesId] = true;
-                }
-            }
-            const seriesIds = Object.keys(seriesInProgress);
+            const seriesIds = Object.keys(watchedEpisodes).filter(
+                sId => Array.isArray(watchedEpisodes[sId]) && watchedEpisodes[sId].length > 0
+            );
 
             const section = document.getElementById('continue-watching-section');
             if (seriesIds.length === 0) {
@@ -192,56 +304,61 @@ document.addEventListener('alpine:init', () => {
                 return;
             }
 
-            const MAX_SEASONS_TO_APPEND = 20;
-            const seasonsToAppend = Array.from({ length: MAX_SEASONS_TO_APPEND }, (_, i) => `season/${i + 1}`).join(',');
-
-            const promises = seriesIds.map(id =>
-                this.fetchAPI(`tv/${id}?language=fr-FR&append_to_response=${seasonsToAppend}`, false)
-            );
-            const results = await Promise.all(promises);
-
+            const results = await Promise.all(seriesIds.map(id => this.fetchSeriesForContinueWatching(id)));
             const seriesToDisplay = [];
+            const today = new Date().toISOString().split('T')[0];
 
             for (const seriesDetails of results) {
                 if (!seriesDetails) continue;
 
                 const seriesIdStr = String(seriesDetails.id);
-                let totalEpisodes = 0;
+                const userWatchedEps = watchedEpisodes[seriesIdStr] || [];
+                let totalReleasedEpisodes = 0;
                 let watchedCount = 0;
                 let nextEpisode = null;
-                let foundNext = false;
+                let remainingUnwatchedReleased = 0;
 
-                const seasons = seriesDetails.seasons ? seriesDetails.seasons.sort((a, b) => a.season_number - b.season_number) : [];
+                const seasons = seriesDetails.seasons
+                    ? [...seriesDetails.seasons].sort((a, b) => a.season_number - b.season_number)
+                    : [];
 
                 for (const season of seasons) {
                     if (season.season_number === 0) continue;
 
-                    const seasonDetail = seriesDetails[`season/${season.season_number}`];
-                    if (!seasonDetail || !seasonDetail.episodes) continue;
+                    const episodes = season.episodes || seriesDetails[`season/${season.season_number}`]?.episodes;
+                    if (!Array.isArray(episodes)) continue;
 
-                    totalEpisodes += seasonDetail.episodes.length;
+                    for (const episode of episodes) {
+                        const isReleased = !episode.air_date || episode.air_date <= today;
+                        const isWatched = userWatchedEps.includes(episode.id);
 
-                    for (const episode of seasonDetail.episodes) {
-                        const isWatched = watchedEpisodes[seriesIdStr] && watchedEpisodes[seriesIdStr].includes(episode.id);
+                        if (isReleased) {
+                            totalReleasedEpisodes++;
+                        }
 
                         if (isWatched) {
                             watchedCount++;
-                        } else if (!foundNext) {
-                            const today = new Date().toISOString().split('T')[0];
-                            if (episode.air_date && episode.air_date <= today) {
-                                nextEpisode = episode;
-                                foundNext = true;
-                            } else {
-                                foundNext = true;
-                                nextEpisode = null;
+                        } else if (isReleased) {
+                            remainingUnwatchedReleased++;
+                            if (!nextEpisode) {
+                                nextEpisode = {
+                                    ...episode,
+                                    season_number: episode.season_number || season.season_number
+                                };
                             }
                         }
                     }
                 }
 
-                if (nextEpisode) {
-                    const progress = totalEpisodes > 0 ? (watchedCount / totalEpisodes) * 100 : 0;
-                    seriesToDisplay.push({ series: seriesDetails, nextEpisode, progress });
+                if (nextEpisode && totalReleasedEpisodes > 0) {
+                    const progress = (watchedCount / totalReleasedEpisodes) * 100;
+                    const isLastReleasedEpisode = remainingUnwatchedReleased === 1;
+                    seriesToDisplay.push({
+                        series: seriesDetails,
+                        nextEpisode,
+                        progress,
+                        isLastReleasedEpisode
+                    });
                 }
             }
 
@@ -261,7 +378,11 @@ document.addEventListener('alpine:init', () => {
                     return b.progress - a.progress;
                 });
 
-                if (container) container.innerHTML = seriesToDisplay.map(item => this.createContinueWatchingCard(item.series, item.nextEpisode, item.progress)).join('');
+                if (container) {
+                    container.innerHTML = seriesToDisplay
+                        .map(item => this.createContinueWatchingCard(item.series, item.nextEpisode, item.progress, item.isLastReleasedEpisode))
+                        .join('');
+                }
                 if (section) section.style.display = 'block';
             } else {
                 if (section) section.style.display = 'none';
@@ -271,6 +392,7 @@ document.addEventListener('alpine:init', () => {
         async fetchAndDisplayContent() {
             this.isLoading = true;
             try {
+                // Lance "Reprendre la lecture" sans bloquer le reste
                 this.loadContinueWatching();
 
                 const popularContent = await this.fetchAPI('trending/all/week?language=fr-FR');
@@ -281,43 +403,50 @@ document.addEventListener('alpine:init', () => {
 
                 if (favoriteActors.length > 0) {
                     const actorIds = favoriteActors.map(a => a.id).join('|');
-                    const favoriteMovies = await this.fetchAPI(`discover/movie?with_people=${actorIds}&sort_by=release_date.desc&vote_count.gte=10`);
+                    const favoriteMovies = await this.fetchAPI(`discover/movie?with_people=${actorIds}&sort_by=release_date.desc&vote_count.gte=10&language=fr-FR`);
 
                     if (favoriteMovies && favoriteMovies.length > 0) {
                         this.renderContent('favorite-actors-container', favoriteMovies, 'platform');
-                        if(favoriteActorsSection) favoriteActorsSection.style.display = 'block';
+                        if (favoriteActorsSection) favoriteActorsSection.style.display = 'block';
                     } else {
-                        if(favoriteActorsSection) favoriteActorsSection.style.display = 'none';
+                        if (favoriteActorsSection) favoriteActorsSection.style.display = 'none';
                     }
                 } else {
-                    if(favoriteActorsSection) favoriteActorsSection.style.display = 'none';
+                    if (favoriteActorsSection) favoriteActorsSection.style.display = 'none';
                 }
 
-                 const platforms = [
-                    { id: 8, name: 'Netflix', containerId: 'netflix-container', sectionId: 'netflix-section' },
-                    { id: 119, name: 'Prime Video', containerId: 'prime-video-container', sectionId: 'prime-video-section' },
-                    { id: 350, name: 'Apple TV+', containerId: 'apple-tv-container', sectionId: 'apple-tv-section' },
-                    { id: 337, name: 'Disney+', containerId: 'disney-plus-container', sectionId: 'disney-plus-section' },
-                    { id: 392, name: 'Canal+', containerId: 'canal-plus-container', sectionId: 'canal-plus-section' },
-                    { id: 531, name: 'Paramount+', containerId: 'paramount-container', sectionId: 'paramount-section' }
+                const platforms = [
+                    { key: 'netflix', id: '8', name: 'Netflix', containerId: 'netflix-container', sectionId: 'netflix-section' },
+                    { key: 'prime', id: '119', name: 'Prime Video', containerId: 'prime-video-container', sectionId: 'prime-video-section' },
+                    { key: 'apple', id: '350', name: 'Apple TV+', containerId: 'apple-tv-container', sectionId: 'apple-tv-section' },
+                    { key: 'disney', id: '337', name: 'Disney+', containerId: 'disney-plus-container', sectionId: 'disney-plus-section' },
+                    { key: 'canal', id: '381|392', name: 'Canal+', containerId: 'canal-plus-container', sectionId: 'canal-plus-section' },
+                    { key: 'paramount', id: '531', name: 'Paramount+', containerId: 'paramount-container', sectionId: 'paramount-section' }
                 ];
 
-                for (const platform of platforms) {
+                const userSelectedPlatforms = getSafeLocalStorage('selectedPlatforms', []);
+
+                await Promise.all(platforms.map(async (platform) => {
+                    const section = document.getElementById(platform.sectionId);
+                    // Si l'utilisateur a personnalisé ses plateformes, masquer celles qu'il n'a pas sélectionnées
+                    if (userSelectedPlatforms.length > 0 && !userSelectedPlatforms.includes(platform.key)) {
+                        if (section) section.style.display = 'none';
+                        return;
+                    }
+
                     const [movies, series] = await Promise.all([
-                        this.fetchAPI(`discover/movie?sort_by=popularity.desc&with_watch_providers=${platform.id}`),
-                        this.fetchAPI(`discover/tv?sort_by=popularity.desc&with_watch_providers=${platform.id}`)
+                        this.fetchAPI(`discover/movie?sort_by=popularity.desc&with_watch_providers=${platform.id}&language=fr-FR`),
+                        this.fetchAPI(`discover/tv?sort_by=popularity.desc&with_watch_providers=${platform.id}&language=fr-FR`)
                     ]);
 
-                    let combined = [...movies, ...series];
-                    combined.sort((a, b) => b.popularity - a.popularity);
-
+                    const combined = [...movies, ...series].sort((a, b) => b.popularity - a.popularity);
                     this.renderContent(platform.containerId, combined.slice(0, 20), 'platform');
 
-                    const section = document.getElementById(platform.sectionId);
-                    if(section) {
+                    if (section) {
                         section.style.display = combined.length > 0 ? 'block' : 'none';
                     }
-                }
+                }));
+
                 localStorage.setItem('lastHomeFetch', Date.now());
             } finally {
                 this.isLoading = false;

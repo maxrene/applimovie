@@ -6,31 +6,36 @@ const IMG_BASE_BANNER = 'https://image.tmdb.org/t/p/original';
 const IMG_BASE_PROFILE = 'https://image.tmdb.org/t/p/w185';
 
 const CUSTOM_PLATFORMS = {
-    8: { name: 'Netflix', url: 'https://images.ctfassets.net/4cd45et68cgf/Rx83JoRDMkYNlMC9MKzcB/2b14d5a59fc3937afd3f03191e19502d/Netflix-Symbol.png?w=700&h=456' },
-    119: { name: 'Prime Video', url: 'https://www.citypng.com/public/uploads/preview/amazon-prime-ios-app-icon-701751695133984u2yuon8nlu.png' },
-    337: { name: 'Disney+', url: 'https://platform.theverge.com/wp-content/uploads/sites/2/chorus/uploads/chorus_asset/file/25357066/Disney__Logo_March_2024.png?quality=90&strip=all&crop=0,0,100,100' },
-    350: { name: 'Apple TV+', url: 'https://image.tmdb.org/t/p/original/9icYBfYFcwgCbky5VdGUIKJ4C5i.png' },
-    392: { name: 'Canal+', url: 'https://static1.purepeople.com/articles/0/46/23/10/@/6655765-logo-de-la-chaine-canal-1200x0-2.png' },
-    531: { name: 'Paramount+', url: 'https://images.seeklogo.com/logo-png/39/1/paramount-logo-png_seeklogo-397501.png' },
-    1899: { name: 'Max', url: 'https://logo.clearbit.com/max.com' },
-    29: { name: 'Sky Go', url: 'https://logo.clearbit.com/sky.com' },
-    39: { name: 'Now', url: 'https://logo.clearbit.com/nowtv.com' }
+    8: { name: 'Netflix', url: 'https://image.tmdb.org/t/p/original/pbpMk2JmcoNnQwx5JGpXngfoWtp.jpg' },
+    119: { name: 'Prime Video', url: 'https://image.tmdb.org/t/p/original/pvske1MyAoymrs5bguRfVqYiM9a.jpg' },
+    337: { name: 'Disney+', url: 'https://image.tmdb.org/t/p/original/97yvRBw1GzX7fXprcF80er19ot.jpg' },
+    350: { name: 'Apple TV+', url: 'https://image.tmdb.org/t/p/original/mcbz1LgtErU9p4UdbZ0rG6RTWHX.jpg' },
+    381: { name: 'Canal+', url: 'https://image.tmdb.org/t/p/original/geOzgeKZWpZC3lymAVEHVIk3X0q.jpg' },
+    392: { name: 'Canal+', url: 'https://image.tmdb.org/t/p/original/geOzgeKZWpZC3lymAVEHVIk3X0q.jpg' },
+    531: { name: 'Paramount+', url: 'https://image.tmdb.org/t/p/original/h5DcR0J2EESLitnhR8xLG1QymTE.jpg' },
+    1899: { name: 'Max', url: 'https://image.tmdb.org/t/p/original/jbe4gVSfRlbPTdESXhEKpornsfu.jpg' },
+    29: { name: 'Sky Go', url: 'https://image.tmdb.org/t/p/original/1UrT2H9x6DuQ9ytNhsSCUFtTUwS.jpg' },
+    39: { name: 'Now', url: 'https://image.tmdb.org/t/p/original/g0E9h3JAeIwmdvxlT73jiEuxdNj.jpg' },
+    35: { name: 'Rakuten TV', url: 'https://image.tmdb.org/t/p/original/bZvc9dXrXNly7cA0V4D9pR8yJwm.jpg' },
+    300: { name: 'Pluto TV', url: 'https://image.tmdb.org/t/p/original/dB8G41Q6tSL5NBisrIeqByfepBc.jpg' },
+    283: { name: 'Crunchyroll', url: 'https://image.tmdb.org/t/p/original/fzN5Jok5Ig1eJ7gyNGoMhnLSCfh.jpg' },
+    234: { name: 'Arte', url: 'https://image.tmdb.org/t/p/original/vPZrjHe7wvALuwJEXT2kwYLi0gV.jpg' }
 };
 
 const PLATFORM_ID_MAP = {
-    'netflix': 8,
-    'prime': 119,
-    'disney': 337,
-    'apple': 350,
-    'canal': 392,
-    'paramount': 531,
-    'max': 1899,
-    'skygo': 29,
-    'now': 39,
-    'rakuten': 35,
-    'pluto': 300,
-    'crunchyroll': 283,
-    'arte': 234
+    'netflix': [8],
+    'prime': [119],
+    'disney': [337],
+    'apple': [350],
+    'canal': [381, 392],
+    'paramount': [531],
+    'max': [1899],
+    'skygo': [29],
+    'now': [39],
+    'rakuten': [35],
+    'pluto': [300],
+    'crunchyroll': [283],
+    'arte': [234]
 };
 
 let currentCastData = [];
@@ -113,24 +118,51 @@ async function fetchFullFromTMDB(id, type) {
     try {
         let appendOptions = 'credits,watch/providers,similar,external_ids,videos';
         if (type === 'tv') {
-            const MAX_SEASONS_TO_APPEND = 15;
+            const MAX_SEASONS_TO_APPEND = 18;
             const seasonsToAppend = Array.from({ length: MAX_SEASONS_TO_APPEND }, (_, i) => `season/${i + 1}`).join(',');
             appendOptions += `,${seasonsToAppend}`;
         }
 
-        const url = `${BASE_URL}/${type}/${id}?api_key=${TMDB_API_KEY}&append_to_response=${appendOptions}`;
+        const url = `${BASE_URL}/${type}/${id}?api_key=${TMDB_API_KEY}&language=fr-FR&include_video_language=fr,en&append_to_response=${appendOptions}`;
         const res = await fetch(url);
         if (!res.ok) throw new Error("Erreur TMDB");
         const data = await res.json();
-        
+
+        // Si le synopsis français est vide, récupérer le synopsis anglais en fallback
+        if (!data.overview) {
+            try {
+                const enRes = await fetch(`${BASE_URL}/${type}/${id}?api_key=${TMDB_API_KEY}&language=en-US`);
+                if (enRes.ok) {
+                    const enData = await enRes.json();
+                    if (enData.overview) data.overview = enData.overview;
+                }
+            } catch (e) {}
+        }
+
         if (type === 'tv') {
             window.currentSeriesData = data;
+            // Enrichir chaque saison avec ses épisodes pour le cache compacté
+            if (Array.isArray(data.seasons)) {
+                data.seasons.forEach(s => {
+                    if (s.season_number > 0 && data[`season/${s.season_number}`]?.episodes) {
+                        s.episodes = data[`season/${s.season_number}`].episodes;
+                    }
+                });
+            }
+            const compacted = window.compactSeriesForCache ? window.compactSeriesForCache(data) : data;
+            try {
+                localStorage.setItem(`series-details-${id}`, JSON.stringify({ timestamp: Date.now(), data: compacted }));
+            } catch (e) {}
+        } else {
+            const compacted = window.compactMovieForCache ? window.compactMovieForCache(data) : data;
+            try {
+                localStorage.setItem(`movie-details-${id}`, JSON.stringify({ timestamp: Date.now(), data: compacted }));
+            } catch (e) {}
         }
 
         const formattedData = formatTMDBData(data, type);
         updateUI(formattedData, type, false);
 
-        // --- NOUVEAU : Appel OMDb ---
         if (data.external_ids && data.external_ids.imdb_id) {
             fetchOMDbRatings(data.external_ids.imdb_id);
         }
@@ -164,10 +196,9 @@ async function fetchFullFromTMDB(id, type) {
 
 async function fetchUpdates(id, type) {
     try {
-        // Fetch streaming, credits, and videos in parallel
         const urls = [
             `${BASE_URL}/${type}/${id}/watch/providers?api_key=${TMDB_API_KEY}`,
-            `${BASE_URL}/${type}/${id}/credits?api_key=${TMDB_API_KEY}`,
+            `${BASE_URL}/${type}/${id}/credits?api_key=${TMDB_API_KEY}&language=fr-FR`,
             `${BASE_URL}/${type}/${id}/external_ids?api_key=${TMDB_API_KEY}`
         ];
         const [streamingRes, creditsRes, extRes] = await Promise.all(urls.map(url => fetch(url)));
@@ -191,26 +222,39 @@ async function fetchUpdates(id, type) {
         
         updateCastUI(cast);
 
-        if (type === 'movie') {
-            const similarUrl = `${BASE_URL}/${type}/${id}/similar?api_key=${TMDB_API_KEY}`;
-            const similarRes = await fetch(similarUrl);
-            const similarData = await similarRes.json();
+        const similarUrl = `${BASE_URL}/${type}/${id}/similar?api_key=${TMDB_API_KEY}&language=fr-FR`;
+        fetch(similarUrl)
+            .then(r => r.json())
+            .then(similarData => {
+                const similarItems = similarData.results?.map(s => ({
+                    id: s.id,
+                    title: s.title || s.name,
+                    posterUrl: s.poster_path ? IMG_BASE_POSTER + s.poster_path : 'https://placehold.co/200x300'
+                })) || [];
+                updateSimilarMoviesUI(similarItems, type);
+            })
+            .catch(() => {});
 
-            const similarMovies = similarData.results?.map(s => ({
-                id: s.id,
-                title: s.title,
-                posterUrl: s.poster_path ? IMG_BASE_POSTER + s.poster_path : 'https://placehold.co/200x300'
-            })) || [];
-
-            updateSimilarMoviesUI(similarMovies);
-        } else if (type === 'tv') {
-            const MAX_SEASONS_TO_APPEND = 15;
+        if (type === 'tv') {
+            const MAX_SEASONS_TO_APPEND = 18;
             const seasonsToAppend = Array.from({ length: MAX_SEASONS_TO_APPEND }, (_, i) => `season/${i + 1}`).join(',');
-            const seriesDetailsUrl = `${BASE_URL}/tv/${id}?api_key=${TMDB_API_KEY}&append_to_response=credits,${seasonsToAppend}`;
+            const seriesDetailsUrl = `${BASE_URL}/tv/${id}?api_key=${TMDB_API_KEY}&language=fr-FR&append_to_response=credits,watch/providers,${seasonsToAppend}`;
             const seriesDetailsRes = await fetch(seriesDetailsUrl);
             const seriesDetailsData = await seriesDetailsRes.json();
 
             window.currentSeriesData = seriesDetailsData;
+
+            if (Array.isArray(seriesDetailsData.seasons)) {
+                seriesDetailsData.seasons.forEach(s => {
+                    if (s.season_number > 0 && seriesDetailsData[`season/${s.season_number}`]?.episodes) {
+                        s.episodes = seriesDetailsData[`season/${s.season_number}`].episodes;
+                    }
+                });
+            }
+            const compacted = window.compactSeriesForCache ? window.compactSeriesForCache(seriesDetailsData) : seriesDetailsData;
+            try {
+                localStorage.setItem(`series-details-${id}`, JSON.stringify({ timestamp: Date.now(), data: compacted }));
+            } catch (e) {}
 
             // Update Date & Status
             const firstAirDate = seriesDetailsData.first_air_date;
@@ -246,6 +290,7 @@ async function fetchUpdates(id, type) {
             if (seriesDetailsData.created_by && seriesDetailsData.created_by.length > 0) {
                 const c = seriesDetailsData.created_by[0];
                 creator = {
+                    id: c.id,
                     name: c.name,
                     imageUrl: c.profile_path ? IMG_BASE_PROFILE + c.profile_path : 'https://placehold.co/64x64'
                 };
@@ -253,6 +298,7 @@ async function fetchUpdates(id, type) {
                 const director = seriesDetailsData.credits?.crew?.find(c => c.job === 'Director');
                 if (director) {
                     creator = {
+                        id: director.id,
                         name: director.name,
                         imageUrl: director.profile_path ? IMG_BASE_PROFILE + director.profile_path : 'https://placehold.co/64x64'
                     };
@@ -329,8 +375,8 @@ function updateUI(data, type, isLocal) {
     // Attendre le chargement des awards avant de mettre à jour l'UI
     awardsLoadedPromise.then(() => updateAwardsUI(data));
 
-    if (type === 'movie' && data.similarMovies) {
-        updateSimilarMoviesUI(data.similarMovies);
+    if (data.similarMovies) {
+        updateSimilarMoviesUI(data.similarMovies, type);
     }
 
     if (data.videos) {
@@ -338,23 +384,24 @@ function updateUI(data, type, isLocal) {
     }
 }
 
-function updateSimilarMoviesUI(similarMovies) {
+function updateSimilarMoviesUI(similarItems, type = 'movie') {
     const simSection = document.getElementById('similar-movies-section');
     const simContainer = document.getElementById('similar-movies-container');
+    const targetPage = type === 'tv' ? 'serie.html' : 'film.html';
 
-    if(simSection && similarMovies && similarMovies.length > 0) {
+    if (simSection && similarItems && similarItems.length > 0) {
         simSection.style.display = 'block';
         simContainer.innerHTML = '';
-        similarMovies.slice(0,6).forEach(sim => {
+        similarItems.slice(0, 8).forEach(sim => {
             simContainer.innerHTML += `
-                <div class="w-28 flex-shrink-0 cursor-pointer group" onclick="window.location.href='film.html?id=${sim.id}'">
-                    <div class="relative aspect-[2/3] rounded-lg overflow-hidden">
-                        <img class="w-full h-full object-cover transition-transform group-hover:scale-105" src="${sim.posterUrl}"/>
+                <div class="w-28 flex-shrink-0 cursor-pointer group" onclick="window.location.href='${targetPage}?id=${sim.id}'">
+                    <div class="relative aspect-[2/3] rounded-lg overflow-hidden bg-gray-800 shadow-md">
+                        <img class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" src="${sim.posterUrl}" loading="lazy"/>
                     </div>
-                    <p class="mt-1 truncate text-xs font-medium text-white/80 group-hover:text-white">${sim.title}</p>
+                    <p class="mt-1.5 truncate text-xs font-medium text-white/80 group-hover:text-white">${sim.title}</p>
                 </div>`;
         });
-    } else if(simSection) {
+    } else if (simSection) {
         simSection.style.display = 'none';
     }
 }
@@ -367,26 +414,32 @@ function updateStreamingUI(allProvidersData) {
 
     const selectedPlatforms = getSafeLocalStorage('selectedPlatforms', []);
 
-    // If no platforms are selected, show nothing/message as per user request (strict filtering)
     if (selectedPlatforms.length === 0) {
         section.style.display = 'block';
-        container.innerHTML = '<span class="text-gray-500 text-sm">Aucune plateforme sélectionnée</span>';
+        container.innerHTML = '<a href="platforms.html" class="text-primary hover:underline text-sm font-medium">Sélectionner mes plateformes →</a>';
         return;
     }
 
-    const allowedIds = new Set(selectedPlatforms.map(id => PLATFORM_ID_MAP[id]).filter(Boolean));
+    const allowedIds = new Set();
+    selectedPlatforms.forEach(id => {
+        const mapped = PLATFORM_ID_MAP[id];
+        if (Array.isArray(mapped)) mapped.forEach(n => allowedIds.add(n));
+        else if (mapped) allowedIds.add(mapped);
+    });
 
     let providers = [];
     if (Array.isArray(allProvidersData)) {
         providers = allProvidersData;
     } else {
-        if (allProvidersData[userRegion] && allProvidersData[userRegion].flatrate) {
-            providers = [...allProvidersData[userRegion].flatrate];
+        const currentRegion = localStorage.getItem('userRegion') || 'FR';
+        if (allProvidersData[currentRegion] && allProvidersData[currentRegion].flatrate) {
+            providers = [...allProvidersData[currentRegion].flatrate];
         }
-        // Special case for Canal+ in non-FR regions if selected
-        if (userRegion !== 'FR' && selectedPlatforms.includes('canal')) {
+        if (currentRegion !== 'FR' && selectedPlatforms.includes('canal')) {
             if (allProvidersData['FR'] && allProvidersData['FR'].flatrate) {
-                const canal = allProvidersData['FR'].flatrate.find(p => p.provider_id === 392 || p.provider_name.includes('Canal'));
+                const canal = allProvidersData['FR'].flatrate.find(
+                    p => p.provider_id === 381 || p.provider_id === 392 || (p.provider_name && p.provider_name.includes('Canal'))
+                );
                 if (canal && !providers.some(p => p.provider_id === canal.provider_id)) {
                     providers.push(canal);
                 }
@@ -394,16 +447,19 @@ function updateStreamingUI(allProvidersData) {
         }
     }
 
-    // Filter by allowed IDs and Deduplicate
     const uniqueProviders = [];
-    const seen = new Set();
+    const seenInternalKeys = new Set();
 
     for (const p of providers) {
-        // Strict filtering: only show if the provider ID is in the user's allowed list
-        if (allowedIds.has(p.provider_id)) {
-            if (!seen.has(p.provider_id)) {
+        const internalKey = window.getInternalPlatformId
+            ? window.getInternalPlatformId(p.provider_name, p.provider_id)
+            : null;
+        const isAllowed = allowedIds.has(p.provider_id) || (internalKey && selectedPlatforms.includes(internalKey));
+        if (isAllowed) {
+            const dedupKey = internalKey || p.provider_id;
+            if (!seenInternalKeys.has(dedupKey)) {
                 uniqueProviders.push(p);
-                seen.add(p.provider_id);
+                seenInternalKeys.add(dedupKey);
             }
         }
     }
@@ -412,29 +468,25 @@ function updateStreamingUI(allProvidersData) {
         section.style.display = 'block';
         uniqueProviders.forEach(p => {
             let logoUrl = p.logo_path ? IMG_BASE_PROFILE + p.logo_path : 'https://placehold.co/64x64';
-            let cssClass = "object-cover"; 
-
             if (CUSTOM_PLATFORMS[p.provider_id]) {
                 logoUrl = CUSTOM_PLATFORMS[p.provider_id].url;
-                cssClass = "object-contain bg-black p-1";
             }
 
             container.innerHTML += `
                 <img src="${logoUrl}" 
                      alt="${p.provider_name}" 
                      title="${p.provider_name}" 
-                     class="h-10 w-10 rounded-lg border border-white/10 ${cssClass}"/>
+                     class="h-10 w-10 rounded-xl border border-white/15 object-cover bg-black shadow-md"/>
             `;
         });
     } else {
         section.style.display = 'block';
-        container.innerHTML = '<span class="text-gray-500 text-sm">Non disponible sur vos plateformes</span>';
+        container.innerHTML = '<span class="text-gray-500 text-sm">Non disponible sur vos plateformes en abonnement</span>';
     }
 }
 
 function updateCastUI(cast) {
     currentCastData = cast;
-    const castContainer = document.getElementById('full-cast-container');
     const castSection = document.getElementById('cast-section');
 
     if (currentCastData && currentCastData.length > 0) {
@@ -452,7 +504,7 @@ function renderCastList() {
     const seeAllLink = document.querySelector('#cast-section a');
     castContainer.innerHTML = '';
 
-    const limit = isCastExpanded ? 20 : 4;
+    const limit = isCastExpanded ? 24 : 4;
     const displayList = currentCastData.slice(0, limit);
 
     displayList.forEach(member => {
@@ -462,7 +514,7 @@ function renderCastList() {
                 <img class="h-12 w-12 rounded-full object-cover flex-shrink-0 group-hover:scale-105 transition-transform duration-200 bg-gray-800" src="${member.imageUrl}" onerror="this.src='https://placehold.co/64x64'"/>
                 <div class="min-w-0 flex-1">
                     <p class="font-semibold text-white text-sm leading-tight group-hover:text-primary transition-colors">${member.name}</p>
-                    <p class="text-xs text-gray-400">${member.character}</p>
+                    <p class="text-xs text-gray-400 truncate">${member.character || ''}</p>
                 </div>
             </a>`;
     });
@@ -472,7 +524,7 @@ function renderCastList() {
             seeAllLink.style.display = 'none';
         } else {
             seeAllLink.style.display = 'block';
-            seeAllLink.textContent = isCastExpanded ? 'Voir moins' : 'Voir tout';
+            seeAllLink.textContent = isCastExpanded ? 'Voir moins' : `Voir tout (${Math.min(currentCastData.length, 24)})`;
         }
     }
 }
@@ -492,8 +544,10 @@ function updatePersonUI(person, type) {
     }
 
     section.style.display = 'block';
-    document.getElementById('director-image').src = person.imageUrl;
-    document.getElementById('director-name').textContent = person.name;
+    const imgEl = document.getElementById('director-image');
+    const nameEl = document.getElementById('director-name');
+    if (imgEl) imgEl.src = person.imageUrl;
+    if (nameEl) nameEl.textContent = person.name;
 
     const roleTitle = document.getElementById('director-title');
     const roleText = document.getElementById('director-role');
@@ -501,6 +555,17 @@ function updatePersonUI(person, type) {
 
     if (roleTitle) roleTitle.textContent = role;
     if (roleText) roleText.textContent = role;
+
+    if (person.id && imgEl) {
+        const wrapper = imgEl.parentElement;
+        if (wrapper) {
+            wrapper.classList.add('cursor-pointer', 'group', 'hover:bg-white/5', 'p-1.5', '-m-1.5', 'rounded-lg', 'transition-colors');
+            if (nameEl) nameEl.classList.add('group-hover:text-primary', 'transition-colors');
+            wrapper.onclick = () => {
+                window.location.href = `person.html?id=${person.id}`;
+            };
+        }
+    }
 }
 
 function isEpisodeReleased(episode, season = null) {
@@ -601,6 +666,68 @@ async function checkSeasonStatus(seriesId, seasonNumber, seasonCard) {
     }
 }
 
+function formatEpisodeDate(dateStr) {
+    if (!dateStr) return '';
+    try {
+        const d = new Date(dateStr);
+        if (isNaN(d.getTime())) return dateStr;
+        return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
+    } catch (e) {
+        return dateStr;
+    }
+}
+
+function populateEpisodesDOM(episodesContainer, episodes, seasonDetails, seriesId, totalEpisodes) {
+    const watchedEpisodes = getSafeLocalStorage('watchedEpisodes', {});
+    const seriesWatchedEpisodes = watchedEpisodes[String(seriesId)] || [];
+
+    const episodesListHTML = episodes.map(episode => {
+        const isChecked = seriesWatchedEpisodes.includes(episode.id);
+        const isReleased = isEpisodeReleased(episode, seasonDetails);
+        const formattedDate = formatEpisodeDate(episode.air_date);
+        const metaParts = [];
+        if (episode.runtime) metaParts.push(`${episode.runtime}m`);
+        if (formattedDate) metaParts.push(formattedDate);
+        const hasOverview = Boolean(episode.overview && episode.overview.trim());
+
+        return `
+            <div class="border-t border-white/5 hover:bg-white/5 transition-colors">
+                <div class="flex items-center gap-3 p-3">
+                    <span class="text-xs font-mono text-gray-500 w-6 text-center">${episode.episode_number}</span>
+                    <div class="flex-1 min-w-0 ${hasOverview ? 'cursor-pointer episode-info-toggle' : ''}">
+                        <div class="flex items-center gap-2">
+                            <p class="text-sm font-medium ${isReleased ? 'text-white' : 'text-gray-400'} truncate">${episode.name || ('Épisode ' + episode.episode_number)}</p>
+                            ${!isReleased ? '<span class="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 text-[9px] font-bold uppercase flex-shrink-0">À venir</span>' : ''}
+                        </div>
+                        <p class="text-[10px] text-gray-500 mt-0.5">${metaParts.join(' • ')}${hasOverview ? ' • <span class="text-gray-400 underline">Synopsis</span>' : ''}</p>
+                    </div>
+                    <span class="material-symbols-outlined !text-xl cursor-pointer episode-tick-icon ${isChecked ? 'text-green-400' : 'text-gray-500'}" data-episode-id="${episode.id}" data-released="${isReleased}">${isChecked ? 'check_circle' : 'radio_button_unchecked'}</span>
+                </div>
+                ${hasOverview ? `<div class="episode-overview hidden px-4 pb-3 pl-12 text-xs text-gray-400 leading-relaxed">${episode.overview}</div>` : ''}
+            </div>`;
+    }).join('');
+
+    episodesContainer.innerHTML = `<div>${episodesListHTML}</div>`;
+
+    episodesContainer.querySelectorAll('.episode-tick-icon').forEach(icon => {
+        icon.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const episodeId = parseInt(icon.dataset.episodeId, 10);
+            toggleEpisodeWatchedStatus(seriesId, episodeId, totalEpisodes, icon);
+        });
+    });
+
+    episodesContainer.querySelectorAll('.episode-info-toggle').forEach(infoEl => {
+        infoEl.addEventListener('click', () => {
+            const wrapper = infoEl.closest('.border-t');
+            const overviewEl = wrapper ? wrapper.querySelector('.episode-overview') : null;
+            if (overviewEl) {
+                overviewEl.classList.toggle('hidden');
+            }
+        });
+    });
+}
+
 async function handleSeasonCheck(seriesId, seasonNumber, seasonCard, totalEpisodes) {
     const episodesContainer = seasonCard.querySelector('.episodes-container');
     const tick = seasonCard.querySelector('.season-tick-action');
@@ -608,11 +735,11 @@ async function handleSeasonCheck(seriesId, seasonNumber, seasonCard, totalEpisod
 
     // 1. Ensure Episodes are Loaded (Fetch if needed)
     if (!episodesContainer.dataset.loaded) {
-        tick.textContent = 'hourglass_empty'; // Loading indicator
+        tick.textContent = 'hourglass_empty';
         try {
             let seasonDetails = window.currentSeriesData && window.currentSeriesData[`season/${seasonNumber}`];
             if (!seasonDetails) {
-                const url = `${BASE_URL}/tv/${seriesId}/season/${seasonNumber}?api_key=${TMDB_API_KEY}`;
+                const url = `${BASE_URL}/tv/${seriesId}/season/${seasonNumber}?api_key=${TMDB_API_KEY}&language=fr-FR`;
                 const res = await fetch(url);
                 if (!res.ok) throw new Error('Failed to fetch season details');
                 seasonDetails = await res.json();
@@ -622,33 +749,8 @@ async function handleSeasonCheck(seriesId, seasonNumber, seasonCard, totalEpisod
             }
             const episodes = seasonDetails.episodes || [];
 
-            // Render hidden (just to populate DOM and check IDs)
             if (episodes.length > 0) {
-                const watchedEpisodes = getSafeLocalStorage('watchedEpisodes', {});
-                const seriesWatchedEpisodes = watchedEpisodes[seriesIdStr] || [];
-
-                const episodesListHTML = episodes.map(episode => {
-                    const isChecked = seriesWatchedEpisodes.includes(episode.id);
-                    const isReleased = isEpisodeReleased(episode, seasonDetails);
-                    return `
-                        <div class="flex items-center gap-3 p-3 border-t border-white/5 hover:bg-white/5 transition-colors">
-                            <span class="text-xs font-mono text-gray-500 w-6 text-center">${episode.episode_number}</span>
-                            <div class="flex-1 min-w-0">
-                                <p class="text-sm font-medium text-white truncate">${episode.name}</p>
-                                <p class="text-[10px] text-gray-500">${episode.runtime ? episode.runtime + 'm' : ''}</p>
-                            </div>
-                            <span class="material-symbols-outlined !text-xl cursor-pointer episode-tick-icon ${isChecked ? 'text-green-400' : 'text-gray-500'}" data-episode-id="${episode.id}" data-released="${isReleased}">${isChecked ? 'check_circle' : 'radio_button_unchecked'}</span>
-                        </div>`;
-                }).join('');
-
-                episodesContainer.innerHTML = `<div class="">${episodesListHTML}</div>`;
-
-                episodesContainer.querySelectorAll('.episode-tick-icon').forEach(icon => {
-                    icon.addEventListener('click', () => {
-                        const episodeId = parseInt(icon.dataset.episodeId, 10);
-                        toggleEpisodeWatchedStatus(seriesId, episodeId, totalEpisodes, icon);
-                    });
-                });
+                populateEpisodesDOM(episodesContainer, episodes, seasonDetails, seriesId, totalEpisodes);
             }
             episodesContainer.dataset.loaded = 'true';
         } catch (e) {
@@ -664,8 +766,6 @@ async function handleSeasonCheck(seriesId, seasonNumber, seasonCard, totalEpisod
     const targetIcons = releasedIcons.length > 0 ? releasedIcons : episodeIcons;
     const allCurrentlyWatched = targetIcons.length > 0 && targetIcons.every(icon => icon.textContent.trim() === 'check_circle');
 
-    // If all released are currently watched (GREEN), we want to UNWATCH all.
-    // If mixed or none are watched (GREY), we want to WATCH all released.
     const shouldMarkWatched = !allCurrentlyWatched;
 
     let watchedEpisodes = getSafeLocalStorage('watchedEpisodes', {});
@@ -776,7 +876,7 @@ function updateSeasonsUI(seasons, seriesId, totalEpisodes) {
                     try {
                         let seasonDetails = window.currentSeriesData && window.currentSeriesData[`season/${seasonNumber}`];
                         if (!seasonDetails) {
-                            const url = `${BASE_URL}/tv/${seriesId}/season/${seasonNumber}?api_key=${TMDB_API_KEY}`;
+                            const url = `${BASE_URL}/tv/${seriesId}/season/${seasonNumber}?api_key=${TMDB_API_KEY}&language=fr-FR`;
                             const res = await fetch(url);
                             if (!res.ok) throw new Error('Failed to fetch season details');
                             seasonDetails = await res.json();
@@ -789,31 +889,7 @@ function updateSeasonsUI(seasons, seriesId, totalEpisodes) {
                         if (!episodes || episodes.length === 0) {
                             episodesContainer.innerHTML = '<div class="p-4 text-gray-400 text-sm">Aucun épisode.</div>';
                         } else {
-                            const watchedEpisodes = getSafeLocalStorage('watchedEpisodes', {});
-                            const seriesWatchedEpisodes = watchedEpisodes[String(seriesId)] || [];
-
-                            const episodesListHTML = episodes.map(episode => {
-                                const isChecked = seriesWatchedEpisodes.includes(episode.id);
-                                const isReleased = isEpisodeReleased(episode, seasonDetails);
-                                return `
-                                    <div class="flex items-center gap-3 p-3 border-t border-white/5 hover:bg-white/5 transition-colors">
-                                        <span class="text-xs font-mono text-gray-500 w-6 text-center">${episode.episode_number}</span>
-                                        <div class="flex-1 min-w-0">
-                                            <p class="text-sm font-medium text-white truncate">${episode.name}</p>
-                                            <p class="text-[10px] text-gray-500">${episode.runtime ? episode.runtime + 'm' : ''}</p>
-                                        </div>
-                                        <span class="material-symbols-outlined !text-xl cursor-pointer episode-tick-icon ${isChecked ? 'text-green-400' : 'text-gray-500'}" data-episode-id="${episode.id}" data-released="${isReleased}">${isChecked ? 'check_circle' : 'radio_button_unchecked'}</span>
-                                    </div>`;
-                            }).join('');
-
-                            episodesContainer.innerHTML = `<div class="">${episodesListHTML}</div>`;
-
-                            episodesContainer.querySelectorAll('.episode-tick-icon').forEach(icon => {
-                                icon.addEventListener('click', () => {
-                                    const episodeId = parseInt(icon.dataset.episodeId, 10);
-                                    toggleEpisodeWatchedStatus(seriesId, episodeId, totalEpisodes, icon);
-                                });
-                            });
+                            populateEpisodesDOM(episodesContainer, episodes, seasonDetails, seriesId, totalEpisodes);
                         }
                         episodesContainer.dataset.loaded = 'true';
                         updateSeasonWatchedStatus(card);
@@ -945,12 +1021,15 @@ function syncSeriesStateFromEpisodes(seriesId, fallbackTotalEpisodes = null, use
 
 function formatTMDBData(data, type) {
     const isMovie = type === 'movie';
-    let dir = { name: 'Unknown', imageUrl: 'https://placehold.co/64x64' };
-    if(isMovie) {
+    let dir = { id: null, name: 'Unknown', imageUrl: 'https://placehold.co/64x64' };
+    if (isMovie) {
         const d = data.credits?.crew?.find(c => c.job === 'Director');
-        if(d) dir = { name: d.name, imageUrl: d.profile_path ? IMG_BASE_PROFILE + d.profile_path : dir.imageUrl };
-    } else if(data.created_by?.length > 0) {
-        dir = { name: data.created_by[0].name, imageUrl: data.created_by[0].profile_path ? IMG_BASE_PROFILE + data.created_by[0].profile_path : dir.imageUrl };
+        if (d) dir = { id: d.id, name: d.name, imageUrl: d.profile_path ? IMG_BASE_PROFILE + d.profile_path : dir.imageUrl };
+    } else if (data.created_by?.length > 0) {
+        dir = { id: data.created_by[0].id, name: data.created_by[0].name, imageUrl: data.created_by[0].profile_path ? IMG_BASE_PROFILE + data.created_by[0].profile_path : dir.imageUrl };
+    } else {
+        const d = data.credits?.crew?.find(c => c.job === 'Director');
+        if (d) dir = { id: d.id, name: d.name, imageUrl: d.profile_path ? IMG_BASE_PROFILE + d.profile_path : dir.imageUrl };
     }
 
     const cast = data.credits?.cast?.map(c => ({
@@ -964,7 +1043,7 @@ function formatTMDBData(data, type) {
 
     const similar = data.similar?.results?.map(s => ({
         id: s.id,
-        title: s.title,
+        title: s.title || s.name,
         posterUrl: s.poster_path ? IMG_BASE_POSTER + s.poster_path : 'https://placehold.co/200x300'
     })) || [];
 

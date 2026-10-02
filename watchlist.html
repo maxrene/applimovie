@@ -70,11 +70,15 @@
                 <span class="material-symbols-outlined text-gray-400 text-xl ml-1 transition-transform duration-200" :class="showServiceBar ? 'rotate-180 text-primary' : ''">expand_more</span>
             </button>
         </div>
-        <div class="flex items-center gap-2 flex-shrink-0">
+        <div class="flex items-center gap-1.5 flex-shrink-0">
+            <button @click="pickRandomMedia()" title="Choisir au hasard" class="flex items-center space-x-1 rounded-full bg-primary/15 text-primary hover:bg-primary/25 p-2 px-2.5 text-xs font-semibold transition-colors">
+                <span class="material-symbols-outlined text-base">casino</span>
+                <span class="hidden sm:inline">Au hasard</span>
+            </button>
             <div class="relative" x-data="{ open: false }">
                 <button @click="open = !open" class="flex items-center space-x-1 rounded-full bg-gray-200 dark:bg-gray-800 p-2 px-3 text-xs text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors">
                     <span class="material-symbols-outlined text-base">swap_vert</span>
-                    <span x-text="'Trier: ' + sortLabel"></span>
+                    <span x-text="sortLabel"></span>
                 </button>
                 <div x-show="open" @click.away="open = false" class="absolute right-0 top-full mt-2 w-48 bg-gray-800 rounded-xl shadow-xl z-50 border border-gray-700 py-2" x-transition x-cloak>
                     <a href="#" @click.prevent="setSort('popularity'); open = false" class="block px-4 py-3 text-sm text-gray-300 hover:bg-gray-700 hover:text-white border-b border-gray-700/50">Popularité</a>
@@ -82,7 +86,7 @@
                     <a href="#" @click.prevent="setSort('recently_added'); open = false" class="block px-4 py-3 text-sm text-gray-300 hover:bg-gray-700 hover:text-white">Date d'ajout</a>
                 </div>
             </div>
-            <button class="flex items-center space-x-1 rounded-full bg-gray-200 dark:bg-gray-800 p-2 px-3 text-xs text-gray-500 dark:text-gray-500 cursor-not-allowed opacity-50">
+            <button @click="showFilterModal = !showFilterModal" class="relative flex items-center space-x-1 rounded-full p-2 px-3 text-xs font-medium transition-colors" :class="hasActiveExtraFilters || showFilterModal ? 'bg-primary text-white' : 'bg-gray-200 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'">
                 <span class="material-symbols-outlined text-base">filter_list</span>
                 <span>Filtrer</span>
             </button>
@@ -101,6 +105,36 @@
             </button>
         </template>
     </div>
+
+    <!-- Panneau Filtres Watchlist (Genre & Durée) -->
+    <div x-show="showFilterModal" @click.away="showFilterModal = false" x-transition class="bg-gray-100 dark:bg-[#181818] border-b border-gray-200 dark:border-gray-800 p-4 space-y-4 shadow-lg" x-cloak>
+        <div class="flex items-center justify-between">
+            <span class="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Filtres avancés</span>
+            <button x-show="hasActiveExtraFilters" @click="resetExtraFilters()" class="text-xs font-semibold text-primary hover:underline">Réinitialiser</button>
+        </div>
+
+        <template x-if="subTab === 'movie'">
+            <div class="space-y-1.5">
+                <label class="text-xs font-semibold text-gray-600 dark:text-gray-300">Durée maximum</label>
+                <div class="flex gap-2">
+                    <button @click="maxDuration = null; renderWatchlist()" class="flex-1 py-1.5 rounded-lg text-xs font-semibold border transition-colors" :class="!maxDuration ? 'bg-primary text-white border-primary' : 'bg-gray-200 dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-transparent'">Toutes</button>
+                    <button @click="maxDuration = 95; renderWatchlist()" class="flex-1 py-1.5 rounded-lg text-xs font-semibold border transition-colors" :class="maxDuration === 95 ? 'bg-primary text-white border-primary' : 'bg-gray-200 dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-transparent'">&lt; 1h35</button>
+                    <button @click="maxDuration = 120; renderWatchlist()" class="flex-1 py-1.5 rounded-lg text-xs font-semibold border transition-colors" :class="maxDuration === 120 ? 'bg-primary text-white border-primary' : 'bg-gray-200 dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-transparent'">&lt; 2h00</button>
+                    <button @click="maxDuration = 150; renderWatchlist()" class="flex-1 py-1.5 rounded-lg text-xs font-semibold border transition-colors" :class="maxDuration === 150 ? 'bg-primary text-white border-primary' : 'bg-gray-200 dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-transparent'">&lt; 2h30</button>
+                </div>
+            </div>
+        </template>
+
+        <div class="space-y-1.5" x-show="availableGenresInWatchlist.length > 0">
+            <label class="text-xs font-semibold text-gray-600 dark:text-gray-300">Genre</label>
+            <div class="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto no-scrollbar">
+                <button @click="selectedGenre = ''; renderWatchlist()" class="px-2.5 py-1 rounded-full text-xs font-medium border transition-colors" :class="!selectedGenre ? 'bg-primary text-white border-primary' : 'bg-gray-200 dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-transparent'">Tous</button>
+                <template x-for="g in availableGenresInWatchlist" :key="g">
+                    <button @click="selectedGenre = (selectedGenre === g ? '' : g); renderWatchlist()" class="px-2.5 py-1 rounded-full text-xs font-medium border transition-colors" :class="selectedGenre === g ? 'bg-primary text-white border-primary' : 'bg-gray-200 dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-transparent'" x-text="g"></button>
+                </template>
+            </div>
+        </div>
+    </div>
 </header>
     <main class="flex-1 overflow-y-auto pb-24" x-cloak>
         <div id="media-list" class="divide-y divide-gray-200/20 dark:divide-gray-700/50"></div>
@@ -109,21 +143,47 @@
             <p class="text-gray-500 dark:text-gray-400 text-lg font-medium">Aucun résultat.</p>
         </div>
     </main>
+
+    <!-- Modal "Au hasard" -->
+    <div x-show="randomPickItem" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm" x-transition.opacity x-cloak>
+        <template x-if="randomPickItem">
+            <div @click.away="randomPickItem = null" class="bg-white dark:bg-[#1c1c1c] w-full max-w-xs rounded-2xl shadow-2xl overflow-hidden border border-gray-200 dark:border-gray-800 p-5 flex flex-col items-center text-center">
+                <div class="flex items-center gap-1.5 text-primary text-xs font-bold uppercase tracking-wider mb-3">
+                    <span class="material-symbols-outlined text-base">casino</span>
+                    <span>Suggestion au hasard</span>
+                </div>
+                <img :src="randomPickItem.poster_path ? 'https://image.tmdb.org/t/p/w342' + randomPickItem.poster_path : 'https://placehold.co/200x300?text=No+Image'" class="w-36 aspect-[2/3] rounded-xl object-cover shadow-lg mb-3">
+                <h3 class="text-lg font-bold text-gray-900 dark:text-white leading-snug" x-text="randomPickItem.title || randomPickItem.name"></h3>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1" x-text="(randomPickItem.genres || []).slice(0, 2).map(g => g.name).join(', ')"></p>
+                <div class="flex gap-2 w-full mt-5">
+                    <button @click="pickRandomMedia()" class="flex-1 py-2.5 rounded-xl bg-gray-200 dark:bg-gray-800 text-gray-800 dark:text-gray-200 text-xs font-bold hover:bg-gray-300 dark:hover:bg-gray-700 transition-colors flex items-center justify-center gap-1">
+                        <span class="material-symbols-outlined text-sm">refresh</span>
+                        <span>Autre idée</span>
+                    </button>
+                    <a :href="(randomPickItem.media_type === 'movie' ? 'film.html' : 'serie.html') + '?id=' + randomPickItem.id" class="flex-1 py-2.5 rounded-xl bg-primary text-white text-xs font-bold hover:bg-primary/90 transition-colors flex items-center justify-center gap-1">
+                        <span>Voir la fiche</span>
+                        <span class="material-symbols-outlined text-sm">arrow_forward</span>
+                    </a>
+                </div>
+            </div>
+        </template>
+    </div>
+
     <footer class="flex-shrink-0 bg-background-light/90 dark:bg-background-dark/90 backdrop-blur-md border-t border-gray-200 dark:border-gray-800 z-30 h-20 pb-2">
         <nav class="flex justify-around items-center h-full">
-            <a class="flex flex-col items-center justify-center gap-1 text-gray-500 dark:text-gray-400 hover:text-primary transition-colors w-16" href="index.html">
+            <a class="flex flex-col items-center justify-center gap-1 text-gray-500 dark:text-gray-400 hover:text-primary transition-colors w-16" href="index.html?tab=home">
                 <span class="material-symbols-outlined text-2xl">home</span>
                 <span class="text-[10px] font-medium">Accueil</span>
             </a>
-            <a class="flex flex-col items-center justify-center gap-1 text-gray-500 dark:text-gray-400 hover:text-primary transition-colors w-16" href="popular.html">
+            <a class="flex flex-col items-center justify-center gap-1 text-gray-500 dark:text-gray-400 hover:text-primary transition-colors w-16" href="index.html?tab=popular">
                 <span class="material-symbols-outlined thick text-2xl">local_fire_department</span>
                 <span class="text-[10px] font-medium">Populaire</span>
             </a>
-            <a class="flex flex-col items-center justify-center gap-1 text-gray-500 dark:text-gray-400 hover:text-primary transition-colors w-16" href="search.html">
+            <a class="flex flex-col items-center justify-center gap-1 text-gray-500 dark:text-gray-400 hover:text-primary transition-colors w-16" href="index.html?tab=search">
                 <span class="material-symbols-outlined text-2xl">search</span>
                 <span class="text-[10px] font-medium">Recherche</span>
             </a>
-            <a class="flex flex-col items-center justify-center gap-1 text-primary transition-colors w-16" href="watchlist.html">
+            <a class="flex flex-col items-center justify-center gap-1 text-primary transition-colors w-16" href="index.html?tab=watchlist">
                 <span class="material-symbols-outlined filled text-2xl">bookmark</span>
                 <span class="text-[10px] font-bold">Ma Liste</span>
             </a>

@@ -1,48 +1,18 @@
 document.addEventListener('DOMContentLoaded', () => {
-    const allPlatforms = [
-        { 
-            id: 'netflix', 
-            apiId: 8, 
-            name: 'Netflix', 
-            logoUrl: 'https://images.ctfassets.net/4cd45et68cgf/Rx83JoRDMkYNlMC9MKzcB/2b14d5a59fc3937afd3f03191e19502d/Netflix-Symbol.png?w=700&h=456' 
-        },
-        { 
-            id: 'prime', 
-            apiId: 119, 
-            name: 'Prime Video', 
-            logoUrl: 'https://www.citypng.com/public/uploads/preview/amazon-prime-ios-app-icon-701751695133984u2yuon8nlu.png' 
-        },
-        { 
-            id: 'disney', 
-            apiId: 337, 
-            name: 'Disney+', 
-            logoUrl: 'https://platform.theverge.com/wp-content/uploads/sites/2/chorus/uploads/chorus_asset/file/25357066/Disney__Logo_March_2024.png?quality=90&strip=all&crop=0,0,100,100' 
-        },
-        { 
-            id: 'apple', 
-            apiId: 350, 
-            name: 'Apple TV+', 
-            logoUrl: 'https://image.tmdb.org/t/p/original/9icYBfYFcwgCbky5VdGUIKJ4C5i.png' 
-        },
-        { 
-            id: 'canal', 
-            apiId: 392, 
-            name: 'Canal+', 
-            logoUrl: 'https://static1.purepeople.com/articles/0/46/23/10/@/6655765-logo-de-la-chaine-canal-1200x0-2.png' 
-        },
-        { 
-            id: 'paramount', 
-            apiId: 531, 
-            name: 'Paramount+', 
-            logoUrl: 'https://images.seeklogo.com/logo-png/39/1/paramount-logo-png_seeklogo-397501.png' 
-        },
-        { id: 'max', apiId: 1899, name: 'Max', logoUrl: 'https://logo.clearbit.com/max.com' },
-        { id: 'skygo', apiId: 29, name: 'Sky Go', logoUrl: 'https://logo.clearbit.com/sky.com' },
-        { id: 'now', apiId: 39, name: 'Now', logoUrl: 'https://logo.clearbit.com/nowtv.com' },
-        { id: 'rakuten', apiId: 35, name: 'Rakuten TV', logoUrl: 'https://logo.clearbit.com/rakuten.tv' },
-        { id: 'pluto', apiId: 300, name: 'Pluto TV', logoUrl: 'https://logo.clearbit.com/pluto.tv' },
-        { id: 'crunchyroll', apiId: 283, name: 'Crunchyroll', logoUrl: 'https://logo.clearbit.com/crunchyroll.com' },
-        { id: 'arte', apiId: 234, name: 'Arte', logoUrl: 'https://logo.clearbit.com/arte.tv' }
+    const allPlatforms = window.PLATFORMS_CATALOG || [
+        { id: 'netflix', apiId: 8, name: 'Netflix', logoUrl: 'https://image.tmdb.org/t/p/original/pbpMk2JmcoNnQwx5JGpXngfoWtp.jpg' },
+        { id: 'prime', apiId: 119, name: 'Prime Video', logoUrl: 'https://image.tmdb.org/t/p/original/pvske1MyAoymrs5bguRfVqYiM9a.jpg' },
+        { id: 'disney', apiId: 337, name: 'Disney+', logoUrl: 'https://image.tmdb.org/t/p/original/97yvRBw1GzX7fXprcF80er19ot.jpg' },
+        { id: 'apple', apiId: 350, name: 'Apple TV+', logoUrl: 'https://image.tmdb.org/t/p/original/mcbz1LgtErU9p4UdbZ0rG6RTWHX.jpg' },
+        { id: 'canal', apiId: 381, name: 'Canal+', logoUrl: 'https://image.tmdb.org/t/p/original/geOzgeKZWpZC3lymAVEHVIk3X0q.jpg' },
+        { id: 'paramount', apiId: 531, name: 'Paramount+', logoUrl: 'https://image.tmdb.org/t/p/original/h5DcR0J2EESLitnhR8xLG1QymTE.jpg' },
+        { id: 'max', apiId: 1899, name: 'Max', logoUrl: 'https://image.tmdb.org/t/p/original/jbe4gVSfRlbPTdESXhEKpornsfu.jpg' },
+        { id: 'skygo', apiId: 29, name: 'Sky Go', logoUrl: 'https://image.tmdb.org/t/p/original/1UrT2H9x6DuQ9ytNhsSCUFtTUwS.jpg' },
+        { id: 'now', apiId: 39, name: 'Now', logoUrl: 'https://image.tmdb.org/t/p/original/g0E9h3JAeIwmdvxlT73jiEuxdNj.jpg' },
+        { id: 'rakuten', apiId: 35, name: 'Rakuten TV', logoUrl: 'https://image.tmdb.org/t/p/original/bZvc9dXrXNly7cA0V4D9pR8yJwm.jpg' },
+        { id: 'pluto', apiId: 300, name: 'Pluto TV', logoUrl: 'https://image.tmdb.org/t/p/original/dB8G41Q6tSL5NBisrIeqByfepBc.jpg' },
+        { id: 'crunchyroll', apiId: 283, name: 'Crunchyroll', logoUrl: 'https://image.tmdb.org/t/p/original/fzN5Jok5Ig1eJ7gyNGoMhnLSCfh.jpg' },
+        { id: 'arte', apiId: 234, name: 'Arte', logoUrl: 'https://image.tmdb.org/t/p/original/vPZrjHe7wvALuwJEXT2kwYLi0gV.jpg' }
     ];
 
     const platformsContainer = document.getElementById('platforms-container');
@@ -60,7 +30,7 @@ document.addEventListener('DOMContentLoaded', () => {
             html += `
                 <div class="platform-item relative flex flex-col items-center gap-2">
                     <input ${isChecked ? 'checked' : ''} class="hidden" id="${platform.id}" type="checkbox"/>
-                    <label class="relative flex aspect-square w-full cursor-pointer items-center justify-center rounded-full border-2 border-transparent transition-all duration-200 hover:scale-105 overflow-hidden" for="${platform.id}">
+                    <label class="relative flex aspect-square w-full cursor-pointer items-center justify-center rounded-full border-2 border-transparent transition-all duration-200 hover:scale-105 overflow-hidden shadow-md" for="${platform.id}">
                         <img alt="${platform.name}" class="h-full w-full object-cover bg-black" src="${platform.logoUrl}" onerror="this.src='https://placehold.co/100x100?text=${platform.name[0]}'"/>
                         
                         <div class="check-icon absolute bottom-0 right-0 flex h-6 w-6 items-center justify-center rounded-full border-2 border-background-light bg-primary text-white opacity-0 transition-all duration-200 dark:border-background-dark">
@@ -83,9 +53,17 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
         localStorage.setItem('selectedPlatforms', JSON.stringify(selected));
-        window.location.href = 'profile.html';
+        if (window.history.length > 1) {
+            window.history.back();
+        } else {
+            window.location.href = 'profile.html';
+        }
     }
 
-    if(saveButton) saveButton.addEventListener('click', saveSelectedPlatforms);
-    if(platformsContainer) renderPlatforms();
+    if (saveButton) saveButton.addEventListener('click', saveSelectedPlatforms);
+    if (platformsContainer) renderPlatforms();
+
+    window.addEventListener('cloud-data-synced', () => {
+        if (platformsContainer) renderPlatforms();
+    });
 });

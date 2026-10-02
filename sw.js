@@ -1,7 +1,8 @@
 // sw.js
-// VERSION V14 - ACTIVATION DU MODE HORS LIGNE, CACHE DYNAMIQUE ET NETTOYAGE AUTO
-const CACHE_NAME = 'cinematch-v14-offline-capable';
-const MAX_IMAGES = 150; // Nombre maximum d'images à conserver en mémoire
+// VERSION V15 - CACHE SHELL ET IMAGES SÉPARÉS, RAPIDITÉ ACCRUE
+const CACHE_NAME = 'cinematch-v15-offline-capable';
+const IMAGE_CACHE_NAME = 'cinematch-images-v15';
+const MAX_IMAGES = 200;
 
 const ASSETS_TO_CACHE = [
   './',
@@ -19,6 +20,9 @@ const ASSETS_TO_CACHE = [
   './details.js',
   './person.js',
   './watchlist.js',
+  './firebase-config.js',
+  './js/utils.js',
+  './js/popular.js',
   './js/search.js',
   './js/platforms.js',
   './js/awards.js',
@@ -29,39 +33,31 @@ const ASSETS_TO_CACHE = [
   'https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400..700,0..1,0'
 ];
 
-// Fonction magique pour limiter la taille du cache et préserver le stockage de l'iPhone
 function trimCache(cacheName, maxItems) {
   caches.open(cacheName).then((cache) => {
     cache.keys().then((keys) => {
       if (keys.length > maxItems) {
-        // Supprime la plus vieille image pour faire de la place
         cache.delete(keys[0]).then(() => {
-          trimCache(cacheName, maxItems); 
+          trimCache(cacheName, maxItems);
         });
       }
     });
   });
 }
 
-// Installation : Force l'arrêt de l'ancien Service Worker
 self.addEventListener('install', (event) => {
   self.skipWaiting();
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then((cache) => {
-        return cache.addAll(ASSETS_TO_CACHE);
-      })
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS_TO_CACHE))
   );
 });
 
-// Activation : Supprime immédiatement tous les anciens caches
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME) {
-            console.log('Suppression du vieux cache:', cacheName);
+          if (cacheName !== CACHE_NAME && cacheName !== IMAGE_CACHE_NAME) {
             return caches.delete(cacheName);
           }
         })
@@ -70,37 +66,32 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Interception des requêtes
 self.addEventListener('fetch', (event) => {
+  if (event.request.method !== 'GET') return;
   const url = new URL(event.request.url);
 
-  // 1. STRATÉGIE "CACHE FIRST" POUR LES IMAGES (Rendu instantané)
-  // Cible toutes les images, y compris les affiches provenant de l'API TMDB
+  // 1. STRATÉGIE "CACHE FIRST" POUR LES IMAGES (dans un cache dédié aux images)
   if (event.request.destination === 'image' || url.href.includes('image.tmdb.org')) {
     event.respondWith(
-      caches.match(event.request).then((cachedResponse) => {
-        // Si on l'a en stock, on l'affiche tout de suite
-        if (cachedResponse) {
-          return cachedResponse;
-        }
-        // Sinon on la télécharge et on la sauvegarde
-        return fetch(event.request).then((networkResponse) => {
-          return caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, networkResponse.clone());
-            
-            // On lance le nettoyage automatique en arrière-plan
-            trimCache(CACHE_NAME, MAX_IMAGES); 
-            
+      caches.open(IMAGE_CACHE_NAME).then((imageCache) => {
+        return imageCache.match(event.request).then((cachedResponse) => {
+          if (cachedResponse) {
+            return cachedResponse;
+          }
+          return fetch(event.request).then((networkResponse) => {
+            if (networkResponse && networkResponse.ok) {
+              imageCache.put(event.request, networkResponse.clone());
+              trimCache(IMAGE_CACHE_NAME, MAX_IMAGES);
+            }
             return networkResponse;
-          });
+          }).catch(() => caches.match(event.request));
         });
       })
     );
-    return; // On arrête l'exécution ici pour les requêtes d'images
+    return;
   }
 
-  // 2. STRATÉGIE "RÉSEAU D'ABORD" POUR LE RESTE (HTML, JS, API)
-  // Permet d'avoir une application toujours à jour si une connexion est disponible
+  // 2. STRATÉGIE "RÉSEAU D'ABORD" AVEC FALLBACK CACHE POUR LE RESTE (HTML, JS, API)
   event.respondWith(
     fetch(event.request).catch(() => caches.match(event.request))
   );

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html class="dark" lang="en">
+<html class="dark" lang="fr">
 <head>
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport"/>
@@ -8,7 +8,7 @@
 <meta name="theme-color" content="#121212">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 
-<title>Profile</title>
+<title>Profil - CineMatch</title>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <link href="https://fonts.googleapis.com/css2?family=Spline+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
@@ -37,42 +37,95 @@
     
     <header class="flex-shrink-0 flex items-center p-4 pb-2 justify-between sticky top-0 bg-background-light dark:bg-background-dark z-10">
         <button onclick="history.back()" class="text-slate-900 dark:text-white flex size-12 shrink-0 items-center"><span class="material-symbols-outlined">arrow_back</span></button>
-        <h2 class="text-lg font-bold leading-tight flex-1 text-center">Profile</h2>
+        <h2 class="text-lg font-bold leading-tight flex-1 text-center">Mon Profil</h2>
         <div class="size-12"></div>
     </header>
 
     <main class="flex-1 overflow-y-auto scroll-smooth" x-data="userAuth()">
         <!-- Google Auth UI -->
-        <div class="flex flex-col items-center mt-4 px-4">
+        <div class="flex flex-col items-center mt-2 px-4">
             <template x-if="user">
-                <div class="flex flex-col items-center">
-                    <img :src="user.photoURL || 'icons/icon-192.png'" alt="Profil" class="rounded-full h-32 w-32 shadow-lg object-cover border-4 border-slate-200 dark:border-slate-800">
-                    <p class="text-[22px] font-bold mt-4 text-center" x-text="user.displayName || 'Utilisateur Google'"></p>
-                    <p class="text-green-500 dark:text-green-400 text-sm flex items-center gap-1 mt-1"><span class="material-symbols-outlined text-[16px]">cloud_done</span> Données synchronisées</p>
-                    <button @click="logout()" class="mt-4 px-6 py-2 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-full text-sm font-medium hover:bg-slate-300 dark:hover:bg-slate-700 transition-colors">
-                        Se déconnecter
-                    </button>
+                <div class="flex flex-col items-center w-full max-w-sm bg-slate-200/40 dark:bg-slate-800/30 rounded-2xl p-5 border border-slate-300/50 dark:border-slate-700/50">
+                    <div class="relative">
+                        <img :src="user.photoURL || 'icons/icon-192.png'" referrerpolicy="no-referrer" alt="Profil" class="rounded-full h-24 w-24 shadow-lg object-cover border-4 border-primary">
+                        <span class="absolute bottom-1 right-1 w-4 h-4 bg-green-500 border-2 border-white dark:border-slate-900 rounded-full"></span>
+                    </div>
+                    <p class="text-xl font-bold mt-3 text-center" x-text="user.displayName || 'Utilisateur Google'"></p>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5" x-text="user.email || ''"></p>
+                    <p class="text-green-500 dark:text-green-400 text-xs font-medium flex items-center gap-1 mt-2">
+                        <span class="material-symbols-outlined text-[16px]">cloud_done</span>
+                        <span x-text="syncStatusText"></span>
+                    </p>
+                    <div class="flex items-center gap-2 mt-4 w-full">
+                        <button @click="syncNow()" :disabled="isSyncing" class="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 bg-primary/15 text-primary rounded-xl text-xs font-semibold hover:bg-primary/25 transition-colors disabled:opacity-50">
+                            <span class="material-symbols-outlined text-base" :class="isSyncing ? 'animate-spin' : ''">sync</span>
+                            <span x-text="isSyncing ? 'Synchro...' : 'Synchroniser'"></span>
+                        </button>
+                        <button @click="logout()" class="py-2 px-4 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-medium hover:bg-slate-300 dark:hover:bg-slate-700 transition-colors">
+                            Déconnexion
+                        </button>
+                    </div>
                 </div>
             </template>
             <template x-if="!user">
-                <div class="flex flex-col items-center w-full max-w-sm">
-                    <div class="bg-center bg-no-repeat bg-cover rounded-full h-32 w-32 shadow-lg bg-slate-200 dark:bg-slate-800 flex items-center justify-center">
-                        <span class="material-symbols-outlined text-5xl text-slate-400 dark:text-slate-600">person</span>
+                <div class="flex flex-col items-center w-full max-w-sm bg-slate-200/40 dark:bg-slate-800/30 rounded-2xl p-5 border border-slate-300/50 dark:border-slate-700/50">
+                    <div class="rounded-full h-20 w-20 shadow-lg bg-slate-200 dark:bg-slate-800 flex items-center justify-center">
+                        <span class="material-symbols-outlined text-4xl text-slate-400 dark:text-slate-500">person</span>
                     </div>
-                    <p class="text-[22px] font-bold mt-4 text-center">Invité(e)</p>
-                    <p class="text-slate-500 dark:text-slate-400 text-sm mt-1 text-center mb-4">Vos données sont uniquement sauvegardées sur cet appareil.</p>
-                    <button @click="login()" :disabled="isLoading" class="flex items-center justify-center gap-3 w-full bg-white dark:bg-slate-800 text-slate-700 dark:text-white font-medium py-3 px-4 rounded-xl shadow-sm border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors disabled:opacity-50">
+                    <p class="text-xl font-bold mt-3 text-center">Mode Invité</p>
+                    <p class="text-slate-500 dark:text-slate-400 text-xs mt-1 text-center mb-4">Connectez votre compte Google pour sauvegarder et retrouver vos listes sur tous vos appareils.</p>
+                    <button @click="login()" :disabled="isLoading" class="flex items-center justify-center gap-3 w-full bg-white dark:bg-slate-800 text-slate-800 dark:text-white font-semibold py-3 px-4 rounded-xl shadow-sm border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors disabled:opacity-50">
                         <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" class="w-5 h-5">
-                        <span x-text="isLoading ? 'Connexion en cours...' : 'Se connecter pour synchroniser'"></span>
+                        <span x-text="isLoading ? 'Connexion en cours...' : 'Continuer avec Google'"></span>
                     </button>
+
+                    <!-- Diagnostic d'erreur Firebase clair et actionnable -->
+                    <template x-if="authError">
+                        <div class="mt-4 w-full p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-left text-xs text-red-400 space-y-1.5">
+                            <p class="font-bold flex items-center gap-1 text-red-400">
+                                <span class="material-symbols-outlined text-base">warning</span>
+                                <span x-text="authErrorTitle"></span>
+                            </p>
+                            <p class="text-slate-300 leading-relaxed" x-text="authErrorMessage"></p>
+                            <template x-if="authErrorLink">
+                                <a :href="authErrorLink" target="_blank" rel="noopener" class="inline-flex items-center gap-1 text-primary font-semibold underline mt-1">
+                                    <span>Ouvrir la console Firebase</span>
+                                    <span class="material-symbols-outlined text-xs">open_in_new</span>
+                                </a>
+                            </template>
+                        </div>
+                    </template>
                 </div>
             </template>
         </div>
 
-        <div class="px-4 flex flex-col gap-6 mt-8 pb-8">
+        <div class="px-4 flex flex-col gap-6 mt-6 pb-8">
+
+            <!-- Statistiques de visionnage -->
+            <div class="flex flex-col gap-2">
+                <h3 class="text-lg font-bold pb-1">Mes Statistiques</h3>
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                    <div class="bg-slate-200/50 dark:bg-slate-800/30 rounded-xl p-3 flex flex-col items-center justify-center border border-slate-300/30 dark:border-slate-700/30">
+                        <span class="text-2xl font-bold text-primary" x-text="stats.watchlistCount">0</span>
+                        <span class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Dans ma liste</span>
+                    </div>
+                    <div class="bg-slate-200/50 dark:bg-slate-800/30 rounded-xl p-3 flex flex-col items-center justify-center border border-slate-300/30 dark:border-slate-700/30">
+                        <span class="text-2xl font-bold text-emerald-500" x-text="stats.watchedMoviesCount">0</span>
+                        <span class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Films vus</span>
+                    </div>
+                    <div class="bg-slate-200/50 dark:bg-slate-800/30 rounded-xl p-3 flex flex-col items-center justify-center border border-slate-300/30 dark:border-slate-700/30">
+                        <span class="text-2xl font-bold text-blue-400" x-text="stats.watchedSeriesCount">0</span>
+                        <span class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Séries terminées</span>
+                    </div>
+                    <div class="bg-slate-200/50 dark:bg-slate-800/30 rounded-xl p-3 flex flex-col items-center justify-center border border-slate-300/30 dark:border-slate-700/30">
+                        <span class="text-2xl font-bold text-purple-400" x-text="stats.watchedEpisodesCount">0</span>
+                        <span class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Épisodes vus</span>
+                    </div>
+                </div>
+            </div>
             
             <div class="flex flex-col gap-2">
-                <h3 class="text-lg font-bold pb-2">Préférences</h3>
+                <h3 class="text-lg font-bold pb-1">Préférences</h3>
                 <div class="flex flex-col gap-1 bg-slate-200/50 dark:bg-slate-800/20 rounded-xl p-2">
                     <button @click="showCountryModal = true" class="flex items-center gap-4 p-3 rounded-lg hover:bg-slate-300/50 dark:hover:bg-slate-700/30 transition-colors w-full text-left">
                         <div class="flex items-center justify-center rounded-lg bg-slate-300 dark:bg-slate-800 shrink-0 size-10 text-slate-900 dark:text-white"><span class="material-symbols-outlined">public</span></div>
@@ -120,7 +173,7 @@
             </div>
 
             <div class="flex flex-col gap-2">
-                <h3 class="text-lg font-bold pb-2">Sauvegarde des données</h3>
+                <h3 class="text-lg font-bold pb-1">Sauvegarde des données</h3>
                 <div class="flex flex-col gap-1 bg-slate-200/50 dark:bg-slate-800/20 rounded-xl p-2">
                     <button onclick="exportData()" class="flex items-center gap-4 p-3 rounded-lg hover:bg-slate-300/50 dark:hover:bg-slate-700/30 transition-colors w-full text-left text-primary">
                         <div class="flex items-center justify-center rounded-lg bg-primary/10 shrink-0 size-10"><span class="material-symbols-outlined">download</span></div>
@@ -145,19 +198,19 @@
 
     <footer class="flex-shrink-0 bg-background-light/90 dark:bg-background-dark/90 backdrop-blur-md border-t border-gray-200 dark:border-gray-800 z-30 h-20 pb-2">
         <nav class="flex justify-around items-center h-full">
-            <a class="flex flex-col items-center justify-center gap-1 text-gray-500 dark:text-gray-400 hover:text-primary transition-colors w-16" href="index.html">
+            <a class="flex flex-col items-center justify-center gap-1 text-gray-500 dark:text-gray-400 hover:text-primary transition-colors w-16" href="index.html?tab=home">
                 <span class="material-symbols-outlined text-2xl">home</span>
                 <span class="text-[10px] font-medium">Accueil</span>
             </a>
-            <a class="flex flex-col items-center justify-center gap-1 text-gray-500 dark:text-gray-400 hover:text-primary transition-colors w-16" href="popular.html">
+            <a class="flex flex-col items-center justify-center gap-1 text-gray-500 dark:text-gray-400 hover:text-primary transition-colors w-16" href="index.html?tab=popular">
                 <span class="material-symbols-outlined thick text-2xl">local_fire_department</span>
                 <span class="text-[10px] font-medium">Populaire</span>
             </a>
-            <a class="flex flex-col items-center justify-center gap-1 text-gray-500 dark:text-gray-400 hover:text-primary transition-colors w-16" href="search.html">
+            <a class="flex flex-col items-center justify-center gap-1 text-gray-500 dark:text-gray-400 hover:text-primary transition-colors w-16" href="index.html?tab=search">
                 <span class="material-symbols-outlined text-2xl">search</span>
                 <span class="text-[10px] font-medium">Recherche</span>
             </a>
-            <a class="flex flex-col items-center justify-center gap-1 text-gray-500 dark:text-gray-400 hover:text-primary transition-colors w-16" href="watchlist.html">
+            <a class="flex flex-col items-center justify-center gap-1 text-gray-500 dark:text-gray-400 hover:text-primary transition-colors w-16" href="index.html?tab=watchlist">
                 <span class="material-symbols-outlined text-2xl">bookmark</span>
                 <span class="text-[10px] font-medium">Ma Liste</span>
             </a>
@@ -183,35 +236,97 @@
         Alpine.data('userAuth', () => ({
             user: window.firebaseUser || null,
             isLoading: false,
+            isSyncing: false,
+            lastSyncedAt: localStorage.getItem('lastCloudSync') || null,
+            authError: null,
+            authErrorTitle: '',
+            authErrorMessage: '',
+            authErrorLink: '',
+
+            get syncStatusText() {
+                if (!this.lastSyncedAt) return 'Données synchronisées dans le Cloud';
+                const d = new Date(Number(this.lastSyncedAt));
+                if (isNaN(d.getTime())) return 'Données synchronisées dans le Cloud';
+                return `Synchronisé à ${d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`;
+            },
+
             init() {
-                // Listen to the custom event dispatched by firebase-config.js
                 window.addEventListener('auth-state-changed', (e) => {
                     this.user = e.detail.user;
                     this.isLoading = false;
                 });
 
-                // If it was already loaded before Alpine initialized
+                window.addEventListener('cloud-data-synced', () => {
+                    this.lastSyncedAt = localStorage.getItem('lastCloudSync') || String(Date.now());
+                    this.isSyncing = false;
+                });
+
+                window.addEventListener('auth-error', (e) => {
+                    if (e.detail && e.detail.error) {
+                        this.formatAuthError(e.detail.error);
+                    }
+                });
+
                 if (window.firebaseUser) {
                     this.user = window.firebaseUser;
                 }
+                if (window.lastFirebaseAuthError) {
+                    this.formatAuthError(window.lastFirebaseAuthError);
+                }
             },
+
+            formatAuthError(error) {
+                this.authError = error;
+                const code = error?.code || '';
+                const host = window.location.hostname || 'maxrene.github.io';
+                if (code === 'auth/unauthorized-domain') {
+                    this.authErrorTitle = 'Domaine non autorisé sur Firebase';
+                    this.authErrorMessage = `Ajoutez le domaine "${host}" dans Firebase Console > Authentication > Settings > Authorized domains.`;
+                    this.authErrorLink = 'https://console.firebase.google.com/project/cinemovie-56c80/authentication/settings';
+                } else if (code === 'auth/operation-not-allowed' || code === 'auth/configuration-not-found') {
+                    this.authErrorTitle = 'Fournisseur Google non activé';
+                    this.authErrorMessage = 'Activez la connexion "Google" dans Firebase Console > Authentication > Sign-in method.';
+                    this.authErrorLink = 'https://console.firebase.google.com/project/cinemovie-56c80/authentication/providers';
+                } else if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
+                    this.authErrorTitle = 'Connexion annulée';
+                    this.authErrorMessage = 'La fenêtre de connexion Google a été fermée avant la fin.';
+                    this.authErrorLink = '';
+                } else {
+                    this.authErrorTitle = 'Erreur de connexion Google';
+                    this.authErrorMessage = error?.message || 'Une erreur inattendue est survenue.';
+                    this.authErrorLink = '';
+                }
+            },
+
             async login() {
                 this.isLoading = true;
+                this.authError = null;
                 try {
                     if (window.signInWithGoogle) {
                         await window.signInWithGoogle();
                     } else {
-                        console.error("Firebase Auth not fully loaded yet.");
                         this.isLoading = false;
                     }
                 } catch (error) {
                     console.error("Erreur de connexion :", error);
                     this.isLoading = false;
-                    alert("Erreur lors de la connexion. Veuillez réessayer.");
+                    this.formatAuthError(error);
                 }
             },
+
+            async syncNow() {
+                this.isSyncing = true;
+                try {
+                    if (window.forceCloudMerge) {
+                        await window.forceCloudMerge();
+                    }
+                } finally {
+                    this.isSyncing = false;
+                }
+            },
+
             async logout() {
-                if (confirm("Voulez-vous vraiment vous déconnecter ? Vous reviendrez à vos listes locales hors-ligne.")) {
+                if (confirm("Voulez-vous vraiment vous déconnecter ?")) {
                     try {
                         if (window.signOutGoogle) {
                             await window.signOutGoogle();
@@ -226,24 +341,65 @@
         Alpine.data('userProfile', () => ({
             showCountryModal: false,
             country: localStorage.getItem('userRegion') || 'FR',
+            platformCount: 0,
+            actorCount: 0,
+            stats: {
+                watchlistCount: 0,
+                watchedMoviesCount: 0,
+                watchedSeriesCount: 0,
+                watchedEpisodesCount: 0
+            },
+
+            init() {
+                this.refreshProfileData();
+                window.addEventListener('cloud-data-synced', () => this.refreshProfileData());
+                window.addEventListener('watchlist-updated', () => this.refreshProfileData());
+            },
+
+            refreshProfileData() {
+                this.country = localStorage.getItem('userRegion') || 'FR';
+                this.platformCount = getSafeLocalStorage('selectedPlatforms', []).length;
+                this.actorCount = getSafeLocalStorage('favoriteActors', []).length;
+
+                const watchlist = getSafeLocalStorage('watchlist', []);
+                const watchedMovies = getSafeLocalStorage('watchedMovies', []);
+                const watchedSeries = getSafeLocalStorage('watchedSeries', []);
+                const watchedEpisodes = getSafeLocalStorage('watchedEpisodes', {});
+
+                let epCount = 0;
+                Object.values(watchedEpisodes).forEach(arr => {
+                    if (Array.isArray(arr)) epCount += arr.length;
+                });
+
+                this.stats = {
+                    watchlistCount: watchlist.length,
+                    watchedMoviesCount: watchedMovies.length,
+                    watchedSeriesCount: watchedSeries.length,
+                    watchedEpisodesCount: epCount
+                };
+            },
+
             get countryName() { return this.country === 'FR' ? 'France' : 'Irlande'; },
-            get platformCount() { return getSafeLocalStorage('selectedPlatforms', []).length; },
-            get actorCount() { return getSafeLocalStorage('favoriteActors', []).length; },
-            setCountry(code) { this.country = code; localStorage.setItem('userRegion', code); this.showCountryModal = false; },
+
+            setCountry(code) {
+                this.country = code;
+                localStorage.setItem('userRegion', code);
+                this.showCountryModal = false;
+            },
             
-            // Fonction Vider le Cache
             async clearCache() {
-                if (!confirm("Voulez-vous vraiment vider le cache ? Vos listes seront conservées, mais l'application devra re-télécharger les affiches et détails des films.")) return;
+                if (!confirm("Voulez-vous vraiment vider le cache ? Vos listes et votre progression seront conservées, mais l'application re-téléchargera les affiches et détails.")) return;
 
                 const keysToKeep = [
                     'watchlist', 'watchedMovies', 'watchedSeries', 'watchedEpisodes', 
-                    'favoriteActors', 'selectedPlatforms', 'userRegion', 'userId', 'previousSearches'
+                    'favoriteActors', 'selectedPlatforms', 'userRegion', 'userId',
+                    'anonymousId', 'seriesLastWatchedDate', 'previousSearches', 'lastCloudSync'
                 ];
                 
                 const keysToRemove = [];
                 for (let i = 0; i < localStorage.length; i++) {
                     const key = localStorage.key(i);
-                    if (!keysToKeep.includes(key)) {
+                    if (key && !keysToKeep.includes(key)) {
                         keysToRemove.push(key);
                     }
                 }
@@ -266,14 +422,13 @@
                 }
 
                 alert("Cache vidé avec succès ! L'application va redémarrer.");
-                window.location.reload(true); 
+                window.location.reload(); 
             }
         }));
     });
 
     if ('serviceWorker' in navigator) { window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js')); }
 
-    // Scripts pour l'Export/Import
     function exportData() {
         const data = {
             watchlist: localStorage.getItem('watchlist'),
@@ -281,7 +436,9 @@
             watchedSeries: localStorage.getItem('watchedSeries'),
             watchedEpisodes: localStorage.getItem('watchedEpisodes'),
             favoriteActors: localStorage.getItem('favoriteActors'),
-            selectedPlatforms: localStorage.getItem('selectedPlatforms')
+            selectedPlatforms: localStorage.getItem('selectedPlatforms'),
+            seriesLastWatchedDate: localStorage.getItem('seriesLastWatchedDate'),
+            userRegion: localStorage.getItem('userRegion')
         };
         const blob = new Blob([JSON.stringify(data)], {type: 'application/json'});
         const url = URL.createObjectURL(blob);
@@ -297,16 +454,21 @@
         const file = event.target.files[0];
         if (!file) return;
         const reader = new FileReader();
-        reader.onload = function(e) {
+        reader.onload = async function(e) {
             try {
                 const data = JSON.parse(e.target.result);
-                if(data.watchlist) localStorage.setItem('watchlist', data.watchlist);
-                if(data.watchedMovies) localStorage.setItem('watchedMovies', data.watchedMovies);
-                if(data.watchedSeries) localStorage.setItem('watchedSeries', data.watchedSeries);
-                if(data.watchedEpisodes) localStorage.setItem('watchedEpisodes', data.watchedEpisodes);
-                if(data.favoriteActors) localStorage.setItem('favoriteActors', data.favoriteActors);
-                if(data.selectedPlatforms) localStorage.setItem('selectedPlatforms', data.selectedPlatforms);
-                alert('🎉 Tes données ont été restaurées avec succès !');
+                if(data.watchlist) localStorage.setItem('watchlist', typeof data.watchlist === 'string' ? data.watchlist : JSON.stringify(data.watchlist));
+                if(data.watchedMovies) localStorage.setItem('watchedMovies', typeof data.watchedMovies === 'string' ? data.watchedMovies : JSON.stringify(data.watchedMovies));
+                if(data.watchedSeries) localStorage.setItem('watchedSeries', typeof data.watchedSeries === 'string' ? data.watchedSeries : JSON.stringify(data.watchedSeries));
+                if(data.watchedEpisodes) localStorage.setItem('watchedEpisodes', typeof data.watchedEpisodes === 'string' ? data.watchedEpisodes : JSON.stringify(data.watchedEpisodes));
+                if(data.favoriteActors) localStorage.setItem('favoriteActors', typeof data.favoriteActors === 'string' ? data.favoriteActors : JSON.stringify(data.favoriteActors));
+                if(data.selectedPlatforms) localStorage.setItem('selectedPlatforms', typeof data.selectedPlatforms === 'string' ? data.selectedPlatforms : JSON.stringify(data.selectedPlatforms));
+                if(data.seriesLastWatchedDate) localStorage.setItem('seriesLastWatchedDate', typeof data.seriesLastWatchedDate === 'string' ? data.seriesLastWatchedDate : JSON.stringify(data.seriesLastWatchedDate));
+                if(data.userRegion) localStorage.setItem('userRegion', data.userRegion);
+                if (window.syncToCloud) {
+                    await window.syncToCloud();
+                }
+                alert('🎉 Tes données ont été restaurées et synchronisées avec succès !');
                 window.location.reload();
             } catch(err) {
                 alert('❌ Erreur : Fichier de sauvegarde invalide ou corrompu.');
