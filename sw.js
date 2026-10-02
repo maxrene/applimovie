@@ -1,7 +1,7 @@
 // sw.js
-// VERSION V17 - CACHE SHELL ET IMAGES SÉPARÉS, RAPIDITÉ ACCRUE
-const CACHE_NAME = 'cinematch-v17-offline-capable';
-const IMAGE_CACHE_NAME = 'cinematch-images-v17';
+// VERSION V18 - CONNEXION GOOGLE CLOUD & RÉCUPÉRATION MULTI-APPAREILS
+const CACHE_NAME = 'cinematch-v18-offline-capable';
+const IMAGE_CACHE_NAME = 'cinematch-images-v18';
 const MAX_IMAGES = 200;
 
 const ASSETS_TO_CACHE = [

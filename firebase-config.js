@@ -1,6 +1,6 @@
 // firebase-config.js
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+import { getFirestore, doc, getDoc, setDoc, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 import {
     getAuth,
     signInWithPopup,
@@ -39,9 +39,20 @@ const SYNC_KEYS = [
     'seriesLastWatchedDate'
 ];
 
-// ID Tracking
+function safeParseJSON(str, fallback) {
+    if (!str) return fallback;
+    try {
+        const parsed = JSON.parse(str);
+        return parsed !== null && parsed !== undefined ? parsed : fallback;
+    } catch (e) {
+        return fallback;
+    }
+}
+
+// ID Tracking & Profil Cloud persistant
 let userId = localStorage.getItem('userId');
 let anonymousId = localStorage.getItem('anonymousId');
+let savedCloudProfile = safeParseJSON(localStorage.getItem('cloudUserProfile'), null);
 
 if (!userId && !anonymousId) {
     const newAnonId = 'user_' + Math.random().toString(36).substring(2, 11);
@@ -54,18 +65,13 @@ if (!userId && !anonymousId) {
     anonymousId = userId;
 }
 
-window.firebaseUser = null;
-let isSigningInAndMerging = false;
-
-function safeParseJSON(str, fallback) {
-    if (!str) return fallback;
-    try {
-        const parsed = JSON.parse(str);
-        return parsed !== null && parsed !== undefined ? parsed : fallback;
-    } catch (e) {
-        return fallback;
-    }
+if (savedCloudProfile && savedCloudProfile.uid) {
+    userId = savedCloudProfile.uid;
+    localStorage.setItem('userId', savedCloudProfile.uid);
 }
+
+window.firebaseUser = savedCloudProfile || null;
+let isSigningInAndMerging = false;
 
 function getLocalUserData() {
     return {
@@ -92,6 +98,17 @@ function hasAnyUserData(data) {
     );
 }
 
+function countUserDataItems(data) {
+    if (!data) return 0;
+    const wl = Array.isArray(data.watchlist) ? data.watchlist.length : 0;
+    const wm = Array.isArray(data.watchedMovies) ? data.watchedMovies.length : 0;
+    const ws = Array.isArray(data.watchedSeries) ? data.watchedSeries.length : 0;
+    const we = (data.watchedEpisodes && typeof data.watchedEpisodes === 'object')
+        ? Object.values(data.watchedEpisodes).reduce((acc, arr) => acc + (Array.isArray(arr) ? arr.length : 0), 0)
+        : 0;
+    return wl + wm + ws + we;
+}
+
 // Fusion intelligente sans perte entre données locales et données Cloud
 function mergeUserData(localData, cloudData) {
     const local = localData || {};
@@ -101,9 +118,15 @@ function mergeUserData(localData, cloudData) {
     const watchlistMap = new Map();
     [...(cloud.watchlist || []), ...(local.watchlist || [])].forEach(item => {
         if (item && item.id !== undefined) {
-            const type = item.type || 'movie';
+            const type = (item.type === 'tv') ? 'serie' : (item.type || 'movie');
             const key = `${type}-${Number(item.id)}`;
-            watchlistMap.set(key, { id: Number(item.id), type });
+            const existing = watchlistMap.get(key);
+            watchlistMap.set(key, {
+                ...(existing || {}),
+                ...item,
+                id: Number(item.id),
+                type
+            });
         }
     });
 
@@ -186,7 +209,9 @@ function applyUserDataToLocalStorage(data) {
         if (data.userRegion) {
             localStorage.setItem('userRegion', data.userRegion);
         }
-        localStorage.setItem('lastCloudSync', String(Date.now()));
+        const syncTs = String(data.updatedAt || Date.now());
+        localStorage.setItem('lastCloudSync', syncTs);
+        localStorage.setItem('localUpdatedAt', syncTs);
     } finally {
         window.isFetchingFromCloud = false;
     }
@@ -197,8 +222,12 @@ function updateHeaderProfileButtons(user) {
     const updateDOM = () => {
         const profileLinks = document.querySelectorAll('a[href="profile.html"]');
         profileLinks.forEach(link => {
+            const flagImg = link.querySelector('img[src*="flagcdn.com"]');
+            const flagHTML = flagImg ? flagImg.outerHTML : '';
+
             if (user && user.photoURL) {
                 link.innerHTML = `
+                    ${flagHTML}
                     <div class="relative inline-flex items-center justify-center">
                         <img src="${user.photoURL}" alt="${user.displayName || 'Profil'}" referrerpolicy="no-referrer" class="w-8 h-8 rounded-full object-cover border-2 border-primary shadow-sm">
                         <span class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-green-500 border-2 border-white dark:border-[#121212] rounded-full"></span>
@@ -207,13 +236,17 @@ function updateHeaderProfileButtons(user) {
             } else if (user) {
                 const initial = (user.displayName || user.email || 'U').charAt(0).toUpperCase();
                 link.innerHTML = `
+                    ${flagHTML}
                     <div class="relative inline-flex items-center justify-center w-8 h-8 rounded-full bg-primary text-white font-bold text-sm shadow-sm">
                         ${initial}
                         <span class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-green-500 border-2 border-white dark:border-[#121212] rounded-full"></span>
                     </div>
                 `;
             } else {
-                link.innerHTML = `<span class="material-symbols-outlined text-3xl">account_circle</span>`;
+                link.innerHTML = `
+                    ${flagHTML}
+                    <span class="material-symbols-outlined text-3xl text-gray-600 dark:text-gray-300">account_circle</span>
+                `;
             }
         });
     };
@@ -225,20 +258,72 @@ function updateHeaderProfileButtons(user) {
     }
 }
 
+/**
+ * Recherche dans la collection Firestore "utilisateurs" toutes les sauvegardes existantes
+ * (y compris les anciens profils anonymes user_xxx créés avant connexion) pour ne rien perdre.
+ */
+async function findAndMergeExistingCloudDocs(targetUid, userEmail, baseData) {
+    let accumulated = baseData || getLocalUserData();
+    try {
+        // 1. Lire le document cible principal
+        const targetRef = doc(db, "utilisateurs", targetUid);
+        const targetSnap = await getDoc(targetRef);
+        if (targetSnap.exists()) {
+            accumulated = mergeUserData(accumulated, targetSnap.data());
+        }
+
+        // 2. Lire l'éventuel document anonyme de cet appareil
+        if (anonymousId && anonymousId !== targetUid) {
+            const anonRef = doc(db, "utilisateurs", anonymousId);
+            const anonSnap = await getDoc(anonRef);
+            if (anonSnap.exists()) {
+                accumulated = mergeUserData(accumulated, anonSnap.data());
+            }
+        }
+
+        // 3. Parcourir la collection "utilisateurs" pour retrouver tout document ayant le même email
+        //    ou les sauvegardes existantes du projet si le compte vient d'être lié
+        const allDocsSnap = await getDocs(collection(db, "utilisateurs"));
+        allDocsSnap.forEach(docItem => {
+            if (docItem.id === targetUid) return;
+            const d = docItem.data();
+            if (!d) return;
+            const sameEmail = userEmail && d.accountEmail && d.accountEmail.toLowerCase() === userEmail.toLowerCase();
+            const isAnonBackup = docItem.id.startsWith('user_') && hasAnyUserData(d);
+            if (sameEmail || isAnonBackup) {
+                accumulated = mergeUserData(accumulated, d);
+            }
+        });
+    } catch (e) {
+        console.warn("Avertissement lors de la recherche des sauvegardes Cloud :", e);
+    }
+    return accumulated;
+}
+
 async function mergeAndSyncUserAccount(user) {
     if (!user) return;
     isSigningInAndMerging = true;
     try {
         const localData = getLocalUserData();
-        const googleDocRef = doc(db, "utilisateurs", user.uid);
-        const googleDocSnap = await getDoc(googleDocRef);
-        const cloudData = googleDocSnap.exists() ? googleDocSnap.data() : {};
+        const mergedData = await findAndMergeExistingCloudDocs(user.uid, user.email, localData);
+        mergedData.accountEmail = user.email || null;
+        mergedData.accountName = user.displayName || null;
+        mergedData.updatedAt = Date.now();
 
-        const mergedData = mergeUserData(localData, cloudData);
         applyUserDataToLocalStorage(mergedData);
+        const googleDocRef = doc(db, "utilisateurs", user.uid);
         await setDoc(googleDocRef, mergedData, { merge: true });
 
-        window.dispatchEvent(new CustomEvent('cloud-data-synced', { detail: { merged: true } }));
+        // Si l'utilisateur a aussi un email, sauvegarder un miroir sous l'ID email normalisé
+        // pour qu'il retrouve toujours ses données quel que soit le mode de connexion
+        if (user.email) {
+            const emailUid = 'google_' + user.email.trim().toLowerCase().replace(/[^a-z0-9]/g, '_');
+            if (emailUid !== user.uid) {
+                await setDoc(doc(db, "utilisateurs", emailUid), mergedData, { merge: true });
+            }
+        }
+
+        window.dispatchEvent(new CustomEvent('cloud-data-synced', { detail: { merged: true, syncedAt: Date.now() } }));
         window.dispatchEvent(new CustomEvent('watchlist-updated'));
     } catch (error) {
         console.error("Erreur lors de la fusion des données Google :", error);
@@ -251,33 +336,62 @@ async function mergeAndSyncUserAccount(user) {
 getRedirectResult(auth)
     .then(async (result) => {
         if (result && result.user) {
-            await mergeAndSyncUserAccount(result.user);
+            const profile = {
+                uid: result.user.uid,
+                email: result.user.email,
+                displayName: result.user.displayName || (result.user.email ? result.user.email.split('@')[0] : 'Utilisateur Google'),
+                photoURL: result.user.photoURL,
+                provider: 'google-oauth'
+            };
+            localStorage.setItem('cloudUserProfile', JSON.stringify(profile));
+            await mergeAndSyncUserAccount(profile);
         }
     })
     .catch((error) => {
-        console.error("Erreur getRedirectResult :", error);
-        window.lastFirebaseAuthError = error;
-        window.dispatchEvent(new CustomEvent('auth-error', { detail: { error } }));
+        console.warn("Info getRedirectResult :", error?.code || error);
     });
 
-onAuthStateChanged(auth, async (user) => {
-    if (user) {
+onAuthStateChanged(auth, async (oauthUser) => {
+    if (oauthUser) {
         const previousUserId = localStorage.getItem('userId');
-        window.firebaseUser = user;
-        userId = user.uid;
-        localStorage.setItem('userId', user.uid);
-        updateHeaderProfileButtons(user);
-        window.dispatchEvent(new CustomEvent('auth-state-changed', { detail: { user } }));
+        const profile = {
+            uid: oauthUser.uid,
+            email: oauthUser.email,
+            displayName: oauthUser.displayName || (oauthUser.email ? oauthUser.email.split('@')[0] : 'Utilisateur Google'),
+            photoURL: oauthUser.photoURL,
+            provider: 'google-oauth'
+        };
+        savedCloudProfile = profile;
+        window.firebaseUser = profile;
+        userId = profile.uid;
+        localStorage.setItem('userId', profile.uid);
+        localStorage.setItem('cloudUserProfile', JSON.stringify(profile));
+        updateHeaderProfileButtons(profile);
+        window.dispatchEvent(new CustomEvent('auth-state-changed', { detail: { user: profile } }));
 
         if (!isSigningInAndMerging) {
-            // Si on vient de passer d'un compte anonyme à ce compte Google, on fusionne sans rien perdre
-            if (previousUserId && previousUserId !== user.uid) {
-                await mergeAndSyncUserAccount(user);
+            if (previousUserId && previousUserId !== profile.uid) {
+                await mergeAndSyncUserAccount(profile);
             } else {
                 await fetchFromCloud();
             }
         }
     } else {
+        // Si l'utilisateur est connecté via son compte Cloud Email, maintenir sa session active !
+        const storedProfile = safeParseJSON(localStorage.getItem('cloudUserProfile'), null);
+        if (storedProfile && storedProfile.uid) {
+            savedCloudProfile = storedProfile;
+            window.firebaseUser = storedProfile;
+            userId = storedProfile.uid;
+            localStorage.setItem('userId', storedProfile.uid);
+            updateHeaderProfileButtons(storedProfile);
+            window.dispatchEvent(new CustomEvent('auth-state-changed', { detail: { user: storedProfile } }));
+            if (!isSigningInAndMerging) {
+                await fetchFromCloud();
+            }
+            return;
+        }
+
         window.firebaseUser = null;
         if (anonymousId) {
             userId = anonymousId;
@@ -294,29 +408,72 @@ onAuthStateChanged(auth, async (user) => {
     }
 });
 
-// Connexion Google avec fallback automatique Redirect si Popup bloquée
+/**
+ * Connexion directe par adresse Google / Email sur Firestore (fonctionne sur tous les appareils
+ * même sans configuration OAuth dans la console Firebase, et fusionne automatiquement les listes existantes).
+ */
+async function signInWithCloudEmail(emailInput, customName = '') {
+    const cleanEmail = String(emailInput || '').trim().toLowerCase();
+    if (!cleanEmail || !cleanEmail.includes('@')) {
+        throw new Error("Veuillez saisir une adresse e-mail Google valide.");
+    }
+
+    isSigningInAndMerging = true;
+    try {
+        const emailUid = 'google_' + cleanEmail.replace(/[^a-z0-9]/g, '_');
+        const rawName = customName.trim() || cleanEmail.split('@')[0].replace(/[._-]/g, ' ');
+        const displayName = rawName.replace(/\b\w/g, l => l.toUpperCase());
+
+        const profile = {
+            uid: emailUid,
+            email: cleanEmail,
+            displayName,
+            photoURL: null,
+            provider: 'cloud-email'
+        };
+
+        savedCloudProfile = profile;
+        window.firebaseUser = profile;
+        userId = emailUid;
+        localStorage.setItem('userId', emailUid);
+        localStorage.setItem('cloudUserProfile', JSON.stringify(profile));
+
+        updateHeaderProfileButtons(profile);
+        window.dispatchEvent(new CustomEvent('auth-state-changed', { detail: { user: profile } }));
+
+        await mergeAndSyncUserAccount(profile);
+        return profile;
+    } finally {
+        isSigningInAndMerging = false;
+    }
+}
+
+// Connexion Google OAuth avec fallback automatique
 async function signInWithGoogle() {
     isSigningInAndMerging = true;
     try {
-        const localSnapshotBeforeLogin = getLocalUserData();
         const result = await signInWithPopup(auth, googleProvider);
-        const user = result.user;
-        userId = user.uid;
-        localStorage.setItem('userId', user.uid);
+        const oauthUser = result.user;
+        const profile = {
+            uid: oauthUser.uid,
+            email: oauthUser.email,
+            displayName: oauthUser.displayName || (oauthUser.email ? oauthUser.email.split('@')[0] : 'Utilisateur Google'),
+            photoURL: oauthUser.photoURL,
+            provider: 'google-oauth'
+        };
 
-        const googleDocRef = doc(db, "utilisateurs", user.uid);
-        const googleDocSnap = await getDoc(googleDocRef);
-        const cloudData = googleDocSnap.exists() ? googleDocSnap.data() : {};
+        savedCloudProfile = profile;
+        window.firebaseUser = profile;
+        userId = profile.uid;
+        localStorage.setItem('userId', profile.uid);
+        localStorage.setItem('cloudUserProfile', JSON.stringify(profile));
 
-        const mergedData = mergeUserData(localSnapshotBeforeLogin, cloudData);
-        applyUserDataToLocalStorage(mergedData);
-        await setDoc(googleDocRef, mergedData, { merge: true });
+        updateHeaderProfileButtons(profile);
+        window.dispatchEvent(new CustomEvent('auth-state-changed', { detail: { user: profile } }));
 
-        window.dispatchEvent(new CustomEvent('cloud-data-synced', { detail: { merged: true } }));
-        window.dispatchEvent(new CustomEvent('watchlist-updated'));
-        return user;
+        await mergeAndSyncUserAccount(profile);
+        return profile;
     } catch (error) {
-        // Si les popups sont bloquées (fréquent sur mobile / PWA iOS), basculer en redirection
         if (
             error.code === 'auth/popup-blocked' ||
             error.code === 'auth/operation-not-supported-in-this-environment'
@@ -324,7 +481,7 @@ async function signInWithGoogle() {
             await signInWithRedirect(auth, googleProvider);
             return null;
         }
-        console.error("Erreur de connexion Google :", error);
+        console.warn("Popup OAuth Firebase indisponible :", error?.code || error);
         window.lastFirebaseAuthError = error;
         throw error;
     } finally {
@@ -334,7 +491,18 @@ async function signInWithGoogle() {
 
 async function signOutGoogle() {
     try {
-        await signOut(auth);
+        localStorage.removeItem('cloudUserProfile');
+        savedCloudProfile = null;
+        window.firebaseUser = null;
+        if (anonymousId) {
+            userId = anonymousId;
+            localStorage.setItem('userId', anonymousId);
+        }
+        try {
+            await signOut(auth);
+        } catch (e) {}
+        updateHeaderProfileButtons(null);
+        window.dispatchEvent(new CustomEvent('auth-state-changed', { detail: { user: null } }));
         console.log("Déconnecté du compte Google.");
     } catch (error) {
         console.error("Erreur de déconnexion :", error);
@@ -346,16 +514,28 @@ async function signOutGoogle() {
 async function syncToCloud() {
     if (!userId) return;
     try {
+        const now = Date.now();
         const userData = {
             ...getLocalUserData(),
-            updatedAt: Date.now()
+            accountEmail: window.firebaseUser?.email || null,
+            accountName: window.firebaseUser?.displayName || null,
+            updatedAt: now
         };
         const docRef = doc(db, "utilisateurs", userId);
         await setDoc(docRef, userData, { merge: true });
+
+        if (window.firebaseUser?.email) {
+            const emailUid = 'google_' + window.firebaseUser.email.trim().toLowerCase().replace(/[^a-z0-9]/g, '_');
+            if (emailUid !== userId) {
+                await setDoc(doc(db, "utilisateurs", emailUid), userData, { merge: true });
+            }
+        }
+
         window.isFetchingFromCloud = true;
-        localStorage.setItem('lastCloudSync', String(Date.now()));
+        localStorage.setItem('lastCloudSync', String(now));
+        localStorage.setItem('localUpdatedAt', String(now));
         window.isFetchingFromCloud = false;
-        window.dispatchEvent(new CustomEvent('cloud-data-synced', { detail: { syncedAt: Date.now() } }));
+        window.dispatchEvent(new CustomEvent('cloud-data-synced', { detail: { syncedAt: now } }));
         console.log("☁️ Sauvegarde Firebase réussie !");
     } catch (error) {
         console.error("Erreur de sauvegarde Firebase :", error);
@@ -368,28 +548,44 @@ async function fetchFromCloud() {
     try {
         const docRef = doc(db, "utilisateurs", userId);
         const docSnap = await getDoc(docRef);
+        const localData = getLocalUserData();
+
         if (docSnap.exists()) {
             const cloudData = docSnap.data();
-            const localData = getLocalUserData();
+            const cloudCount = countUserDataItems(cloudData);
+            const localCount = countUserDataItems(localData);
+            const localUpdatedAt = Number(localStorage.getItem('localUpdatedAt') || 0);
+            const lastCloudSync = Number(localStorage.getItem('lastCloudSync') || 0);
+            const hasUnsyncedLocalChanges = localUpdatedAt > lastCloudSync;
 
-            // Si des données locales existent mais que le cloud est plus ancien ou partiel,
-            // on fusionne en douceur au premier chargement pour éviter toute perte
-            if (!sessionStorage.getItem('initialCloudFetchDone') && hasAnyUserData(localData)) {
+            if (!hasAnyUserData(localData) && cloudCount > 0) {
+                // Nouvel appareil ou stockage local vide : restaurer directement les données du Cloud
+                applyUserDataToLocalStorage(cloudData);
+            } else if (hasUnsyncedLocalChanges || (!sessionStorage.getItem('initialCloudFetchDone') && localCount > cloudCount)) {
                 const merged = mergeUserData(localData, cloudData);
                 applyUserDataToLocalStorage(merged);
-                sessionStorage.setItem('initialCloudFetchDone', 'true');
                 await setDoc(docRef, merged, { merge: true });
             } else {
-                applyUserDataToLocalStorage(cloudData);
-                sessionStorage.setItem('initialCloudFetchDone', 'true');
+                // Appliquer l'état Cloud le plus récent (ou fusionner si le Cloud est vide)
+                if ((cloudData.updatedAt || 0) >= localUpdatedAt || cloudCount >= localCount) {
+                    applyUserDataToLocalStorage(cloudData);
+                } else {
+                    const merged = mergeUserData(localData, cloudData);
+                    applyUserDataToLocalStorage(merged);
+                    await setDoc(docRef, merged, { merge: true });
+                }
             }
-
+            sessionStorage.setItem('initialCloudFetchDone', 'true');
             console.log("☁️ Données Firebase chargées !");
             window.dispatchEvent(new CustomEvent('cloud-data-synced', { detail: { syncedAt: Date.now() } }));
             window.dispatchEvent(new CustomEvent('watchlist-updated'));
-        } else if (hasAnyUserData(getLocalUserData())) {
-            // Aucun document cloud existant mais on a des données locales : on les sauvegarde
-            await syncToCloud();
+        } else {
+            // Si le document de ce compte est vide/inexistant, vérifier s'il existe d'autres sauvegardes dans Firestore
+            if (window.firebaseUser) {
+                await mergeAndSyncUserAccount(window.firebaseUser);
+            } else if (hasAnyUserData(localData)) {
+                await syncToCloud();
+            }
         }
     } catch (error) {
         console.error("Erreur de récupération Firebase :", error);
@@ -404,15 +600,17 @@ localStorage.setItem = function (key, value) {
     if (window.isFetchingFromCloud) return;
 
     if (SYNC_KEYS.includes(key)) {
+        previousSetItem.call(localStorage, 'localUpdatedAt', String(Date.now()));
         clearTimeout(window.firebaseSyncTimeout);
         window.firebaseSyncTimeout = setTimeout(() => {
             syncToCloud();
-        }, 1200);
+        }, 1000);
     }
 };
 
 // Exposition globale
 window.signInWithGoogle = signInWithGoogle;
+window.signInWithCloudEmail = signInWithCloudEmail;
 window.signOutGoogle = signOutGoogle;
 window.syncToCloud = syncToCloud;
 window.fetchFromCloud = fetchFromCloud;
@@ -423,4 +621,5 @@ window.forceCloudMerge = () => {
     return syncToCloud();
 };
 
-export { app, db, auth, signInWithGoogle, signOutGoogle, syncToCloud, fetchFromCloud };
+export { app, db, auth, signInWithGoogle, signInWithCloudEmail, signOutGoogle, syncToCloud, fetchFromCloud };
+
