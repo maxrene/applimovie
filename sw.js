@@ -1,7 +1,7 @@
 // sw.js
-// VERSION V18 - CONNEXION GOOGLE CLOUD & RÉCUPÉRATION MULTI-APPAREILS
-const CACHE_NAME = 'cinematch-v18-offline-capable';
-const IMAGE_CACHE_NAME = 'cinematch-images-v18';
+// VERSION V19 - NOUVEAU LOGO MINIMALISTE CINEMATCH & CACHE REFRESH
+const CACHE_NAME = 'cinematch-v19-offline-capable';
+const IMAGE_CACHE_NAME = 'cinematch-images-v19';
 const MAX_IMAGES = 200;
 
 const ASSETS_TO_CACHE = [
@@ -14,6 +14,9 @@ const ASSETS_TO_CACHE = [
   './serie.html',
   './person.html',
   './platforms.html',
+  './icons/logo.svg',
+  './icons/icon-192.png',
+  './icons/icon-512.png',
   './app.js',
   './config.js',
   './data.js',

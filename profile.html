@@ -5,7 +5,8 @@
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport"/>
 
 <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#121212">
+<meta name="theme-color" content="#12090A">
+<link rel="icon" type="image/svg+xml" href="icons/logo.svg">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 
 <title>Profil - CineMatch</title>
@@ -37,7 +38,10 @@
     
     <header class="flex-shrink-0 flex items-center p-4 pb-2 justify-between sticky top-0 bg-background-light dark:bg-background-dark z-10">
         <button onclick="history.back()" class="text-slate-900 dark:text-white flex size-12 shrink-0 items-center"><span class="material-symbols-outlined">arrow_back</span></button>
-        <h2 class="text-lg font-bold leading-tight flex-1 text-center">Mon Profil</h2>
+        <div class="flex items-center justify-center gap-2 flex-1">
+            <img src="icons/logo.svg" alt="CineMatch" class="h-6 w-6 rounded-md shadow-sm object-contain">
+            <h2 class="text-lg font-bold leading-tight">Mon Profil</h2>
+        </div>
         <div class="size-12"></div>
     </header>
 
@@ -47,7 +51,7 @@
             <template x-if="user">
                 <div class="flex flex-col items-center w-full max-w-sm bg-slate-200/40 dark:bg-slate-800/30 rounded-2xl p-5 border border-slate-300/50 dark:border-slate-700/50">
                     <div class="relative">
-                        <img :src="user.photoURL || 'icons/icon-192.png'" referrerpolicy="no-referrer" alt="Profil" class="rounded-full h-24 w-24 shadow-lg object-cover border-4 border-primary">
+                        <img :src="user.photoURL || 'icons/logo.svg'" referrerpolicy="no-referrer" alt="Profil" class="rounded-full h-24 w-24 shadow-lg object-cover border-4 border-primary">
                         <span class="absolute bottom-1 right-1 w-4 h-4 bg-green-500 border-2 border-white dark:border-slate-900 rounded-full"></span>
                     </div>
                     <p class="text-xl font-bold mt-3 text-center" x-text="user.displayName || 'Utilisateur Google'"></p>
