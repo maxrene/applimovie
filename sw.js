@@ -1,7 +1,7 @@
 // sw.js
 // VERSION V19 - NOUVEAU LOGO MINIMALISTE CINEMATCH & CACHE REFRESH
-const CACHE_NAME = 'cinematch-v19-offline-capable';
-const IMAGE_CACHE_NAME = 'cinematch-images-v19';
+const CACHE_NAME = 'cinematch-v20-offline-capable';
+const IMAGE_CACHE_NAME = 'cinematch-images-v20';
 const MAX_IMAGES = 200;
 
 const ASSETS_TO_CACHE = [
