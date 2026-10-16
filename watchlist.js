@@ -429,12 +429,15 @@ document.addEventListener('alpine:init', () => {
         },
 
         getCachedData(key, ignoreExpiration = false) {
+            if (window.CineDB) {
+                const fromDb = window.CineDB.getMediaSync(key, ignoreExpiration);
+                if (fromDb && (fromDb.title || fromDb.name)) return fromDb;
+            }
             try {
                 const cached = localStorage.getItem(key);
                 if (!cached) return null;
                 const { timestamp, data } = JSON.parse(cached);
                 if (!data || data.error || (!data.title && !data.name)) return null;
-                // Durée de validité portée à 7 jours pour éviter les rechargements lents inutiles
                 const isExpired = (Date.now() - timestamp) > 7 * 24 * 60 * 60 * 1000;
                 return (isExpired && !ignoreExpiration) ? null : data;
             } catch (e) {
@@ -452,11 +455,13 @@ document.addEventListener('alpine:init', () => {
                 console.warn('[Watchlist] Erreur lors du compactage du cache:', e);
             }
             memoryMediaCache.set(key, compacted);
-            try {
-                const item = { timestamp: Date.now(), data: compacted };
-                localStorage.setItem(key, JSON.stringify(item));
-            } catch (e) {
-                console.warn('[Watchlist] Stockage local saturé, élément conservé en mémoire:', key);
+            if (window.CineDB) {
+                window.CineDB.setMedia(key, compacted);
+            } else {
+                try {
+                    const item = { timestamp: Date.now(), data: compacted };
+                    localStorage.setItem(key, JSON.stringify(item));
+                } catch (e) {}
             }
             return compacted;
         },

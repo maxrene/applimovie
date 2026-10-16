@@ -324,6 +324,12 @@ document.addEventListener('alpine:init', () => {
 
         async fetchSeriesForContinueWatching(id) {
             const cacheKey = `series-details-${id}`;
+            if (window.CineDB) {
+                const fromDb = window.CineDB.getMediaSync(cacheKey);
+                if (fromDb && Array.isArray(fromDb.seasons) && fromDb.seasons.some(s => s.season_number > 0 && Array.isArray(s.episodes))) {
+                    return fromDb;
+                }
+            }
             const cachedRaw = localStorage.getItem(cacheKey);
             const ONE_DAY = 24 * 60 * 60 * 1000;
 
@@ -371,12 +377,16 @@ document.addEventListener('alpine:init', () => {
             }
 
             const compacted = window.compactSeriesForCache ? window.compactSeriesForCache(rawData) : rawData;
-            try {
-                localStorage.setItem(cacheKey, JSON.stringify({
-                    timestamp: Date.now(),
-                    data: compacted
-                }));
-            } catch (e) {}
+            if (window.CineDB) {
+                window.CineDB.setMedia(cacheKey, compacted);
+            } else {
+                try {
+                    localStorage.setItem(cacheKey, JSON.stringify({
+                        timestamp: Date.now(),
+                        data: compacted
+                    }));
+                } catch (e) {}
+            }
 
             return compacted;
         },
@@ -479,7 +489,41 @@ document.addEventListener('alpine:init', () => {
         },
 
         async fetchAndDisplayContent() {
-            this.isLoading = true;
+            const currentRegion = localStorage.getItem('userRegion') || 'FR';
+            const currentPlatformsRaw = localStorage.getItem('selectedPlatforms') || '[]';
+            const feedCacheKey = `home-feed-v1-${currentRegion}-${currentPlatformsRaw}`;
+            const cachedFeed = window.CineDB ? window.CineDB.getKVSync(feedCacheKey, null) : null;
+
+            const platforms = [
+                { key: 'netflix', id: '8', name: 'Netflix', containerId: 'netflix-container', sectionId: 'netflix-section' },
+                { key: 'prime', id: '119', name: 'Prime Video', containerId: 'prime-video-container', sectionId: 'prime-video-section' },
+                { key: 'apple', id: '350', name: 'Apple TV+', containerId: 'apple-tv-container', sectionId: 'apple-tv-section' },
+                { key: 'disney', id: '337', name: 'Disney+', containerId: 'disney-plus-container', sectionId: 'disney-plus-section' },
+                { key: 'canal', id: '381|392', name: 'Canal+', containerId: 'canal-plus-container', sectionId: 'canal-plus-section' },
+                { key: 'paramount', id: '531', name: 'Paramount+', containerId: 'paramount-container', sectionId: 'paramount-section' }
+            ];
+
+            // Si un cache du catalogue existe en mémoire / IndexedDB, l'afficher en 0ms sans spinner bloquant
+            if (cachedFeed && Array.isArray(cachedFeed.popular) && cachedFeed.popular.length > 0) {
+                this.renderContent('popular-container', cachedFeed.popular, 'popular');
+                if (cachedFeed.platforms) {
+                    platforms.forEach(p => {
+                        const sec = document.getElementById(p.sectionId);
+                        const list = cachedFeed.platforms[p.key];
+                        if (Array.isArray(list) && list.length > 0) {
+                            this.renderContent(p.containerId, list, 'platform');
+                            if (sec) sec.style.display = 'block';
+                        } else if (sec) {
+                            sec.style.display = 'none';
+                        }
+                    });
+                }
+                this.lastFetchedRegion = currentRegion;
+                this.lastFetchedPlatforms = currentPlatformsRaw;
+            } else {
+                this.isLoading = true;
+            }
+
             try {
                 // Lance "Reprendre la lecture" sans bloquer le reste
                 this.loadContinueWatching();
@@ -504,16 +548,8 @@ document.addEventListener('alpine:init', () => {
                     if (favoriteActorsSection) favoriteActorsSection.style.display = 'none';
                 }
 
-                const platforms = [
-                    { key: 'netflix', id: '8', name: 'Netflix', containerId: 'netflix-container', sectionId: 'netflix-section' },
-                    { key: 'prime', id: '119', name: 'Prime Video', containerId: 'prime-video-container', sectionId: 'prime-video-section' },
-                    { key: 'apple', id: '350', name: 'Apple TV+', containerId: 'apple-tv-container', sectionId: 'apple-tv-section' },
-                    { key: 'disney', id: '337', name: 'Disney+', containerId: 'disney-plus-container', sectionId: 'disney-plus-section' },
-                    { key: 'canal', id: '381|392', name: 'Canal+', containerId: 'canal-plus-container', sectionId: 'canal-plus-section' },
-                    { key: 'paramount', id: '531', name: 'Paramount+', containerId: 'paramount-container', sectionId: 'paramount-section' }
-                ];
-
                 const userSelectedPlatforms = getSafeLocalStorage('selectedPlatforms', []);
+                const platformSnapshot = {};
 
                 await Promise.all(platforms.map(async (platform) => {
                     const section = document.getElementById(platform.sectionId);
@@ -528,16 +564,24 @@ document.addEventListener('alpine:init', () => {
                         this.fetchAPI(`discover/tv?sort_by=popularity.desc&with_watch_providers=${platform.id}&language=fr-FR`)
                     ]);
 
-                    const combined = [...movies, ...series].sort((a, b) => b.popularity - a.popularity);
-                    this.renderContent(platform.containerId, combined.slice(0, 20), 'platform');
+                    const combined = [...movies, ...series].sort((a, b) => b.popularity - a.popularity).slice(0, 20);
+                    platformSnapshot[platform.key] = combined;
+                    this.renderContent(platform.containerId, combined, 'platform');
 
                     if (section) {
                         section.style.display = combined.length > 0 ? 'block' : 'none';
                     }
                 }));
 
-                this.lastFetchedRegion = localStorage.getItem('userRegion') || 'FR';
-                this.lastFetchedPlatforms = localStorage.getItem('selectedPlatforms') || '[]';
+                if (window.CineDB && popularContent && popularContent.length > 0) {
+                    window.CineDB.setKV(feedCacheKey, {
+                        popular: popularContent.slice(0, 20),
+                        platforms: platformSnapshot
+                    });
+                }
+
+                this.lastFetchedRegion = currentRegion;
+                this.lastFetchedPlatforms = currentPlatformsRaw;
                 localStorage.setItem('lastHomeFetch', Date.now());
             } finally {
                 this.isLoading = false;

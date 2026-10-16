@@ -1,7 +1,7 @@
 // sw.js
-// VERSION V21 - SYNCHRONISATION DYNAMIQUE DU DRAPEAU ET DU CATALOGUE PAR PAYS
-const CACHE_NAME = 'cinematch-v21-offline-capable';
-const IMAGE_CACHE_NAME = 'cinematch-images-v21';
+// VERSION V22 - MODE APPLICATION NATIVE SPA (INDEXEDDB + NAVIGATION INSTANTANÉE + CSS PRÉCOMPILÉ)
+const CACHE_NAME = 'cinematch-v22-offline-capable';
+const IMAGE_CACHE_NAME = 'cinematch-images-v22';
 const MAX_IMAGES = 200;
 
 const ASSETS_TO_CACHE = [
@@ -14,6 +14,7 @@ const ASSETS_TO_CACHE = [
   './serie.html',
   './person.html',
   './platforms.html',
+  './css/tailwind.css',
   './icons/logo.svg',
   './icons/icon-192.png',
   './icons/icon-512.png',
@@ -25,12 +26,14 @@ const ASSETS_TO_CACHE = [
   './watchlist.js',
   './firebase-config.js',
   './js/utils.js',
+  './js/db.js',
+  './js/spa.js',
   './js/popular.js',
   './js/search.js',
   './js/platforms.js',
   './js/awards.js',
   './js/offlineManager.js',
-  'https://cdn.tailwindcss.com?plugins=forms,container-queries',
+  'https://unpkg.com/@alpinejs/anchor@3.x.x/dist/cdn.min.js',
   'https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js',
   'https://fonts.googleapis.com/css2?family=Spline+Sans:wght@400;500;700&display=swap',
   'https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400..700,0..1,0'

@@ -2,7 +2,10 @@
 <html class="dark" lang="en">
 <head>
     <meta charset="utf-8"/>
-    <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport"/>
+    <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="CineMatch">
     <link rel="manifest" href="manifest.json?v=20">
     <meta name="theme-color" content="#12090A">
     <link rel="shortcut icon" href="favicon.ico?v=20">
@@ -11,28 +14,17 @@
     <link rel="apple-touch-icon" href="icons/icon-192.png?v=20">
     <title>CineMatch</title>
 
-    <!-- Fonts & CSS -->
+    <!-- Fonts & Precompiled CSS -->
     <link href="https://fonts.googleapis.com/css2?family=Spline+Sans:wght@400;500;700&display=swap" rel="stylesheet"/>
-    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="css/tailwind.css" rel="stylesheet"/>
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400..700,0..1,0" rel="stylesheet" />
 
     <!-- Alpine.js -->
     <script src="https://unpkg.com/@alpinejs/anchor@3.x.x/dist/cdn.min.js" defer></script>
     <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
 
-    <script>
-        tailwind.config = {
-            darkMode: "class",
-            theme: {
-                extend: {
-                    colors: { "primary": "#ea2a33", "background-light": "#f8f6f6", "background-dark": "#211111" },
-                    fontFamily: { "display": ["Spline Sans"] },
-                },
-            },
-        }
-    </script>
     <style> 
-        body { height: 100dvh; overflow: hidden; overscroll-behavior: none; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
+        body { height: 100dvh; overflow: hidden; overscroll-behavior: none; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
         [x-cloak] { display: none !important; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
@@ -686,10 +678,15 @@
         </nav>
     </footer>
 
+    <!-- iOS SPA Slide-Over Stack Root -->
+    <div id="spa-stack-root"></div>
+
 </div>
 
 <script src="config.js"></script>
 <script src="js/utils.js"></script>
+<script src="js/db.js"></script>
+<script src="js/spa.js"></script>
 <script src="app.js"></script>
 <script src="data.js"></script>
 <script src="js/popular.js"></script>

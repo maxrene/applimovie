@@ -122,7 +122,11 @@ document.addEventListener('alpine:init', () => {
                 case 'person': url = `person.html?id=${item.id}`; break;
                 default: return;
             }
-            window.location.href = url;
+            if (window.navigateTo) {
+                window.navigateTo(url);
+            } else {
+                window.location.href = url;
+            }
         },
 
         getItemType(item, forPopular = false) {
