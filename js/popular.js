@@ -79,17 +79,24 @@ document.addEventListener('alpine:init', () => {
         },
 
         init() {
+            const syncRegionAndPlatforms = () => {
+                this.lastUpdate = Date.now();
+                const currentRegion = localStorage.getItem('userRegion') || 'FR';
+                const regionChanged = currentRegion !== this.userRegion;
+                this.userRegion = currentRegion;
+                this.loadUserPlatforms();
+                if (regionChanged) {
+                    this.resetAndFetch();
+                }
+            };
+
             // SPA specific logic: Listen to global view change
-            window.addEventListener('view-changed', () => {
-                 this.lastUpdate = Date.now();
-                 this.loadUserPlatforms(); // Reload platforms in case user changed them
-            });
+            window.addEventListener('view-changed', syncRegionAndPlatforms);
 
             // Keep pageshow for initial load or back/forward cache
-            window.addEventListener('pageshow', () => {
-                this.lastUpdate = Date.now();
-                this.loadUserPlatforms();
-            });
+            window.addEventListener('pageshow', syncRegionAndPlatforms);
+            window.addEventListener('cloud-data-synced', syncRegionAndPlatforms);
+            window.addEventListener('region-changed', syncRegionAndPlatforms);
 
             window.addEventListener('rt-rating-loaded', (e) => {
                 if (!e.detail || !e.detail.rt) return;

@@ -36,15 +36,23 @@ document.addEventListener('alpine:init', () => {
 
             window.addEventListener('pageshow', () => {
                 this.lastUpdate = Date.now();
-                // Refresh previous searches as well since they are stored in localStorage
                 this.previousSearches = getSafeLocalStorage('previousSearches', []);
+                this.fetchPopular();
+            });
+
+            window.addEventListener('region-changed', () => {
+                this.fetchPopular();
+                if (this.searchQuery.length > 1) {
+                    this.fetchResults();
+                }
             });
         },
 
         async fetchPopular() {
             if (!window.TMDB_API_KEY) return;
             try {
-                const response = await fetch(`https://api.themoviedb.org/3/trending/all/week?api_key=${window.TMDB_API_KEY}&language=fr-FR&watch_region=FR`);
+                const region = localStorage.getItem('userRegion') || 'FR';
+                const response = await fetch(`https://api.themoviedb.org/3/trending/all/week?api_key=${window.TMDB_API_KEY}&language=fr-FR&watch_region=${region}`);
                 if (!response.ok) throw new Error(`Erreur API Popular: ${response.status}`);
                 
                 const data = await response.json();
@@ -61,7 +69,8 @@ document.addEventListener('alpine:init', () => {
             if (!window.TMDB_API_KEY) return;
 
             try {
-                const url = `https://api.themoviedb.org/3/search/multi?api_key=${window.TMDB_API_KEY}&language=fr-FR&query=${encodeURIComponent(this.searchQuery)}&include_adult=false&watch_region=FR`;
+                const region = localStorage.getItem('userRegion') || 'FR';
+                const url = `https://api.themoviedb.org/3/search/multi?api_key=${window.TMDB_API_KEY}&language=fr-FR&query=${encodeURIComponent(this.searchQuery)}&include_adult=false&watch_region=${region}`;
                 
                 const response = await fetch(url);
                 if (!response.ok) {

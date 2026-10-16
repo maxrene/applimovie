@@ -173,8 +173,13 @@ function mergeUserData(localData, cloudData) {
         }
     });
 
-    // 7. Région
-    const userRegion = local.userRegion || cloud.userRegion || 'FR';
+    // 7. Région : conserver la modification locale la plus récente, sinon prendre celle du Cloud
+    const localUpdatedAt = Number(localStorage.getItem('localUpdatedAt') || 0);
+    const cloudUpdatedAt = Number(cloud.updatedAt || 0);
+    const rawLocalRegion = localStorage.getItem('userRegion');
+    const userRegion = (rawLocalRegion && localUpdatedAt >= cloudUpdatedAt)
+        ? rawLocalRegion
+        : (cloud.userRegion || rawLocalRegion || 'FR');
 
     return {
         watchlist: Array.from(watchlistMap.values()),
@@ -215,40 +220,86 @@ function applyUserDataToLocalStorage(data) {
     } finally {
         window.isFetchingFromCloud = false;
     }
+    updateHeaderFlags();
 }
 
-// Met à jour l'avatar Google dans le header de toutes les pages
+// Met à jour le drapeau du pays dans le header de toutes les pages sans casser le binding Alpine.js
+function updateHeaderFlags() {
+    const region = (localStorage.getItem('userRegion') || 'FR').trim();
+    const flagUrl = `https://flagcdn.com/w40/${region.toLowerCase()}.png`;
+    const candidates = document.querySelectorAll('a[href="profile.html"] img, #header-flag');
+    candidates.forEach(img => {
+        if (img.closest('[data-profile-avatar]')) return;
+        const isFlag =
+            img.id === 'header-flag' ||
+            img.hasAttribute('data-header-flag') ||
+            (img.getAttribute('src') || '').includes('flagcdn.com') ||
+            (img.getAttribute(':src') || '').includes('flagcdn.com') ||
+            (img.getAttribute('x-bind:src') || '').includes('flagcdn.com');
+        if (isFlag) {
+            img.setAttribute('data-header-flag', 'true');
+            if (img.getAttribute('src') !== flagUrl) {
+                img.setAttribute('src', flagUrl);
+            }
+            img.setAttribute('alt', region.toUpperCase());
+        }
+    });
+}
+
+// Met à jour l'avatar Google dans le header de toutes les pages sans toucher au drapeau Alpine.js
 function updateHeaderProfileButtons(user) {
     const updateDOM = () => {
         const profileLinks = document.querySelectorAll('a[href="profile.html"]');
         profileLinks.forEach(link => {
-            const flagImg = link.querySelector('img[src*="flagcdn.com"]');
-            const flagHTML = flagImg ? flagImg.outerHTML : '';
+            // S'assurer que le drapeau éventuel est marqué sans être recréé (préserve la réactivité Alpine)
+            const flagImg = Array.from(link.querySelectorAll('img')).find(img =>
+                !img.closest('[data-profile-avatar]') && (
+                    img.id === 'header-flag' ||
+                    img.hasAttribute('data-header-flag') ||
+                    (img.getAttribute('src') || '').includes('flagcdn.com') ||
+                    (img.getAttribute(':src') || '').includes('flagcdn.com') ||
+                    (img.getAttribute('x-bind:src') || '').includes('flagcdn.com')
+                )
+            );
+            if (flagImg) {
+                flagImg.setAttribute('data-header-flag', 'true');
+            }
+
+            // Supprimer les anciens conteneurs d'avatar ou l'icône par défaut hors conteneur
+            link.querySelectorAll(':scope > span.material-symbols-outlined, :scope > div.relative').forEach(el => {
+                if (!el.hasAttribute('data-profile-avatar')) {
+                    el.remove();
+                }
+            });
+
+            let avatarSlot = link.querySelector('[data-profile-avatar]');
+            if (!avatarSlot) {
+                avatarSlot = document.createElement('span');
+                avatarSlot.setAttribute('data-profile-avatar', 'true');
+                avatarSlot.className = 'inline-flex items-center justify-center';
+                link.appendChild(avatarSlot);
+            }
 
             if (user && user.photoURL) {
-                link.innerHTML = `
-                    ${flagHTML}
-                    <div class="relative inline-flex items-center justify-center">
+                avatarSlot.innerHTML = `
+                    <span class="relative inline-flex items-center justify-center">
                         <img src="${user.photoURL}" alt="${user.displayName || 'Profil'}" referrerpolicy="no-referrer" class="w-8 h-8 rounded-full object-cover border-2 border-primary shadow-sm">
                         <span class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-green-500 border-2 border-white dark:border-[#121212] rounded-full"></span>
-                    </div>
+                    </span>
                 `;
             } else if (user) {
                 const initial = (user.displayName || user.email || 'U').charAt(0).toUpperCase();
-                link.innerHTML = `
-                    ${flagHTML}
-                    <div class="relative inline-flex items-center justify-center w-8 h-8 rounded-full bg-primary text-white font-bold text-sm shadow-sm">
+                avatarSlot.innerHTML = `
+                    <span class="relative inline-flex items-center justify-center w-8 h-8 rounded-full bg-primary text-white font-bold text-sm shadow-sm">
                         ${initial}
                         <span class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-green-500 border-2 border-white dark:border-[#121212] rounded-full"></span>
-                    </div>
+                    </span>
                 `;
             } else {
-                link.innerHTML = `
-                    ${flagHTML}
-                    <span class="material-symbols-outlined text-3xl text-gray-600 dark:text-gray-300">account_circle</span>
-                `;
+                avatarSlot.innerHTML = `<span class="material-symbols-outlined text-3xl text-gray-600 dark:text-gray-300">account_circle</span>`;
             }
         });
+        updateHeaderFlags();
     };
 
     if (document.readyState === 'loading') {
@@ -257,6 +308,13 @@ function updateHeaderProfileButtons(user) {
         updateDOM();
     }
 }
+
+window.addEventListener('pageshow', () => updateHeaderFlags());
+window.addEventListener('storage', (e) => {
+    if (!e.key || e.key === 'userRegion') updateHeaderFlags();
+});
+window.addEventListener('cloud-data-synced', () => updateHeaderFlags());
+window.updateHeaderFlags = updateHeaderFlags;
 
 /**
  * Recherche dans la collection Firestore "utilisateurs" toutes les sauvegardes existantes
@@ -558,16 +616,18 @@ async function fetchFromCloud() {
             const lastCloudSync = Number(localStorage.getItem('lastCloudSync') || 0);
             const hasUnsyncedLocalChanges = localUpdatedAt > lastCloudSync;
 
-            if (!hasAnyUserData(localData) && cloudCount > 0) {
+            const isLocalNewer = localUpdatedAt > (cloudData.updatedAt || 0);
+
+            if (!hasAnyUserData(localData) && cloudCount > 0 && !isLocalNewer) {
                 // Nouvel appareil ou stockage local vide : restaurer directement les données du Cloud
                 applyUserDataToLocalStorage(cloudData);
-            } else if (hasUnsyncedLocalChanges || (!sessionStorage.getItem('initialCloudFetchDone') && localCount > cloudCount)) {
+            } else if (hasUnsyncedLocalChanges || isLocalNewer || (!sessionStorage.getItem('initialCloudFetchDone') && localCount > cloudCount)) {
                 const merged = mergeUserData(localData, cloudData);
                 applyUserDataToLocalStorage(merged);
                 await setDoc(docRef, merged, { merge: true });
             } else {
-                // Appliquer l'état Cloud le plus récent (ou fusionner si le Cloud est vide)
-                if ((cloudData.updatedAt || 0) >= localUpdatedAt || cloudCount >= localCount) {
+                // Appliquer l'état Cloud s'il est plus récent ou plus complet
+                if ((cloudData.updatedAt || 0) >= localUpdatedAt) {
                     applyUserDataToLocalStorage(cloudData);
                 } else {
                     const merged = mergeUserData(localData, cloudData);
@@ -597,6 +657,11 @@ const previousSetItem = localStorage.setItem;
 localStorage.setItem = function (key, value) {
     previousSetItem.call(localStorage, key, value);
 
+    if (key === 'userRegion') {
+        updateHeaderFlags();
+        window.dispatchEvent(new CustomEvent('region-changed', { detail: { region: value } }));
+    }
+
     if (window.isFetchingFromCloud) return;
 
     if (SYNC_KEYS.includes(key)) {
@@ -604,7 +669,7 @@ localStorage.setItem = function (key, value) {
         clearTimeout(window.firebaseSyncTimeout);
         window.firebaseSyncTimeout = setTimeout(() => {
             syncToCloud();
-        }, 1000);
+        }, 500);
     }
 };
 

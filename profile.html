@@ -433,6 +433,9 @@
                 this.country = code;
                 localStorage.setItem('userRegion', code);
                 this.showCountryModal = false;
+                if (window.syncToCloud) {
+                    window.syncToCloud();
+                }
             },
             
             async clearCache() {

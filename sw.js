@@ -1,7 +1,7 @@
 // sw.js
-// VERSION V19 - NOUVEAU LOGO MINIMALISTE CINEMATCH & CACHE REFRESH
-const CACHE_NAME = 'cinematch-v20-offline-capable';
-const IMAGE_CACHE_NAME = 'cinematch-images-v20';
+// VERSION V21 - SYNCHRONISATION DYNAMIQUE DU DRAPEAU ET DU CATALOGUE PAR PAYS
+const CACHE_NAME = 'cinematch-v21-offline-capable';
+const IMAGE_CACHE_NAME = 'cinematch-images-v21';
 const MAX_IMAGES = 200;
 
 const ASSETS_TO_CACHE = [

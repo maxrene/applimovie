@@ -69,13 +69,24 @@ document.addEventListener('alpine:init', () => {
                 this.switchTab(tabParam);
             }
 
-            window.addEventListener('cloud-data-synced', () => {
+            const refreshRegion = () => {
                 this.userRegion = localStorage.getItem('userRegion') || 'FR';
+                if (window.updateHeaderFlags) window.updateHeaderFlags();
+            };
+
+            window.addEventListener('cloud-data-synced', refreshRegion);
+            window.addEventListener('region-changed', refreshRegion);
+            window.addEventListener('pageshow', refreshRegion);
+            window.addEventListener('focus', refreshRegion);
+            window.addEventListener('storage', (e) => {
+                if (!e.key || e.key === 'userRegion') refreshRegion();
             });
         },
 
         switchTab(tab) {
             this.activeTab = tab;
+            this.userRegion = localStorage.getItem('userRegion') || 'FR';
+            if (window.updateHeaderFlags) window.updateHeaderFlags();
             // Met à jour l'URL sans recharger la page pour garder l'onglet actif au retour arrière
             try {
                 const url = new URL(window.location.href);
@@ -96,23 +107,50 @@ document.addEventListener('alpine:init', () => {
     Alpine.data('homePage', () => ({
         isLoading: false,
         lastUpdate: Date.now(),
+        lastFetchedRegion: null,
+        lastFetchedPlatforms: '',
+
+        hasCatalogContextChanged() {
+            const currentRegion = localStorage.getItem('userRegion') || 'FR';
+            const currentPlatforms = localStorage.getItem('selectedPlatforms') || '[]';
+            return this.lastFetchedRegion !== currentRegion || this.lastFetchedPlatforms !== currentPlatforms;
+        },
 
         async init() {
             await this.fetchAndDisplayContent();
 
             window.addEventListener('view-changed', (e) => {
                 if (!e.detail || e.detail.tab === 'home') {
+                    if (this.hasCatalogContextChanged()) {
+                        this.fetchAndDisplayContent();
+                    } else {
+                        this.updateMediaStatuses();
+                        this.loadContinueWatching();
+                    }
+                }
+            });
+
+            window.addEventListener('cloud-data-synced', () => {
+                if (this.hasCatalogContextChanged()) {
+                    this.fetchAndDisplayContent();
+                } else {
                     this.updateMediaStatuses();
                     this.loadContinueWatching();
                 }
             });
 
-            window.addEventListener('cloud-data-synced', () => {
-                this.updateMediaStatuses();
-                this.loadContinueWatching();
+            window.addEventListener('region-changed', () => {
+                if (this.hasCatalogContextChanged()) {
+                    this.fetchAndDisplayContent();
+                }
             });
 
             window.addEventListener('pageshow', () => {
+                if (this.hasCatalogContextChanged()) {
+                    this.fetchAndDisplayContent();
+                    return;
+                }
+
                 this.updateMediaStatuses();
                 this.loadContinueWatching();
 
@@ -498,6 +536,8 @@ document.addEventListener('alpine:init', () => {
                     }
                 }));
 
+                this.lastFetchedRegion = localStorage.getItem('userRegion') || 'FR';
+                this.lastFetchedPlatforms = localStorage.getItem('selectedPlatforms') || '[]';
                 localStorage.setItem('lastHomeFetch', Date.now());
             } finally {
                 this.isLoading = false;
