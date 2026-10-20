@@ -1,7 +1,7 @@
 // sw.js
-// VERSION V22 - MODE APPLICATION NATIVE SPA (INDEXEDDB + NAVIGATION INSTANTANÉE + CSS PRÉCOMPILÉ)
-const CACHE_NAME = 'cinematch-v22-offline-capable';
-const IMAGE_CACHE_NAME = 'cinematch-images-v22';
+// VERSION V23 - FIX BARRE DE NAVIGATION BASSE & SAFE AREA IOS
+const CACHE_NAME = 'cinematch-v23-offline-capable';
+const IMAGE_CACHE_NAME = 'cinematch-images-v23';
 const MAX_IMAGES = 200;
 
 const ASSETS_TO_CACHE = [

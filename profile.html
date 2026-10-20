@@ -26,8 +26,16 @@
       }
 </script>
 <style>
-    body { height: 100dvh; overflow: hidden; }
+    html, body { height: 100%; height: 100dvh; overflow: hidden; }
     [x-cloak] { display: none !important; }
+    .material-symbols-outlined {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        line-height: 1.2;
+        vertical-align: middle;
+        overflow: visible;
+    }
     .material-symbols-outlined.filled { font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
     .material-symbols-outlined.thick { font-variation-settings: 'FILL' 1, 'wght' 700, 'GRAD' 0, 'opsz' 24; }
 </style>
@@ -35,7 +43,7 @@
 </head>
 <body class="bg-background-light dark:bg-background-dark font-display text-gray-900 dark:text-white" x-data="userProfile">
 
-<div class="flex flex-col h-screen">
+<div class="flex flex-col h-full w-full" style="height: 100dvh;">
     
     <header class="flex-shrink-0 flex items-center p-4 pb-2 justify-between sticky top-0 bg-background-light dark:bg-background-dark z-10">
         <button onclick="history.back()" class="text-slate-900 dark:text-white flex size-12 shrink-0 items-center"><span class="material-symbols-outlined">arrow_back</span></button>
@@ -226,23 +234,23 @@
         </div>
     </main>
 
-    <footer class="flex-shrink-0 bg-background-light/90 dark:bg-background-dark/90 backdrop-blur-md border-t border-gray-200 dark:border-gray-800 z-30 h-20 pb-2">
-        <nav class="flex justify-around items-center h-full">
-            <a class="flex flex-col items-center justify-center gap-1 text-gray-500 dark:text-gray-400 hover:text-primary transition-colors w-16" href="index.html?tab=home">
-                <span class="material-symbols-outlined text-2xl">home</span>
-                <span class="text-[10px] font-medium">Accueil</span>
+    <footer class="flex-shrink-0 bg-background-light/95 dark:bg-background-dark/95 backdrop-blur-md border-t border-gray-200 dark:border-gray-800 z-30" style="padding-bottom: max(0.5rem, env(safe-area-inset-bottom));">
+        <nav class="flex justify-around items-center h-16 px-2 pt-1">
+            <a class="flex flex-col items-center justify-center gap-0.5 py-1 px-2 min-w-[4rem] text-gray-500 dark:text-gray-400 hover:text-primary transition-colors" href="index.html?tab=home">
+                <span class="material-symbols-outlined text-2xl flex items-center justify-center h-7 w-7">home</span>
+                <span class="text-[10px] font-medium leading-tight">Accueil</span>
             </a>
-            <a class="flex flex-col items-center justify-center gap-1 text-gray-500 dark:text-gray-400 hover:text-primary transition-colors w-16" href="index.html?tab=popular">
-                <span class="material-symbols-outlined thick text-2xl">local_fire_department</span>
-                <span class="text-[10px] font-medium">Populaire</span>
+            <a class="flex flex-col items-center justify-center gap-0.5 py-1 px-2 min-w-[4rem] text-gray-500 dark:text-gray-400 hover:text-primary transition-colors" href="index.html?tab=popular">
+                <span class="material-symbols-outlined thick text-2xl flex items-center justify-center h-7 w-7">local_fire_department</span>
+                <span class="text-[10px] font-medium leading-tight">Populaire</span>
             </a>
-            <a class="flex flex-col items-center justify-center gap-1 text-gray-500 dark:text-gray-400 hover:text-primary transition-colors w-16" href="index.html?tab=search">
-                <span class="material-symbols-outlined text-2xl">search</span>
-                <span class="text-[10px] font-medium">Recherche</span>
+            <a class="flex flex-col items-center justify-center gap-0.5 py-1 px-2 min-w-[4rem] text-gray-500 dark:text-gray-400 hover:text-primary transition-colors" href="index.html?tab=search">
+                <span class="material-symbols-outlined text-2xl flex items-center justify-center h-7 w-7">search</span>
+                <span class="text-[10px] font-medium leading-tight">Recherche</span>
             </a>
-            <a class="flex flex-col items-center justify-center gap-1 text-gray-500 dark:text-gray-400 hover:text-primary transition-colors w-16" href="index.html?tab=watchlist">
-                <span class="material-symbols-outlined text-2xl">bookmark</span>
-                <span class="text-[10px] font-medium">Ma Liste</span>
+            <a class="flex flex-col items-center justify-center gap-0.5 py-1 px-2 min-w-[4rem] text-gray-500 dark:text-gray-400 hover:text-primary transition-colors" href="index.html?tab=watchlist">
+                <span class="material-symbols-outlined text-2xl flex items-center justify-center h-7 w-7">bookmark</span>
+                <span class="text-[10px] font-medium leading-tight">Ma Liste</span>
             </a>
         </nav>
     </footer>

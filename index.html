@@ -16,18 +16,26 @@
 
     <!-- Fonts & Precompiled CSS -->
     <link href="https://fonts.googleapis.com/css2?family=Spline+Sans:wght@400;500;700&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
     <link href="css/tailwind.css" rel="stylesheet"/>
-    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400..700,0..1,0" rel="stylesheet" />
 
     <!-- Alpine.js -->
     <script src="https://unpkg.com/@alpinejs/anchor@3.x.x/dist/cdn.min.js" defer></script>
     <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
 
     <style> 
-        body { height: 100dvh; overflow: hidden; overscroll-behavior: none; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+        html, body { height: 100%; height: 100dvh; overflow: hidden; overscroll-behavior: none; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
         [x-cloak] { display: none !important; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .material-symbols-outlined {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 1.2;
+            vertical-align: middle;
+            overflow: visible;
+        }
         .material-symbols-outlined.filled { font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
         .material-symbols-outlined.thick { font-variation-settings: 'FILL' 1, 'wght' 700, 'GRAD' 0, 'opsz' 24; }
 
@@ -67,7 +75,7 @@
 <body class="bg-background-light dark:bg-background-dark font-display text-gray-900 dark:text-gray-100" x-data="app">
 
 <!-- MAIN APP CONTAINER -->
-<div class="flex flex-col h-screen overflow-hidden relative">
+<div class="flex flex-col h-full w-full overflow-hidden relative" style="height: 100dvh;">
 
     <!-- VIEW: HOME -->
     <div x-show="activeTab === 'home'" x-data="homePage" class="absolute inset-0 flex flex-col pb-20 bg-background-light dark:bg-background-dark overflow-hidden"
@@ -657,23 +665,23 @@
     </div>
 
     <!-- SHARED FOOTER NAVIGATION -->
-    <footer class="absolute bottom-0 left-0 right-0 z-50 bg-background-light/90 dark:bg-background-dark/90 backdrop-blur-md border-t border-gray-200 dark:border-gray-800 h-20 pb-2">
-        <nav class="flex justify-around items-center h-full">
-            <button @click="switchTab('home')" class="flex flex-col items-center justify-center gap-1 w-16 transition-colors touch-feedback" :class="activeTab === 'home' ? 'text-primary' : 'text-gray-500 dark:text-gray-400 hover:text-primary'">
-                <span class="material-symbols-outlined text-2xl" :class="activeTab === 'home' ? 'filled' : ''">home</span>
-                <span class="text-[10px]" :class="activeTab === 'home' ? 'font-bold' : 'font-medium'">Accueil</span>
+    <footer class="absolute bottom-0 left-0 right-0 z-50 bg-background-light/95 dark:bg-background-dark/95 backdrop-blur-md border-t border-gray-200 dark:border-gray-800" style="padding-bottom: max(0.5rem, env(safe-area-inset-bottom));">
+        <nav class="flex justify-around items-center h-16 px-2 pt-1">
+            <button @click="switchTab('home')" class="flex flex-col items-center justify-center gap-0.5 py-1 px-2 min-w-[4rem] transition-colors touch-feedback" :class="activeTab === 'home' ? 'text-primary' : 'text-gray-500 dark:text-gray-400 hover:text-primary'">
+                <span class="material-symbols-outlined text-2xl flex items-center justify-center h-7 w-7" :class="activeTab === 'home' ? 'filled' : ''">home</span>
+                <span class="text-[10px] leading-tight" :class="activeTab === 'home' ? 'font-bold' : 'font-medium'">Accueil</span>
             </button>
-            <button @click="switchTab('popular')" class="flex flex-col items-center justify-center gap-1 w-16 transition-colors touch-feedback" :class="activeTab === 'popular' ? 'text-primary' : 'text-gray-500 dark:text-gray-400 hover:text-primary'">
-                <span class="material-symbols-outlined thick text-2xl" :class="activeTab === 'popular' ? 'filled' : ''">local_fire_department</span>
-                <span class="text-[10px]" :class="activeTab === 'popular' ? 'font-bold' : 'font-medium'">Populaire</span>
+            <button @click="switchTab('popular')" class="flex flex-col items-center justify-center gap-0.5 py-1 px-2 min-w-[4rem] transition-colors touch-feedback" :class="activeTab === 'popular' ? 'text-primary' : 'text-gray-500 dark:text-gray-400 hover:text-primary'">
+                <span class="material-symbols-outlined thick text-2xl flex items-center justify-center h-7 w-7" :class="activeTab === 'popular' ? 'filled' : ''">local_fire_department</span>
+                <span class="text-[10px] leading-tight" :class="activeTab === 'popular' ? 'font-bold' : 'font-medium'">Populaire</span>
             </button>
-            <button @click="switchTab('search')" class="flex flex-col items-center justify-center gap-1 w-16 transition-colors touch-feedback" :class="activeTab === 'search' ? 'text-primary' : 'text-gray-500 dark:text-gray-400 hover:text-primary'">
-                <span class="material-symbols-outlined text-2xl" :class="activeTab === 'search' ? 'filled' : ''">search</span>
-                <span class="text-[10px]" :class="activeTab === 'search' ? 'font-bold' : 'font-medium'">Recherche</span>
+            <button @click="switchTab('search')" class="flex flex-col items-center justify-center gap-0.5 py-1 px-2 min-w-[4rem] transition-colors touch-feedback" :class="activeTab === 'search' ? 'text-primary' : 'text-gray-500 dark:text-gray-400 hover:text-primary'">
+                <span class="material-symbols-outlined text-2xl flex items-center justify-center h-7 w-7" :class="activeTab === 'search' ? 'filled' : ''">search</span>
+                <span class="text-[10px] leading-tight" :class="activeTab === 'search' ? 'font-bold' : 'font-medium'">Recherche</span>
             </button>
-            <button @click="switchTab('watchlist')" class="flex flex-col items-center justify-center gap-1 w-16 transition-colors touch-feedback" :class="activeTab === 'watchlist' ? 'text-primary' : 'text-gray-500 dark:text-gray-400 hover:text-primary'">
-                <span class="material-symbols-outlined text-2xl" :class="activeTab === 'watchlist' ? 'filled' : ''">bookmark</span>
-                <span class="text-[10px]" :class="activeTab === 'watchlist' ? 'font-bold' : 'font-medium'">Ma Liste</span>
+            <button @click="switchTab('watchlist')" class="flex flex-col items-center justify-center gap-0.5 py-1 px-2 min-w-[4rem] transition-colors touch-feedback" :class="activeTab === 'watchlist' ? 'text-primary' : 'text-gray-500 dark:text-gray-400 hover:text-primary'">
+                <span class="material-symbols-outlined text-2xl flex items-center justify-center h-7 w-7" :class="activeTab === 'watchlist' ? 'filled' : ''">bookmark</span>
+                <span class="text-[10px] leading-tight" :class="activeTab === 'watchlist' ? 'font-bold' : 'font-medium'">Ma Liste</span>
             </button>
         </nav>
     </footer>
