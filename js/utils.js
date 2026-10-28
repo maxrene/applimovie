@@ -315,6 +315,7 @@ window.setUserRating = function(id, type = 'movie', ratingValue = null, metadata
         delete ratings[key];
         localStorage.setItem('userRatings', JSON.stringify(ratings));
         localStorage.removeItem('recoCacheV1');
+        localStorage.removeItem('recoCacheV2');
         window.dispatchEvent(new CustomEvent('user-rating-changed', {
             detail: { id: numId, type: normType, rating: null }
         }));
@@ -364,6 +365,7 @@ window.setUserRating = function(id, type = 'movie', ratingValue = null, metadata
     ratings[key] = newEntry;
     localStorage.setItem('userRatings', JSON.stringify(ratings));
     localStorage.removeItem('recoCacheV1');
+    localStorage.removeItem('recoCacheV2');
 
     window.dispatchEvent(new CustomEvent('user-rating-changed', {
         detail: { id: numId, type: normType, rating: ratingValue, entry: newEntry }

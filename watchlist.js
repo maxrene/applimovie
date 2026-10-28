@@ -872,7 +872,10 @@ document.addEventListener('alpine:init', () => {
 
         setItemRating(mediaId, type, ratingVal) {
             if (!window.setUserRating) return;
-            const item = this.enrichedWatchlist.find(i => Number(i.id) === Number(mediaId));
+            const normTargetType = (type === 'tv' || type === 'serie') ? 'serie' : 'movie';
+            const item = this.enrichedWatchlist.find(
+                i => Number(i.id) === Number(mediaId) && ((i.type === 'tv' || i.type === 'serie') ? 'serie' : 'movie') === normTargetType
+            ) || this.enrichedWatchlist.find(i => Number(i.id) === Number(mediaId));
             const meta = item ? {
                 title: item.title || '',
                 genres: item.apiDetails?.genres || item.genres || []

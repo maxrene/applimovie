@@ -1,7 +1,7 @@
 // sw.js
-// VERSION V24 - NOTATION INTERNE (PAS AIMÉ / OK / ADORÉ) & RECOMMANDATIONS PERSONNALISÉES
-const CACHE_NAME = 'cinematch-v24-offline-capable';
-const IMAGE_CACHE_NAME = 'cinematch-images-v24';
+// VERSION V25 - RECOMMANDATIONS SÉPARÉES FILMS -> FILMS & SÉRIES -> SÉRIES
+const CACHE_NAME = 'cinematch-v25-offline-capable';
+const IMAGE_CACHE_NAME = 'cinematch-images-v25';
 const MAX_IMAGES = 200;
 
 const ASSETS_TO_CACHE = [
