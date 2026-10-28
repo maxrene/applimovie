@@ -274,6 +274,7 @@
         const isMovie = type === 'movie';
         const cacheKey = isMovie ? `movie-details-${mediaId}` : `series-details-${mediaId}`;
         const cachedData = window.CineDB ? window.CineDB.getMediaSync(cacheKey, true) : null;
+        let currentMediaData = cachedData || null;
         let seriesRuntimeData = (!isMovie && cachedData) ? cachedData : null;
         let castList = [];
         let isCastExpanded = false;
@@ -308,7 +309,7 @@
                     <div data-el="genres" class="flex flex-wrap items-center gap-2 mb-5"></div>
                     <div data-el="awards" style="display: none;"></div>
 
-                    <div class="flex items-center gap-3 mb-7">
+                    <div class="flex items-center gap-3 mb-4">
                         <button type="button" data-el="watchlist-btn" class="flex-1 flex items-center justify-center gap-2 rounded-xl bg-white text-black py-3 font-bold transition-transform active:scale-95 shadow-md">
                             <span class="material-symbols-outlined filled">add</span>
                             <span data-el="watchlist-text">Ajouter à ma liste</span>
@@ -318,6 +319,29 @@
                             <span class="material-symbols-outlined filled text-green-400">check</span>
                             <span data-el="next-ep-text">Épisode vu</span>
                         </button>` : ''}
+                    </div>
+
+                    <div data-el="user-rating-section" class="mb-7" style="display: none;">
+                        <div class="p-3 rounded-xl bg-white/5 border border-white/10">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-xs font-bold uppercase tracking-wider text-gray-400">Votre avis</span>
+                                <span data-el="user-rating-hint" class="text-[11px] text-gray-500">Affinez vos recommandations</span>
+                            </div>
+                            <div class="grid grid-cols-3 gap-2">
+                                <button type="button" data-user-rating="dislike" class="user-rating-btn flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-lg border border-white/10 bg-white/5 text-gray-300 text-xs font-semibold transition-all active:scale-95">
+                                    <span class="material-symbols-outlined text-base">thumb_down</span>
+                                    <span>Pas aimé</span>
+                                </button>
+                                <button type="button" data-user-rating="ok" class="user-rating-btn flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-lg border border-white/10 bg-white/5 text-gray-300 text-xs font-semibold transition-all active:scale-95">
+                                    <span class="material-symbols-outlined text-base">thumb_up</span>
+                                    <span>OK</span>
+                                </button>
+                                <button type="button" data-user-rating="love" class="user-rating-btn flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-lg border border-white/10 bg-white/5 text-gray-300 text-xs font-semibold transition-all active:scale-95">
+                                    <span class="material-symbols-outlined text-base">favorite</span>
+                                    <span>Adoré</span>
+                                </button>
+                            </div>
+                        </div>
                     </div>
 
                     <div data-el="streaming-section" class="mb-7" style="display: none;">
@@ -368,6 +392,95 @@
         const q = (sel) => screenEl.querySelector(sel);
         q('[data-action="back"]').onclick = () => closeTopScreen();
 
+        function updateUserRatingSectionState() {
+            const section = q('[data-el="user-rating-section"]');
+            if (!section) return;
+            const idNum = Number(mediaId);
+            const idStr = String(mediaId);
+            const watchedKey = isMovie ? 'watchedMovies' : 'watchedSeries';
+            const watchedList = getSafeLocalStorage(watchedKey, []);
+            let isEligible = watchedList.includes(idNum);
+
+            if (!isMovie && !isEligible) {
+                const watchedEpisodes = getSafeLocalStorage('watchedEpisodes', {});
+                const watchedCount = (watchedEpisodes[idStr] || []).length;
+                const epInfo = seriesRuntimeData ? determineNextEpisodeForSeries(mediaId, seriesRuntimeData) : null;
+                if (epInfo && epInfo.hasSeasonDetails) {
+                    isEligible = epInfo.totalReleasedEpisodes > 0 && epInfo.watchedReleasedCount >= epInfo.totalReleasedEpisodes && !epInfo.nextEpisode;
+                } else if (epInfo && epInfo.totalReleasedEpisodes > 0) {
+                    isEligible = watchedCount >= epInfo.totalReleasedEpisodes;
+                }
+            }
+
+            if (!isEligible) {
+                section.style.display = 'none';
+                return;
+            }
+            section.style.display = 'block';
+
+            const normType = isMovie ? 'movie' : 'tv';
+            const ratingEntry = window.getUserRating ? window.getUserRating(idNum, normType) : null;
+            const currentRating = ratingEntry ? ratingEntry.rating : null;
+
+            const hintEl = q('[data-el="user-rating-hint"]');
+            if (hintEl) {
+                if (currentRating === 'love') {
+                    hintEl.textContent = '❤️ Pris en compte dans vos recommandations';
+                    hintEl.className = 'text-[11px] text-pink-400 font-medium';
+                } else if (currentRating === 'ok') {
+                    hintEl.textContent = '👍 Pris en compte dans vos recommandations';
+                    hintEl.className = 'text-[11px] text-amber-300 font-medium';
+                } else if (currentRating === 'dislike') {
+                    hintEl.textContent = '👎 Style moins proposé dans vos recos';
+                    hintEl.className = 'text-[11px] text-red-400 font-medium';
+                } else {
+                    hintEl.textContent = 'Affinez vos recommandations';
+                    hintEl.className = 'text-[11px] text-gray-500';
+                }
+            }
+
+            const activeClassesMap = {
+                dislike: ['bg-red-500/20', 'text-red-400', 'border-red-500/50', 'ring-1', 'ring-red-500/40'],
+                ok: ['bg-amber-500/20', 'text-amber-300', 'border-amber-500/50', 'ring-1', 'ring-amber-500/40'],
+                love: ['bg-pink-500/20', 'text-pink-400', 'border-pink-500/50', 'ring-1', 'ring-pink-500/40']
+            };
+            const allActiveClasses = Object.values(activeClassesMap).flat();
+
+            section.querySelectorAll('.user-rating-btn').forEach(btn => {
+                const val = btn.dataset.userRating;
+                const icon = btn.querySelector('.material-symbols-outlined');
+                btn.classList.remove(...allActiveClasses, 'bg-white/5', 'text-gray-300', 'border-white/10');
+                if (val === currentRating && activeClassesMap[val]) {
+                    btn.classList.add(...activeClassesMap[val]);
+                    if (icon) icon.classList.add('filled');
+                } else {
+                    btn.classList.add('bg-white/5', 'text-gray-300', 'border-white/10');
+                    if (icon) icon.classList.remove('filled');
+                }
+            });
+        }
+
+        screenEl.querySelectorAll('.user-rating-btn').forEach(btn => {
+            btn.onclick = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (!window.setUserRating) return;
+                const normType = isMovie ? 'movie' : 'tv';
+                const val = btn.dataset.userRating;
+                const existing = window.getUserRating ? window.getUserRating(mediaId, normType) : null;
+                const nextRating = (existing && existing.rating === val) ? null : val;
+                const metaSource = currentMediaData || seriesRuntimeData || null;
+                const meta = {};
+                if (metaSource) {
+                    meta.title = metaSource.title || metaSource.name || '';
+                    meta.genres = metaSource.genres || [];
+                    meta.genre_ids = metaSource.genre_ids || [];
+                }
+                window.setUserRating(mediaId, normType, nextRating, meta);
+                updateUserRatingSectionState();
+            };
+        });
+
         function updateWatchlistBtnState() {
             const btn = q('[data-el="watchlist-btn"]');
             if (!btn) return;
@@ -397,6 +510,7 @@
                     icon.textContent = 'add';
                     text.textContent = 'Ajouter à ma liste';
                 }
+                updateUserRatingSectionState();
                 return;
             }
 
@@ -445,6 +559,7 @@
                     nextBtn.style.display = 'none';
                 }
             }
+            updateUserRatingSectionState();
         }
 
         function syncSeriesStatusFromEpisodes(userAction = false) {
@@ -572,6 +687,7 @@
                 if (isWatched) {
                     watchlist = watchlist.filter(i => Number(i.id) !== idNum);
                     watchedList = watchedList.filter(id => id !== idNum);
+                    if (window.setUserRating) window.setUserRating(idNum, 'movie', null);
                 } else if (isInWatchlist) {
                     watchlist = watchlist.filter(i => Number(i.id) !== idNum);
                     watchedList.push(idNum);
@@ -598,6 +714,7 @@
                 watchlist = watchlist.filter(i => Number(i.id) !== idNum);
                 watchedList = watchedList.filter(id => id !== idNum);
                 delete watchedEpisodes[idStr];
+                if (window.setUserRating) window.setUserRating(idNum, 'tv', null);
                 localStorage.setItem('watchlist', JSON.stringify(watchlist));
                 localStorage.setItem(watchedKey, JSON.stringify(watchedList));
                 localStorage.setItem('watchedEpisodes', JSON.stringify(watchedEpisodes));
@@ -937,6 +1054,7 @@
 
         function populateScreenFromData(data) {
             if (!data) return;
+            currentMediaData = data;
             const title = isMovie ? (data.title || data.original_title) : (data.name || data.original_name);
             q('[data-el="title"]').textContent = title || 'Sans titre';
 
@@ -1353,6 +1471,11 @@
         const watchedEpisodes = getSafeLocalStorage('watchedEpisodes', {});
         const selectedPlatforms = getSafeLocalStorage('selectedPlatforms', []);
         const favoriteActors = getSafeLocalStorage('favoriteActors', []);
+        const userRatings = getSafeLocalStorage('userRatings', {});
+        const ratingVals = Object.values(userRatings || {}).map(v => typeof v === 'string' ? v : v?.rating);
+        const lovedCount = ratingVals.filter(r => r === 'love').length;
+        const okCount = ratingVals.filter(r => r === 'ok').length;
+        const dislikedCount = ratingVals.filter(r => r === 'dislike').length;
         let epCount = 0;
         Object.values(watchedEpisodes).forEach(arr => { if (Array.isArray(arr)) epCount += arr.length; });
         const region = localStorage.getItem('userRegion') || 'FR';
@@ -1419,6 +1542,29 @@
                         <div class="bg-slate-800/30 rounded-xl p-3 flex flex-col items-center border border-slate-700/30">
                             <span class="text-2xl font-bold text-purple-400">${epCount}</span>
                             <span class="text-xs text-slate-400 mt-0.5">Épisodes vus</span>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-3 gap-2.5 mt-2.5">
+                        <div class="bg-slate-800/30 rounded-xl p-2.5 flex items-center justify-center gap-2 border border-pink-500/20">
+                            <span class="material-symbols-outlined filled text-pink-400 text-lg">favorite</span>
+                            <div class="flex flex-col">
+                                <span class="text-base font-bold text-pink-400 leading-none">${lovedCount}</span>
+                                <span class="text-[10px] text-slate-400">Adorés</span>
+                            </div>
+                        </div>
+                        <div class="bg-slate-800/30 rounded-xl p-2.5 flex items-center justify-center gap-2 border border-amber-500/20">
+                            <span class="material-symbols-outlined filled text-amber-300 text-lg">thumb_up</span>
+                            <div class="flex flex-col">
+                                <span class="text-base font-bold text-amber-300 leading-none">${okCount}</span>
+                                <span class="text-[10px] text-slate-400">OK</span>
+                            </div>
+                        </div>
+                        <div class="bg-slate-800/30 rounded-xl p-2.5 flex items-center justify-center gap-2 border border-red-500/20">
+                            <span class="material-symbols-outlined filled text-red-400 text-lg">thumb_down</span>
+                            <div class="flex flex-col">
+                                <span class="text-base font-bold text-red-400 leading-none">${dislikedCount}</span>
+                                <span class="text-[10px] text-slate-400">Pas aimés</span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1543,7 +1689,7 @@
             if (!confirm("Vider le cache des images et détails ? Vos listes et votre connexion seront conservées.")) return;
             const keysToKeep = [
                 'watchlist', 'watchedMovies', 'watchedSeries', 'watchedEpisodes',
-                'favoriteActors', 'selectedPlatforms', 'userRegion', 'userId',
+                'userRatings', 'favoriteActors', 'selectedPlatforms', 'userRegion', 'userId',
                 'anonymousId', 'seriesLastWatchedDate', 'previousSearches', 'lastCloudSync',
                 'cloudUserProfile', 'localUpdatedAt'
             ];

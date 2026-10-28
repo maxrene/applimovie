@@ -76,6 +76,7 @@ document.addEventListener('alpine:init', () => {
         // Nouveaux filtres ergonomiques pour Ma Liste
         showFilterModal: false,
         selectedGenre: '',
+        selectedRatingFilter: '', // '' | 'love' | 'ok' | 'dislike' | 'unrated'
         maxDuration: 0, // 0 = tous, 100 = <1h40, 130 = <2h10
         randomPickItem: null,
 
@@ -109,6 +110,7 @@ document.addEventListener('alpine:init', () => {
                 localStorage.getItem('watchedSeries') || '[]',
                 localStorage.getItem('watchedEpisodes') || '{}',
                 localStorage.getItem('selectedPlatforms') || '[]',
+                localStorage.getItem('userRatings') || '{}',
                 localStorage.getItem('userRegion') || 'FR'
             ].join('|');
         },
@@ -134,9 +136,13 @@ document.addEventListener('alpine:init', () => {
                 this.maxDuration = 0;
                 this.renderMedia();
             });
-            this.$watch('watchStatusFilter', () => this.renderMedia());
+            this.$watch('watchStatusFilter', (val) => {
+                if (val !== 'watched') this.selectedRatingFilter = '';
+                this.renderMedia();
+            });
             this.$watch('activePlatformFilters', () => this.renderMedia());
             this.$watch('selectedGenre', () => this.renderMedia());
+            this.$watch('selectedRatingFilter', () => this.renderMedia());
             this.$watch('maxDuration', () => this.renderMedia());
 
             const handleRefreshIfChanged = async () => {
@@ -165,6 +171,16 @@ document.addEventListener('alpine:init', () => {
                 handleRefreshIfChanged();
             });
 
+            window.addEventListener('user-rating-changed', () => {
+                this.lastStateSignature = this.computeStateSignature();
+                this.renderMedia();
+            });
+
+            window.addEventListener('open-watched-to-rate', () => {
+                this.watchStatusFilter = 'watched';
+                this.renderMedia();
+            });
+
             window.addEventListener('rt-rating-loaded', (e) => {
                 if (!e.detail || !e.detail.rt) return;
                 const { tmdbId, type, rt } = e.detail;
@@ -185,7 +201,7 @@ document.addEventListener('alpine:init', () => {
         },
 
         get hasActiveExtraFilters() {
-            return Boolean(this.selectedGenre) || this.maxDuration > 0;
+            return Boolean(this.selectedGenre) || Boolean(this.selectedRatingFilter) || this.maxDuration > 0;
         },
 
         get availableGenresInWatchlist() {
@@ -204,6 +220,7 @@ document.addEventListener('alpine:init', () => {
 
         resetExtraFilters() {
             this.selectedGenre = '';
+            this.selectedRatingFilter = '';
             this.maxDuration = 0;
             this.showFilterModal = false;
         },
@@ -650,6 +667,14 @@ document.addEventListener('alpine:init', () => {
 
             if (this.watchStatusFilter === 'watched') {
                 filtered = filtered.filter(item => item.isWatched);
+                if (this.selectedRatingFilter) {
+                    filtered = filtered.filter(item => {
+                        const rEntry = window.getUserRating ? window.getUserRating(item.id, item.type) : null;
+                        const rVal = rEntry ? rEntry.rating : null;
+                        if (this.selectedRatingFilter === 'unrated') return !rVal;
+                        return rVal === this.selectedRatingFilter;
+                    });
+                }
             } else if (this.watchStatusFilter === 'unwatched') {
                 filtered = filtered.filter(item => !item.isWatched);
             }
@@ -806,6 +831,57 @@ document.addEventListener('alpine:init', () => {
             return `<span class="inline-flex items-center gap-2 ml-1.5">${starHTML}<span data-rt-slot="${normType}-${item.id}" class="inline-flex items-center">${rtHTML}</span></span>`;
         },
 
+        createUserRatingSelectorHTML(item) {
+            if (!item.isWatched) return '';
+            const normType = (item.type === 'tv' || item.type === 'serie') ? 'tv' : 'movie';
+            const rEntry = window.getUserRating ? window.getUserRating(item.id, normType) : null;
+            const activeRating = rEntry ? rEntry.rating : null;
+
+            const buttons = [
+                {
+                    key: 'dislike',
+                    label: 'Pas aimé',
+                    icon: 'thumb_down',
+                    activeClass: 'bg-red-500/20 text-red-400 border-red-500/50'
+                },
+                {
+                    key: 'ok',
+                    label: 'OK',
+                    icon: 'thumb_up',
+                    activeClass: 'bg-amber-500/20 text-amber-300 border-amber-500/50'
+                },
+                {
+                    key: 'love',
+                    label: 'Adoré',
+                    icon: 'favorite',
+                    activeClass: 'bg-pink-500/20 text-pink-400 border-pink-500/50'
+                }
+            ];
+
+            const btnsHTML = buttons.map(b => {
+                const isSelected = activeRating === b.key;
+                const styleClass = isSelected
+                    ? `${b.activeClass} font-bold shadow-sm`
+                    : 'bg-white/5 text-gray-400 border-white/10 hover:bg-white/10 hover:text-gray-200 font-medium';
+                const iconClass = isSelected ? 'filled' : '';
+                return `<button @click.prevent.stop="setItemRating(${item.id}, '${normType}', '${b.key}')" title="${b.label}" class="inline-flex items-center gap-1 px-2 py-1 rounded-full border text-[11px] transition-all active:scale-95 ${styleClass}"><span class="material-symbols-outlined text-[13px] ${iconClass}">${b.icon}</span><span>${b.label}</span></button>`;
+            }).join('');
+
+            return `<div class="mt-2.5 flex items-center gap-1.5 flex-wrap">${btnsHTML}</div>`;
+        },
+
+        setItemRating(mediaId, type, ratingVal) {
+            if (!window.setUserRating) return;
+            const item = this.enrichedWatchlist.find(i => Number(i.id) === Number(mediaId));
+            const meta = item ? {
+                title: item.title || '',
+                genres: item.apiDetails?.genres || item.genres || []
+            } : {};
+            window.setUserRating(mediaId, type, ratingVal, meta);
+            this.lastStateSignature = this.computeStateSignature();
+            this.renderMedia();
+        },
+
         createMovieItemHTML(item) {
             const link = `film.html?id=${item.id}`;
             const durationStr = item.duration || (item.apiDetails?.runtime ? this.formatDuration(item.apiDetails.runtime) : '');
@@ -818,8 +894,9 @@ document.addEventListener('alpine:init', () => {
 
             const platformsHTML = this.createPlatformIconsHTML(item.dynamicProviders);
             const availableLine = platformsHTML
-                ? `<div class="mt-3 flex items-center gap-2 text-xs text-gray-400"><span>Disponible sur :</span><div class="flex items-center gap-1.5">${platformsHTML}</div></div>`
+                ? `<div class="mt-2.5 flex items-center gap-2 text-xs text-gray-400"><span>Disponible sur :</span><div class="flex items-center gap-1.5">${platformsHTML}</div></div>`
                 : '';
+            const userRatingLine = this.createUserRatingSelectorHTML(item);
             const checkButton = this.createCheckButtonHTML(item.id, item.isWatched, 'movie');
             const removeButton = this.createRemoveButtonHTML(item.id, 'movie');
 
@@ -843,6 +920,7 @@ document.addEventListener('alpine:init', () => {
                     </div>
                     <p class="text-xs sm:text-sm text-gray-400 mt-1 flex items-center flex-wrap">${metaLine}${ratingBadge}</p>
                     ${availableLine}
+                    ${userRatingLine}
                 </div>
             </div>`;
         },
@@ -857,6 +935,7 @@ document.addEventListener('alpine:init', () => {
             if (item.isWatched || (item.apiDetails && totalEpisodes > 0 && watchedCount >= totalEpisodes)) {
                 const checkButton = this.createCheckButtonHTML(item.id, true, 'serie', "'all'");
                 const removeButton = this.createRemoveButtonHTML(item.id, 'serie');
+                const userRatingLine = this.createUserRatingSelectorHTML({ ...item, isWatched: true, type: 'tv' });
 
                 let statusText = "Série à jour";
                 let textColorClass = "text-green-400";
@@ -880,7 +959,7 @@ document.addEventListener('alpine:init', () => {
                 const ratingBadge = this.createRatingBadgesHTML(item);
 
                 return `
-                <div class="relative flex items-center gap-4 p-4 hover:bg-white/5 transition-colors rounded-lg">
+                <div class="relative flex items-start gap-4 p-4 hover:bg-white/5 transition-colors rounded-lg">
                     <a href="serie.html?id=${item.id}" class="w-24 flex-shrink-0">
                         <div class="relative w-full aspect-[2/3] rounded-lg overflow-hidden bg-gray-800 shadow-md">
                             <img src="${item.posterUrl}" loading="lazy" class="w-full h-full object-cover">
@@ -905,7 +984,8 @@ document.addEventListener('alpine:init', () => {
                             ${platformsHTML ? '<span class="text-gray-600">•</span>' : ''}
                             <div class="flex items-center gap-1">${platformsHTML}</div>
                         </div>
-                        <p class="text-xs ${textColorClass} mt-2 font-medium">${statusText}</p>
+                        <p class="text-xs ${textColorClass} mt-1.5 font-medium">${statusText}</p>
+                        ${userRatingLine}
                     </div>
                 </div>`;
             }
@@ -1123,10 +1203,12 @@ document.addEventListener('alpine:init', () => {
                 let watchedMovies = getSafeLocalStorage('watchedMovies', []);
                 watchedMovies = watchedMovies.filter(id => Number(id) !== mediaIdNum);
                 localStorage.setItem('watchedMovies', JSON.stringify(watchedMovies));
+                if (window.setUserRating) window.setUserRating(mediaIdNum, 'movie', null);
             } else {
                 let watchedSeries = getSafeLocalStorage('watchedSeries', []);
                 watchedSeries = watchedSeries.filter(id => Number(id) !== mediaIdNum);
                 localStorage.setItem('watchedSeries', JSON.stringify(watchedSeries));
+                if (window.setUserRating) window.setUserRating(mediaIdNum, 'tv', null);
 
                 let watchedEpisodes = getSafeLocalStorage('watchedEpisodes', {});
                 if (watchedEpisodes[mediaIdStr]) {
@@ -1151,6 +1233,7 @@ document.addEventListener('alpine:init', () => {
                 let watchedSeries = getSafeLocalStorage('watchedSeries', []);
                 watchedSeries = watchedSeries.filter(id => Number(id) !== seriesIdNum);
                 localStorage.setItem('watchedSeries', JSON.stringify(watchedSeries));
+                if (window.setUserRating) window.setUserRating(seriesIdNum, 'tv', null);
 
                 let watchedEpisodes = getSafeLocalStorage('watchedEpisodes', {});
                 if (watchedEpisodes[seriesIdStr]) {
@@ -1245,6 +1328,7 @@ document.addEventListener('alpine:init', () => {
 
             if (watchedMovies.includes(movieIdNum)) {
                 watchedMovies = watchedMovies.filter(id => Number(id) !== movieIdNum);
+                if (window.setUserRating) window.setUserRating(movieIdNum, 'movie', null);
                 // Remettre dans la watchlist si on le décoche de "Vu"
                 if (!watchlist.some(i => Number(i.id) === movieIdNum)) {
                     watchlist.push({ id: movieIdNum, type: 'movie', added_at: new Date().toISOString() });

@@ -56,6 +56,14 @@ window.markNextEpisodeWatched = function (event, seriesId, episodeId, isLastRele
     window.dispatchEvent(new CustomEvent('view-changed', { detail: { tab: 'home' } }));
 };
 
+window.openWatchedListToRate = function (event) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+    window.dispatchEvent(new CustomEvent('open-watched-to-rate'));
+};
+
 // --- 1. LOGIQUE ALPINE.JS ---
 document.addEventListener('alpine:init', () => {
     Alpine.data('app', () => ({
@@ -80,6 +88,10 @@ document.addEventListener('alpine:init', () => {
             window.addEventListener('focus', refreshRegion);
             window.addEventListener('storage', (e) => {
                 if (!e.key || e.key === 'userRegion') refreshRegion();
+            });
+
+            window.addEventListener('open-watched-to-rate', () => {
+                this.switchTab('watchlist');
             });
         },
 
@@ -106,6 +118,8 @@ document.addEventListener('alpine:init', () => {
 
     Alpine.data('homePage', () => ({
         isLoading: false,
+        isLoadingRecos: false,
+        recoRefreshCycle: 0,
         lastUpdate: Date.now(),
         lastFetchedRegion: null,
         lastFetchedPlatforms: '',
@@ -126,6 +140,7 @@ document.addEventListener('alpine:init', () => {
                     } else {
                         this.updateMediaStatuses();
                         this.loadContinueWatching();
+                        this.loadRecommendations(false);
                     }
                 }
             });
@@ -136,6 +151,7 @@ document.addEventListener('alpine:init', () => {
                 } else {
                     this.updateMediaStatuses();
                     this.loadContinueWatching();
+                    this.loadRecommendations(false);
                 }
             });
 
@@ -143,6 +159,11 @@ document.addEventListener('alpine:init', () => {
                 if (this.hasCatalogContextChanged()) {
                     this.fetchAndDisplayContent();
                 }
+            });
+
+            window.addEventListener('user-rating-changed', () => {
+                this.updateMediaStatuses();
+                this.loadRecommendations(true);
             });
 
             window.addEventListener('pageshow', () => {
@@ -153,6 +174,7 @@ document.addEventListener('alpine:init', () => {
 
                 this.updateMediaStatuses();
                 this.loadContinueWatching();
+                this.loadRecommendations(false);
 
                 const lastFetch = localStorage.getItem('lastHomeFetch');
                 const now = Date.now();
@@ -265,11 +287,15 @@ document.addEventListener('alpine:init', () => {
             if (status === 'watchlist') {
                 statusIconHTML = `<span class="material-symbols-outlined text-primary text-base">bookmark</span>`;
             } else if (status === 'watched') {
-                statusIconHTML = `<span class="material-symbols-outlined text-green-500 text-base">visibility</span>`;
+                const ratingBadge = window.createUserRatingBadgeHTML ? window.createUserRatingBadgeHTML(id, normType, 'sm') : '';
+                statusIconHTML = ratingBadge || `<span class="material-symbols-outlined text-green-500 text-base">visibility</span>`;
             }
 
             const cachedRatings = window.getCachedMediaRatings ? window.getCachedMediaRatings(id, normType) : null;
             const rtBadgeHTML = (cachedRatings?.rt && window.createRTBadgeHTML) ? window.createRTBadgeHTML(cachedRatings.rt, 'xs') : '';
+            const recoReasonHTML = media._recoReason
+                ? `<p class="text-[10px] font-semibold text-primary/90 truncate leading-tight mt-0.5">${media._recoReason}</p>`
+                : '';
 
             return `
                 <a href="${link}" data-id="${id}" data-type="${normType}" class="flex-shrink-0 ${cardWidth} snap-start group flex flex-col media-card-link">
@@ -293,6 +319,7 @@ document.addEventListener('alpine:init', () => {
                         </div>
                         <span data-rt-slot="${normType}-${id}" class="inline-flex items-center ml-0.5">${rtBadgeHTML}</span>
                     </div>
+                    ${recoReasonHTML}
                 </a>
             `;
         },
@@ -488,6 +515,560 @@ document.addEventListener('alpine:init', () => {
             }
         },
 
+        computeRecoSignature() {
+            return [
+                localStorage.getItem('userRatings') || '{}',
+                localStorage.getItem('watchedMovies') || '[]',
+                localStorage.getItem('watchedSeries') || '[]',
+                localStorage.getItem('watchlist') || '[]',
+                localStorage.getItem('selectedPlatforms') || '[]',
+                localStorage.getItem('userRegion') || 'FR'
+            ].join('|');
+        },
+
+        addCrossGenreWeight(genreId, weight, movieWeights, tvWeights) {
+            const g = Number(genreId);
+            if (!g) return;
+
+            const addW = (map, id, w) => {
+                map.set(id, (map.get(id) || 0) + w);
+            };
+
+            // Genres communs entre Film et Série TV sur TMDB
+            const sharedIds = [16, 35, 80, 99, 18, 10751, 9648, 37];
+            if (sharedIds.includes(g)) {
+                addW(movieWeights, g, weight);
+                addW(tvWeights, g, weight);
+                return;
+            }
+
+            // Correspondances Film -> Série TV
+            if (g === 28 || g === 12) {
+                addW(movieWeights, g, weight);
+                addW(tvWeights, 10759, weight); // Action & Adventure TV
+            } else if (g === 878 || g === 14) {
+                addW(movieWeights, g, weight);
+                addW(tvWeights, 10765, weight); // Sci-Fi & Fantasy TV
+            } else if (g === 10752) {
+                addW(movieWeights, g, weight);
+                addW(tvWeights, 10768, weight); // War & Politics TV
+            } else if (g === 53 || g === 27) {
+                addW(movieWeights, g, weight);
+                addW(tvWeights, 9648, weight * 0.8); // Mystery TV
+                addW(tvWeights, 80, weight * 0.6);   // Crime TV
+            } else if (g === 36 || g === 10749 || g === 10402) {
+                addW(movieWeights, g, weight);
+                addW(tvWeights, 18, weight * 0.7);   // Drama TV
+            }
+            // Correspondances Série TV -> Film
+            else if (g === 10759) {
+                addW(tvWeights, g, weight);
+                addW(movieWeights, 28, weight);
+                addW(movieWeights, 12, weight * 0.8);
+            } else if (g === 10765) {
+                addW(tvWeights, g, weight);
+                addW(movieWeights, 878, weight);
+                addW(movieWeights, 14, weight * 0.8);
+            } else if (g === 10768) {
+                addW(tvWeights, g, weight);
+                addW(movieWeights, 10752, weight);
+                addW(movieWeights, 36, weight * 0.7);
+            } else {
+                addW(movieWeights, g, weight);
+                addW(tvWeights, g, weight);
+            }
+        },
+
+        async resolveItemMetadata(id, type) {
+            const numId = Number(id);
+            const normType = (type === 'tv' || type === 'serie') ? 'tv' : 'movie';
+            const cacheKey = normType === 'tv' ? `series-details-${numId}` : `movie-details-${numId}`;
+            const cineDbData = window.CineDB && window.CineDB.getMediaSync ? window.CineDB.getMediaSync(cacheKey, true) : null;
+            const cachedRaw = cineDbData || getSafeLocalStorage(cacheKey, null);
+            let details = cachedRaw ? (cachedRaw.data || cachedRaw) : null;
+
+            if (!details || details.error || !Array.isArray(details.genres)) {
+                const fetched = await this.fetchAPI(`${normType}/${numId}?language=fr-FR`, false);
+                if (fetched && !fetched.error) {
+                    details = fetched;
+                }
+            }
+
+            if (!details) return { title: '', genreIds: [], genres: [] };
+            const title = details.title || details.name || '';
+            const extracted = window.extractGenreIdsAndNames
+                ? window.extractGenreIdsAndNames(details.genres, details.genre_ids)
+                : { genreIds: [], genres: [] };
+            return { title, ...extracted };
+        },
+
+        isAvailableOnUserPlatforms(providersResults, allowedProviderIds, userSelectedPlatforms, region) {
+            if (!providersResults) return false;
+            if (userSelectedPlatforms.length === 0) return true;
+
+            let flatrate = [];
+            if (providersResults[region] && Array.isArray(providersResults[region].flatrate)) {
+                flatrate = [...providersResults[region].flatrate];
+            }
+            if (region !== 'FR' && userSelectedPlatforms.includes('canal') && providersResults['FR']?.flatrate) {
+                flatrate.push(...providersResults['FR'].flatrate.filter(
+                    p => p.provider_id === 381 || p.provider_id === 392 || String(p.provider_name).toLowerCase().includes('canal')
+                ));
+            }
+
+            return flatrate.some(p => {
+                if (allowedProviderIds.has(Number(p.provider_id))) return true;
+                if (window.getInternalPlatformId) {
+                    const internalKey = window.getInternalPlatformId(p.provider_name, p.provider_id);
+                    return userSelectedPlatforms.includes(internalKey);
+                }
+                return false;
+            });
+        },
+
+        async loadRecommendations(forceRefresh = false) {
+            const section = document.getElementById('recommendations-section');
+            const container = document.getElementById('recommendations-container');
+            const subtitleEl = document.getElementById('recommendations-subtitle');
+            const tipEl = document.getElementById('recommendations-tip');
+            if (!section || !container) return;
+
+            const watchedMovies = getSafeLocalStorage('watchedMovies', []).map(Number).filter(Boolean);
+            const watchedSeries = getSafeLocalStorage('watchedSeries', []).map(Number).filter(Boolean);
+            const watchedEpisodes = getSafeLocalStorage('watchedEpisodes', {});
+            const watchlist = getSafeLocalStorage('watchlist', []);
+            const userRatingsRaw = getSafeLocalStorage('userRatings', {});
+            const userSelectedPlatforms = getSafeLocalStorage('selectedPlatforms', []);
+            const region = localStorage.getItem('userRegion') || 'FR';
+
+            const ratingEntries = Object.entries(userRatingsRaw || {}).map(([key, val]) => {
+                const parts = key.split('-');
+                const inferredType = parts[0] === 'tv' || parts[0] === 'serie' ? 'tv' : 'movie';
+                const inferredId = Number(parts[1] || val?.id || 0);
+                if (typeof val === 'string') {
+                    return { key, id: inferredId, type: inferredType, rating: val, genreIds: [], genres: [], title: '' };
+                }
+                return {
+                    key,
+                    id: Number(val.id || inferredId),
+                    type: (val.type === 'tv' || val.type === 'serie') ? 'tv' : 'movie',
+                    rating: val.rating,
+                    title: val.title || '',
+                    genreIds: Array.isArray(val.genreIds) ? val.genreIds : [],
+                    genres: Array.isArray(val.genres) ? val.genres : [],
+                    updatedAt: Number(val.updatedAt || 0)
+                };
+            }).filter(e => e.id && ['love', 'ok', 'dislike'].includes(e.rating));
+
+            const totalWatchedCount = watchedMovies.length + watchedSeries.length;
+
+            // Si aucun film/série vu et aucune note : afficher une carte d'accueil invitant à noter ses films/séries vus
+            if (ratingEntries.length === 0 && totalWatchedCount === 0) {
+                section.style.display = 'block';
+                if (subtitleEl) subtitleEl.textContent = 'Notez vos films et séries vus (Pas aimé, OK, Adoré) pour activer vos recommandations';
+                if (tipEl) {
+                    tipEl.style.display = 'block';
+                    tipEl.innerHTML = `
+                        <div class="flex items-center justify-between gap-3 p-3.5 rounded-xl bg-white/5 border border-white/10 text-xs text-gray-300">
+                            <div class="flex items-center gap-2.5">
+                                <span class="material-symbols-outlined text-primary text-xl shrink-0">psychology</span>
+                                <span>Marquez des films ou séries comme <b>Vus</b> puis indiquez <b>Pas aimé</b>, <b>OK</b> ou <b>Adoré</b> pour débloquer vos recommandations personnalisées sur vos plateformes.</span>
+                            </div>
+                        </div>
+                    `;
+                }
+                container.innerHTML = '';
+                return;
+            }
+
+            // Vérifier le cache de session si non forcé
+            const currentSig = this.computeRecoSignature();
+            if (!forceRefresh) {
+                const cachedReco = getSafeLocalStorage('recoCacheV1', null);
+                if (cachedReco && cachedReco.signature === currentSig && Array.isArray(cachedReco.items) && cachedReco.items.length > 0) {
+                    const age = Date.now() - (cachedReco.timestamp || 0);
+                    if (age < 30 * 60 * 1000) {
+                        section.style.display = 'block';
+                        if (subtitleEl) subtitleEl.textContent = cachedReco.subtitle || '';
+                        if (tipEl) {
+                            if (cachedReco.tipHTML) {
+                                tipEl.style.display = 'block';
+                                tipEl.innerHTML = cachedReco.tipHTML;
+                            } else {
+                                tipEl.style.display = 'none';
+                            }
+                        }
+                        this.renderContent('recommendations-container', cachedReco.items, 'platform');
+                        return;
+                    }
+                }
+            } else {
+                this.recoRefreshCycle = (this.recoRefreshCycle + 1) % 3;
+            }
+
+            this.isLoadingRecos = true;
+            try {
+                // 1. Enrichir les entrées notées qui n'ont pas encore leurs genres en cache
+                let ratingsUpdated = false;
+                const missingGenreEntries = ratingEntries.filter(e => !e.genreIds || e.genreIds.length === 0).slice(0, 6);
+                if (missingGenreEntries.length > 0) {
+                    await Promise.all(missingGenreEntries.map(async (entry) => {
+                        const meta = await this.resolveItemMetadata(entry.id, entry.type);
+                        if (meta.genreIds.length > 0 || meta.title) {
+                            entry.genreIds = meta.genreIds;
+                            entry.genres = meta.genres;
+                            if (!entry.title) entry.title = meta.title;
+                            if (userRatingsRaw[entry.key] && typeof userRatingsRaw[entry.key] === 'object') {
+                                userRatingsRaw[entry.key].genreIds = meta.genreIds;
+                                userRatingsRaw[entry.key].genres = meta.genres;
+                                if (!userRatingsRaw[entry.key].title) userRatingsRaw[entry.key].title = meta.title;
+                                ratingsUpdated = true;
+                            }
+                        }
+                    }));
+                    if (ratingsUpdated) {
+                        localStorage.setItem('userRatings', JSON.stringify(userRatingsRaw));
+                    }
+                }
+
+                const lovedItems = ratingEntries.filter(e => e.rating === 'love').sort((a, b) => b.updatedAt - a.updatedAt);
+                const okItems = ratingEntries.filter(e => e.rating === 'ok').sort((a, b) => b.updatedAt - a.updatedAt);
+                const dislikedItems = ratingEntries.filter(e => e.rating === 'dislike');
+                const hasPositiveRatings = lovedItems.length > 0 || okItems.length > 0;
+
+                // Fallback progressif : si l'utilisateur a des films/séries vus mais n'a pas encore voté "OK" ou "Adoré",
+                // on s'appuie provisoirement sur ses derniers films/séries vus tout en l'invitant à les noter
+                let fallbackSeeds = [];
+                if (!hasPositiveRatings && totalWatchedCount > 0) {
+                    const dislikedKeys = new Set(dislikedItems.map(d => `${d.type}-${d.id}`));
+                    const sampleMovies = watchedMovies.slice(-4).reverse().map(id => ({ id, type: 'movie', rating: 'watched' }));
+                    const sampleSeries = watchedSeries.slice(-3).reverse().map(id => ({ id, type: 'tv', rating: 'watched' }));
+                    const candidates = [...sampleMovies, ...sampleSeries].filter(c => !dislikedKeys.has(`${c.type}-${c.id}`)).slice(0, 5);
+
+                    fallbackSeeds = await Promise.all(candidates.map(async (c) => {
+                        const meta = await this.resolveItemMetadata(c.id, c.type);
+                        return { ...c, ...meta, weight: 1 };
+                    }));
+                }
+
+                // 2. Calculer le profil d'affinité par genre (pondéré par Adoré = +3, OK = +1, Pas aimé = -2)
+                const movieGenreWeights = new Map();
+                const tvGenreWeights = new Map();
+
+                ratingEntries.forEach(entry => {
+                    const weight = entry.rating === 'love' ? 3 : (entry.rating === 'ok' ? 1 : -2);
+                    (entry.genreIds || []).forEach(gId => {
+                        this.addCrossGenreWeight(gId, weight, movieGenreWeights, tvGenreWeights);
+                    });
+                });
+
+                fallbackSeeds.forEach(seed => {
+                    (seed.genreIds || []).forEach(gId => {
+                        this.addCrossGenreWeight(gId, 1, movieGenreWeights, tvGenreWeights);
+                    });
+                });
+
+                const getSortedGenres = (weightMap, minScore = 0.5) =>
+                    Array.from(weightMap.entries())
+                        .filter(([, score]) => score >= minScore)
+                        .sort((a, b) => b[1] - a[1])
+                        .map(([id]) => id);
+
+                const getDislikedGenres = (weightMap) =>
+                    Array.from(weightMap.entries())
+                        .filter(([, score]) => score <= -2)
+                        .map(([id]) => id);
+
+                const topMovieGenres = getSortedGenres(movieGenreWeights);
+                const topTvGenres = getSortedGenres(tvGenreWeights);
+                const dislikedMovieGenres = getDislikedGenres(movieGenreWeights);
+                const dislikedTvGenres = getDislikedGenres(tvGenreWeights);
+
+                // 3. Construire le filtre des plateformes de l'utilisateur
+                const catalog = window.PLATFORMS_CATALOG || [];
+                const allowedProviderIds = new Set();
+                if (userSelectedPlatforms.length > 0) {
+                    catalog.forEach(p => {
+                        if (userSelectedPlatforms.includes(p.id)) {
+                            (p.providerIds || [p.apiId]).forEach(pid => {
+                                String(pid).split('|').forEach(sub => allowedProviderIds.add(Number(sub)));
+                            });
+                        }
+                    });
+                } else {
+                    [8, 119, 337, 350, 381, 392, 531].forEach(pid => allowedProviderIds.add(pid));
+                }
+                const providerPipeStr = Array.from(allowedProviderIds).filter(Boolean).join('|');
+
+                // 4. Sélectionner les œuvres "graines" (Seeds) pour les recommandations directes TMDB
+                const allPositiveSeeds = [...lovedItems, ...okItems, ...fallbackSeeds];
+                const seedPool = forceRefresh && allPositiveSeeds.length > 3
+                    ? [...allPositiveSeeds].sort(() => Math.random() - 0.5)
+                    : allPositiveSeeds;
+                const activeSeeds = seedPool.slice(0, 3);
+
+                const pageNum = (this.recoRefreshCycle % 2) + 1;
+                const withoutMovieParam = dislikedMovieGenres.length > 0 ? `&without_genres=${dislikedMovieGenres.join(',')}` : '';
+                const withoutTvParam = dislikedTvGenres.length > 0 ? `&without_genres=${dislikedTvGenres.join(',')}` : '';
+
+                const movieGenreStrict = topMovieGenres.slice(0, 2).join(',');
+                const movieGenreBroad = topMovieGenres.slice(0, 3).join('|');
+                const tvGenreStrict = topTvGenres.slice(0, 2).join(',');
+                const tvGenreBroad = topTvGenres.slice(0, 3).join('|');
+
+                const discoverPromises = [];
+
+                // Requêtes Films disponibles sur les plateformes de l'utilisateur
+                if (movieGenreStrict) {
+                    discoverPromises.push(
+                        this.fetchAPI(`discover/movie?sort_by=popularity.desc&with_watch_providers=${providerPipeStr}&with_genres=${movieGenreStrict}${withoutMovieParam}&vote_count.gte=50&vote_average.gte=6.4&page=${pageNum}&language=fr-FR`)
+                            .then(list => list.map(m => ({ ...m, media_type: 'movie', _fromDiscover: true })))
+                    );
+                }
+                if (movieGenreBroad) {
+                    discoverPromises.push(
+                        this.fetchAPI(`discover/movie?sort_by=vote_average.desc&with_watch_providers=${providerPipeStr}&with_genres=${movieGenreBroad}${withoutMovieParam}&vote_count.gte=180&vote_average.gte=7.0&page=${pageNum}&language=fr-FR`)
+                            .then(list => list.map(m => ({ ...m, media_type: 'movie', _fromDiscover: true })))
+                    );
+                } else {
+                    discoverPromises.push(
+                        this.fetchAPI(`discover/movie?sort_by=vote_average.desc&with_watch_providers=${providerPipeStr}${withoutMovieParam}&vote_count.gte=250&vote_average.gte=7.2&page=${pageNum}&language=fr-FR`)
+                            .then(list => list.map(m => ({ ...m, media_type: 'movie', _fromDiscover: true })))
+                    );
+                }
+
+                // Requêtes Séries disponibles sur les plateformes de l'utilisateur
+                if (tvGenreStrict) {
+                    discoverPromises.push(
+                        this.fetchAPI(`discover/tv?sort_by=popularity.desc&with_watch_providers=${providerPipeStr}&with_genres=${tvGenreStrict}${withoutTvParam}&vote_count.gte=40&vote_average.gte=6.6&page=${pageNum}&language=fr-FR`)
+                            .then(list => list.map(t => ({ ...t, media_type: 'tv', _fromDiscover: true })))
+                    );
+                }
+                if (tvGenreBroad) {
+                    discoverPromises.push(
+                        this.fetchAPI(`discover/tv?sort_by=vote_average.desc&with_watch_providers=${providerPipeStr}&with_genres=${tvGenreBroad}${withoutTvParam}&vote_count.gte=120&vote_average.gte=7.2&page=${pageNum}&language=fr-FR`)
+                            .then(list => list.map(t => ({ ...t, media_type: 'tv', _fromDiscover: true })))
+                    );
+                } else {
+                    discoverPromises.push(
+                        this.fetchAPI(`discover/tv?sort_by=vote_average.desc&with_watch_providers=${providerPipeStr}${withoutTvParam}&vote_count.gte=150&vote_average.gte=7.4&page=${pageNum}&language=fr-FR`)
+                            .then(list => list.map(t => ({ ...t, media_type: 'tv', _fromDiscover: true })))
+                    );
+                }
+
+                // Requêtes directes /recommendations à partir des films/séries adorés ou appréciés
+                const seedPromises = activeSeeds.map(seed =>
+                    this.fetchAPI(`${seed.type}/${seed.id}/recommendations?language=fr-FR`)
+                        .then(list => (list || []).map(item => ({
+                            ...item,
+                            media_type: seed.type,
+                            _seedTitle: seed.title,
+                            _seedRating: seed.rating
+                        })))
+                );
+
+                const [discoverLists, seedLists] = await Promise.all([
+                    Promise.all(discoverPromises),
+                    Promise.all(seedPromises)
+                ]);
+
+                // Ensemble des IDs à exclure (déjà vus, en cours, dans la watchlist ou déjà notés)
+                const excludedKeys = new Set();
+                watchedMovies.forEach(id => excludedKeys.add(`movie-${Number(id)}`));
+                watchedSeries.forEach(id => excludedKeys.add(`tv-${Number(id)}`));
+                Object.entries(watchedEpisodes || {}).forEach(([sId, eps]) => {
+                    if (Array.isArray(eps) && eps.length > 0) excludedKeys.add(`tv-${Number(sId)}`);
+                });
+                watchlist.forEach(item => {
+                    if (!item || !item.id) return;
+                    const t = (item.type === 'tv' || item.type === 'serie') ? 'tv' : 'movie';
+                    excludedKeys.add(`${t}-${Number(item.id)}`);
+                });
+                ratingEntries.forEach(e => excludedKeys.add(`${e.type}-${Number(e.id)}`));
+
+                const candidateMap = new Map();
+                const discoverConfirmedKeys = new Set();
+
+                discoverLists.flat().forEach(item => {
+                    if (!item || !item.id || !item.poster_path) return;
+                    const key = `${item.media_type}-${item.id}`;
+                    if (excludedKeys.has(key)) return;
+                    discoverConfirmedKeys.add(key);
+                    if (!candidateMap.has(key)) {
+                        candidateMap.set(key, item);
+                    }
+                });
+
+                // Vérifier la disponibilité sur les plateformes de l'utilisateur pour les meilleures recommandations directes (Seeds)
+                const rawSeedCandidates = seedLists.flat().filter(item => {
+                    if (!item || !item.id || !item.poster_path) return false;
+                    return !excludedKeys.has(`${item.media_type}-${item.id}`);
+                });
+
+                const unverifiedSeeds = [];
+                rawSeedCandidates.forEach(item => {
+                    const key = `${item.media_type}-${item.id}`;
+                    if (discoverConfirmedKeys.has(key)) {
+                        const existing = candidateMap.get(key);
+                        candidateMap.set(key, {
+                            ...existing,
+                            _seedTitle: item._seedTitle || existing._seedTitle,
+                            _seedRating: item._seedRating || existing._seedRating
+                        });
+                    } else if (unverifiedSeeds.length < 10 && !unverifiedSeeds.some(u => `${u.media_type}-${u.id}` === key)) {
+                        unverifiedSeeds.push(item);
+                    }
+                });
+
+                if (unverifiedSeeds.length > 0) {
+                    await Promise.all(unverifiedSeeds.map(async (item) => {
+                        const key = `${item.media_type}-${item.id}`;
+                        const cacheKey = item.media_type === 'tv' ? `series-details-${item.id}` : `movie-details-${item.id}`;
+                        const cached = getSafeLocalStorage(cacheKey, null);
+                        let providersResults = cached?.data?.['watch/providers']?.results || cached?.['watch/providers']?.results || null;
+
+                        if (!providersResults) {
+                            const provData = await this.fetchAPI(`${item.media_type}/${item.id}/watch/providers`, false);
+                            providersResults = provData?.results || null;
+                        }
+
+                        if (this.isAvailableOnUserPlatforms(providersResults, allowedProviderIds, userSelectedPlatforms, region)) {
+                            candidateMap.set(key, item);
+                        }
+                    }));
+                }
+
+                // 5. Scorer et classer tous les candidats selon le profil de goûts
+                const scoredCandidates = [];
+                candidateMap.forEach((item) => {
+                    const isMovie = item.media_type === 'movie';
+                    const weightMap = isMovie ? movieGenreWeights : tvGenreWeights;
+                    const gIds = Array.isArray(item.genre_ids) ? item.genre_ids : [];
+
+                    let genreScore = 0;
+                    let matchedPosGenres = [];
+
+                    gIds.forEach(gid => {
+                        const w = weightMap.get(Number(gid)) || 0;
+                        genreScore += w;
+                        if (w > 0) {
+                            matchedPosGenres.push({
+                                id: Number(gid),
+                                weight: w,
+                                name: window.TMDB_GENRE_LABELS_FR?.[Number(gid)] || ''
+                            });
+                        }
+                    });
+
+                    // Exclure les contenus dont les genres sont globalement rejetés par l'utilisateur
+                    if (genreScore < 0 && item._seedRating !== 'love') return;
+
+                    matchedPosGenres.sort((a, b) => b.weight - a.weight);
+
+                    const synergyBonus = matchedPosGenres.length >= 2 ? 3.5 : 0;
+                    const seedBonus = item._seedRating === 'love' ? 7 : (item._seedRating === 'ok' ? 3.5 : (item._seedTitle ? 2.5 : 0));
+                    const voteAvg = Number(item.vote_average || 6.5);
+                    const pop = Number(item.popularity || 10);
+                    const qualityScore = (voteAvg - 6.0) * 1.6 + Math.min(2.5, Math.log10(pop + 1));
+                    const jitter = forceRefresh ? (Math.random() * 2.2) : 0;
+
+                    const totalScore = genreScore + synergyBonus + seedBonus + qualityScore + jitter;
+
+                    // Construire l'étiquette explicative sous la carte
+                    let recoReason = '';
+                    if (item._seedTitle) {
+                        const prefix = item._seedRating === 'love' ? '❤️ Comme' : '👍 Comme';
+                        recoReason = `${prefix} ${item._seedTitle}`;
+                    } else if (matchedPosGenres.length > 0) {
+                        const genreLabels = matchedPosGenres.map(g => g.name).filter(Boolean).slice(0, 2);
+                        if (genreLabels.length > 0) {
+                            recoReason = `Style : ${genreLabels.join(' • ')}`;
+                        }
+                    }
+
+                    scoredCandidates.push({
+                        ...item,
+                        _recoScore: totalScore,
+                        _recoReason: recoReason
+                    });
+                });
+
+                scoredCandidates.sort((a, b) => b._recoScore - a._recoScore);
+                const finalRecos = scoredCandidates.slice(0, 20);
+
+                // 6. Mettre à jour le sous-titre et l'éventuelle bannière de conseil
+                const topGenreLabels = topMovieGenres
+                    .slice(0, 3)
+                    .map(id => window.TMDB_GENRE_LABELS_FR?.[id])
+                    .filter(Boolean);
+
+                const platformText = userSelectedPlatforms.length > 0
+                    ? 'Dispo sur vos plateformes'
+                    : 'Toutes plateformes';
+
+                let subtitleText = '';
+                if (hasPositiveRatings) {
+                    const posCount = lovedItems.length + okItems.length;
+                    const genreSummary = topGenreLabels.length > 0 ? ` (${topGenreLabels.join(', ')})` : '';
+                    const posLabel = posCount === 1 ? 'Selon votre avis positif' : `Selon vos ${posCount} avis positifs`;
+                    subtitleText = `${posLabel}${genreSummary} • ${platformText}`;
+                } else {
+                    subtitleText = `Selon votre historique de visionnage • ${platformText}`;
+                }
+
+                // Compter combien de films/séries vus ne sont pas encore notés
+                const ratedKeysSet = new Set(ratingEntries.map(e => `${e.type}-${e.id}`));
+                const unratedWatchedCount =
+                    watchedMovies.filter(id => !ratedKeysSet.has(`movie-${id}`)).length +
+                    watchedSeries.filter(id => !ratedKeysSet.has(`tv-${id}`)).length;
+
+                let tipHTML = '';
+                if (!hasPositiveRatings && unratedWatchedCount > 0) {
+                    tipHTML = `
+                        <div class="flex items-center justify-between gap-3 p-3 rounded-xl bg-primary/10 border border-primary/25 text-xs">
+                            <div class="flex items-center gap-2 text-gray-200">
+                                <span class="material-symbols-outlined text-primary text-lg shrink-0">tips_and_updates</span>
+                                <span>Vous avez <b>${unratedWatchedCount} film${unratedWatchedCount > 1 ? 's' : ''}/série${unratedWatchedCount > 1 ? 's' : ''} vu${unratedWatchedCount > 1 ? 's' : ''}</b> non noté${unratedWatchedCount > 1 ? 's' : ''}. Notez-les (👎 / 👍 / ❤️) pour affiner ce carrousel !</span>
+                            </div>
+                            <button onclick="window.openWatchedListToRate(event)" class="px-3 py-1.5 rounded-lg bg-primary text-white font-bold text-[11px] shrink-0 hover:bg-primary/90 transition-colors active:scale-95">
+                                Noter mes vus
+                            </button>
+                        </div>
+                    `;
+                }
+
+                if (finalRecos.length > 0) {
+                    if (subtitleEl) subtitleEl.textContent = subtitleText;
+                    if (tipEl) {
+                        if (tipHTML) {
+                            tipEl.style.display = 'block';
+                            tipEl.innerHTML = tipHTML;
+                        } else {
+                            tipEl.style.display = 'none';
+                        }
+                    }
+                    this.renderContent('recommendations-container', finalRecos, 'platform');
+                    section.style.display = 'block';
+
+                    try {
+                        localStorage.setItem('recoCacheV1', JSON.stringify({
+                            timestamp: Date.now(),
+                            signature: currentSig,
+                            subtitle: subtitleText,
+                            tipHTML,
+                            items: finalRecos
+                        }));
+                    } catch (e) {}
+                } else {
+                    section.style.display = 'none';
+                }
+            } catch (err) {
+                console.error('Erreur lors du calcul des recommandations :', err);
+            } finally {
+                this.isLoadingRecos = false;
+            }
+        },
+
         async fetchAndDisplayContent() {
             const currentRegion = localStorage.getItem('userRegion') || 'FR';
             const currentPlatformsRaw = localStorage.getItem('selectedPlatforms') || '[]';
@@ -525,8 +1106,9 @@ document.addEventListener('alpine:init', () => {
             }
 
             try {
-                // Lance "Reprendre la lecture" sans bloquer le reste
+                // Lance "Reprendre la lecture" et "Recommandations" sans bloquer le reste
                 this.loadContinueWatching();
+                this.loadRecommendations(false);
 
                 const popularContent = await this.fetchAPI('trending/all/week?language=fr-FR');
                 this.renderContent('popular-container', popularContent, 'popular');
@@ -600,7 +1182,8 @@ document.addEventListener('alpine:init', () => {
                 if (status === 'watchlist') {
                     statusIconHTML = `<span class="material-symbols-outlined text-primary text-base">bookmark</span>`;
                 } else if (status === 'watched') {
-                    statusIconHTML = `<span class="material-symbols-outlined text-green-500 text-base">visibility</span>`;
+                    const ratingBadge = window.createUserRatingBadgeHTML ? window.createUserRatingBadgeHTML(id, type, 'sm') : '';
+                    statusIconHTML = ratingBadge || `<span class="material-symbols-outlined text-green-500 text-base">visibility</span>`;
                 }
                 statusContainer.innerHTML = statusIconHTML;
             });

@@ -93,7 +93,7 @@
             <div id="awards-section" style="display: none;"></div>
 
 
-            <div class="flex items-center gap-3 mb-8">
+            <div class="flex items-center gap-3 mb-4">
                 <button id="watchlist-button" class="flex-1 flex items-center justify-center gap-2 rounded-xl bg-white text-black py-3 font-bold transition-transform active:scale-95">
                     <span class="material-symbols-outlined filled">add</span>
                     <span>Ajouter à ma liste</span>
@@ -102,6 +102,27 @@
                     <span class="material-symbols-outlined filled text-green-400">check</span>
                     <span id="next-episode-text">Épisode vu</span>
                 </button>
+            </div>
+
+            <div id="user-rating-section" class="mb-8 bg-white/5 border border-white/10 rounded-2xl p-3.5 backdrop-blur-sm transition-all" style="display: none;">
+                <div class="flex items-center justify-between mb-2.5">
+                    <span class="text-xs font-bold text-gray-400 uppercase tracking-wider">Qu'avez-vous pensé de cette série ?</span>
+                    <span id="user-rating-status" class="text-[11px] font-semibold text-gray-400"></span>
+                </div>
+                <div class="grid grid-cols-3 gap-2.5">
+                    <button type="button" data-rating-btn="dislike" class="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl border border-white/10 bg-gray-800/70 text-gray-300 text-xs font-bold transition-all active:scale-95 hover:bg-gray-800">
+                        <span class="material-symbols-outlined text-base">thumb_down</span>
+                        <span>Pas aimé</span>
+                    </button>
+                    <button type="button" data-rating-btn="ok" class="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl border border-white/10 bg-gray-800/70 text-gray-300 text-xs font-bold transition-all active:scale-95 hover:bg-gray-800">
+                        <span class="material-symbols-outlined text-base">thumb_up</span>
+                        <span>OK</span>
+                    </button>
+                    <button type="button" data-rating-btn="love" class="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl border border-white/10 bg-gray-800/70 text-gray-300 text-xs font-bold transition-all active:scale-95 hover:bg-gray-800">
+                        <span class="material-symbols-outlined text-base">favorite</span>
+                        <span>Adoré</span>
+                    </button>
+                </div>
             </div>
             
             <div class="mb-8" id="streaming-section" style="display: none;">

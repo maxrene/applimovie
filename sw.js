@@ -1,7 +1,7 @@
 // sw.js
-// VERSION V23 - FIX BARRE DE NAVIGATION BASSE & SAFE AREA IOS
-const CACHE_NAME = 'cinematch-v23-offline-capable';
-const IMAGE_CACHE_NAME = 'cinematch-images-v23';
+// VERSION V24 - NOTATION INTERNE (PAS AIMÉ / OK / ADORÉ) & RECOMMANDATIONS PERSONNALISÉES
+const CACHE_NAME = 'cinematch-v24-offline-capable';
+const IMAGE_CACHE_NAME = 'cinematch-images-v24';
 const MAX_IMAGES = 200;
 
 const ASSETS_TO_CACHE = [

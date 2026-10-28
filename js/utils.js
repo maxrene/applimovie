@@ -135,6 +135,251 @@ window.getInternalPlatformId = function(tmdbName = '', providerId = null) {
     return 'other';
 };
 
+// --- SYSTÈME DE NOTATION INTERNE (PAS AIMÉ / OK / ADORÉ) & PROFIL DE GOÛTS ---
+window.USER_RATING_OPTIONS = {
+    dislike: {
+        value: 'dislike',
+        label: 'Pas aimé',
+        icon: 'thumb_down',
+        weight: -2,
+        activeBtnClass: 'bg-red-500/20 text-red-400 border-red-500/60 shadow-sm',
+        badgeClass: 'text-red-400'
+    },
+    ok: {
+        value: 'ok',
+        label: 'OK',
+        icon: 'thumb_up',
+        weight: 1,
+        activeBtnClass: 'bg-amber-500/20 text-amber-300 border-amber-500/60 shadow-sm',
+        badgeClass: 'text-amber-400'
+    },
+    love: {
+        value: 'love',
+        label: 'Adoré',
+        icon: 'favorite',
+        weight: 3,
+        activeBtnClass: 'bg-pink-500/20 text-pink-400 border-pink-500/60 shadow-sm',
+        badgeClass: 'text-pink-500'
+    }
+};
+
+// Table de correspondance Genres (Noms FR/EN -> IDs TMDB Movie & TV)
+window.TMDB_GENRE_MAP = {
+    // Movie & Shared IDs
+    'action': 28,
+    'aventure': 12,
+    'adventure': 12,
+    'animation': 16,
+    'comédie': 35,
+    'comedie': 35,
+    'comedy': 35,
+    'crime': 80,
+    'policier': 80,
+    'documentaire': 99,
+    'documentary': 99,
+    'drame': 18,
+    'drama': 18,
+    'familial': 10751,
+    'famille': 10751,
+    'family': 10751,
+    'fantastique': 14,
+    'fantasy': 14,
+    'histoire': 36,
+    'history': 36,
+    'horreur': 27,
+    'épouvante-horreur': 27,
+    'horror': 27,
+    'musique': 10402,
+    'music': 10402,
+    'mystère': 9648,
+    'mystere': 9648,
+    'mystery': 9648,
+    'romance': 10749,
+    'science-fiction': 878,
+    'sci-fi': 878,
+    'science fiction': 878,
+    'téléfilm': 10770,
+    'thriller': 53,
+    'guerre': 10752,
+    'war': 10752,
+    'western': 37,
+    // TV Specific IDs
+    'action & adventure': 10759,
+    'action & aventure': 10759,
+    'sci-fi & fantasy': 10765,
+    'science-fiction & fantastique': 10765,
+    'war & politics': 10768,
+    'guerre & politique': 10768,
+    'kids': 10762,
+    'enfants': 10762,
+    'reality': 10764,
+    'téléréalité': 10764,
+    'soap': 10766
+};
+
+window.TMDB_GENRE_LABELS_FR = {
+    28: 'Action',
+    12: 'Aventure',
+    16: 'Animation',
+    35: 'Comédie',
+    80: 'Policier',
+    99: 'Documentaire',
+    18: 'Drame',
+    10751: 'Familial',
+    14: 'Fantastique',
+    36: 'Histoire',
+    27: 'Horreur',
+    10402: 'Musique',
+    9648: 'Mystère',
+    10749: 'Romance',
+    878: 'Sci-Fi',
+    53: 'Thriller',
+    10752: 'Guerre',
+    37: 'Western',
+    10759: 'Action & Aventure',
+    10765: 'Sci-Fi & Fantastique',
+    10768: 'Guerre & Politique',
+    10762: 'Jeunesse'
+};
+
+window.normalizeMediaTypeForRating = function(type) {
+    return (type === 'tv' || type === 'serie') ? 'tv' : 'movie';
+};
+
+window.extractGenreIdsAndNames = function(rawGenres, rawGenreIds) {
+    const ids = new Set();
+    const names = new Set();
+
+    if (Array.isArray(rawGenreIds)) {
+        rawGenreIds.forEach(id => {
+            const num = Number(id);
+            if (num) {
+                ids.add(num);
+                if (window.TMDB_GENRE_LABELS_FR[num]) names.add(window.TMDB_GENRE_LABELS_FR[num]);
+            }
+        });
+    }
+
+    if (Array.isArray(rawGenres)) {
+        rawGenres.forEach(g => {
+            if (!g) return;
+            if (typeof g === 'object') {
+                if (g.id) ids.add(Number(g.id));
+                if (g.name) {
+                    names.add(g.name);
+                    const mapped = window.TMDB_GENRE_MAP[String(g.name).toLowerCase().trim()];
+                    if (mapped) ids.add(mapped);
+                }
+            } else if (typeof g === 'string') {
+                names.add(g);
+                const mapped = window.TMDB_GENRE_MAP[g.toLowerCase().trim()];
+                if (mapped) ids.add(mapped);
+            }
+        });
+    }
+
+    return {
+        genreIds: Array.from(ids),
+        genres: Array.from(names)
+    };
+};
+
+window.getUserRating = function(id, type = 'movie') {
+    if (!id) return null;
+    const normType = window.normalizeMediaTypeForRating(type);
+    const ratings = window.getSafeLocalStorage('userRatings', {});
+    const entry = ratings[`${normType}-${Number(id)}`] || ratings[`serie-${Number(id)}`] || null;
+    if (!entry) return null;
+    if (typeof entry === 'string') {
+        return { id: Number(id), type: normType, rating: entry, updatedAt: 0 };
+    }
+    return entry;
+};
+
+window.setUserRating = function(id, type = 'movie', ratingValue = null, metadata = {}) {
+    if (!id) return null;
+    const numId = Number(id);
+    const normType = window.normalizeMediaTypeForRating(type);
+    const key = `${normType}-${numId}`;
+    const ratings = window.getSafeLocalStorage('userRatings', {});
+    const existing = ratings[key] || ratings[`serie-${numId}`] || null;
+
+    // Nettoyer l'éventuelle ancienne clé non normalisée
+    if (ratings[`serie-${numId}`]) {
+        delete ratings[`serie-${numId}`];
+    }
+
+    // Si on clique sur la note déjà active ou si ratingValue est null -> suppression de la note
+    const currentRatingVal = existing ? (typeof existing === 'string' ? existing : existing.rating) : null;
+    if (!ratingValue || currentRatingVal === ratingValue) {
+        delete ratings[key];
+        localStorage.setItem('userRatings', JSON.stringify(ratings));
+        localStorage.removeItem('recoCacheV1');
+        window.dispatchEvent(new CustomEvent('user-rating-changed', {
+            detail: { id: numId, type: normType, rating: null }
+        }));
+        return null;
+    }
+
+    // Enrichir automatiquement avec le cache local (movie-details-X / series-details-X / data.js)
+    let title = metadata.title || (existing && existing.title) || '';
+    let rawGenres = metadata.genres || (existing && existing.genres) || [];
+    let rawGenreIds = metadata.genreIds || (existing && existing.genreIds) || [];
+
+    const cacheKey = normType === 'tv' ? `series-details-${numId}` : `movie-details-${numId}`;
+    const cineDbData = window.CineDB && window.CineDB.getMediaSync ? window.CineDB.getMediaSync(cacheKey, true) : null;
+    const cachedRaw = cineDbData || window.getSafeLocalStorage(cacheKey, null);
+    const cachedData = cachedRaw ? (cachedRaw.data || cachedRaw) : null;
+
+    if (cachedData && !cachedData.error) {
+        if (!title) title = cachedData.title || cachedData.name || '';
+        if (Array.isArray(cachedData.genres) && cachedData.genres.length > 0) {
+            rawGenres = cachedData.genres;
+        }
+        if (Array.isArray(cachedData.genre_ids) && cachedData.genre_ids.length > 0) {
+            rawGenreIds = cachedData.genre_ids;
+        }
+    }
+
+    if ((!title || (rawGenres.length === 0 && rawGenreIds.length === 0)) && typeof mediaData !== 'undefined' && Array.isArray(mediaData)) {
+        const staticItem = mediaData.find(m => Number(m.id) === numId);
+        if (staticItem) {
+            if (!title) title = staticItem.title || staticItem.name || '';
+            if (rawGenres.length === 0 && Array.isArray(staticItem.genres)) rawGenres = staticItem.genres;
+        }
+    }
+
+    const { genreIds, genres } = window.extractGenreIdsAndNames(rawGenres, rawGenreIds);
+
+    const newEntry = {
+        id: numId,
+        type: normType,
+        rating: ratingValue,
+        title: title || '',
+        genreIds,
+        genres,
+        updatedAt: Date.now()
+    };
+
+    ratings[key] = newEntry;
+    localStorage.setItem('userRatings', JSON.stringify(ratings));
+    localStorage.removeItem('recoCacheV1');
+
+    window.dispatchEvent(new CustomEvent('user-rating-changed', {
+        detail: { id: numId, type: normType, rating: ratingValue, entry: newEntry }
+    }));
+
+    return newEntry;
+};
+
+window.createUserRatingBadgeHTML = function(id, type = 'movie', size = 'base') {
+    const entry = window.getUserRating(id, type);
+    if (!entry || !entry.rating || !window.USER_RATING_OPTIONS[entry.rating]) return '';
+    const opt = window.USER_RATING_OPTIONS[entry.rating];
+    const sizeClass = size === 'sm' ? 'text-sm' : 'text-base';
+    return `<span class="material-symbols-outlined filled ${opt.badgeClass} ${sizeClass}" title="Votre avis : ${opt.label}">${opt.icon}</span>`;
+};
+
 /**
  * Réduit la taille d'un objet Film ou Série TMDB avant mise en cache dans localStorage
  * (divise la taille par ~30 à 50 pour éviter toute erreur QuotaExceededError).

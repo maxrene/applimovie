@@ -36,7 +36,8 @@ const SYNC_KEYS = [
     'favoriteActors',
     'selectedPlatforms',
     'userRegion',
-    'seriesLastWatchedDate'
+    'seriesLastWatchedDate',
+    'userRatings'
 ];
 
 function safeParseJSON(str, fallback) {
@@ -82,7 +83,8 @@ function getLocalUserData() {
         favoriteActors: safeParseJSON(localStorage.getItem('favoriteActors'), []),
         selectedPlatforms: safeParseJSON(localStorage.getItem('selectedPlatforms'), []),
         userRegion: localStorage.getItem('userRegion') || 'FR',
-        seriesLastWatchedDate: safeParseJSON(localStorage.getItem('seriesLastWatchedDate'), {})
+        seriesLastWatchedDate: safeParseJSON(localStorage.getItem('seriesLastWatchedDate'), {}),
+        userRatings: safeParseJSON(localStorage.getItem('userRatings'), {})
     };
 }
 
@@ -94,7 +96,8 @@ function hasAnyUserData(data) {
         (Array.isArray(data.watchedSeries) && data.watchedSeries.length > 0) ||
         (data.watchedEpisodes && Object.keys(data.watchedEpisodes).length > 0) ||
         (Array.isArray(data.favoriteActors) && data.favoriteActors.length > 0) ||
-        (Array.isArray(data.selectedPlatforms) && data.selectedPlatforms.length > 0)
+        (Array.isArray(data.selectedPlatforms) && data.selectedPlatforms.length > 0) ||
+        (data.userRatings && Object.keys(data.userRatings).length > 0)
     );
 }
 
@@ -106,7 +109,10 @@ function countUserDataItems(data) {
     const we = (data.watchedEpisodes && typeof data.watchedEpisodes === 'object')
         ? Object.values(data.watchedEpisodes).reduce((acc, arr) => acc + (Array.isArray(arr) ? arr.length : 0), 0)
         : 0;
-    return wl + wm + ws + we;
+    const ur = (data.userRatings && typeof data.userRatings === 'object')
+        ? Object.keys(data.userRatings).length
+        : 0;
+    return wl + wm + ws + we + ur;
 }
 
 // Fusion intelligente sans perte entre données locales et données Cloud
@@ -181,6 +187,28 @@ function mergeUserData(localData, cloudData) {
         ? rawLocalRegion
         : (cloud.userRegion || rawLocalRegion || 'FR');
 
+    // 8. Notes internes (userRatings : fusion par clé avec priorité au plus récent)
+    const userRatings = {};
+    const mergeRatingDict = (dict) => {
+        if (!dict || typeof dict !== 'object') return;
+        Object.entries(dict).forEach(([rawKey, val]) => {
+            if (!val) return;
+            const normKey = rawKey.replace(/^serie-/, 'tv-');
+            const entry = typeof val === 'string'
+                ? { rating: val, updatedAt: 0 }
+                : val;
+            const existing = userRatings[normKey];
+            if (!existing || (Number(entry.updatedAt || 0) >= Number(existing.updatedAt || 0))) {
+                userRatings[normKey] = {
+                    ...(existing || {}),
+                    ...entry
+                };
+            }
+        });
+    };
+    mergeRatingDict(cloud.userRatings);
+    mergeRatingDict(local.userRatings);
+
     return {
         watchlist: Array.from(watchlistMap.values()),
         watchedMovies,
@@ -190,6 +218,7 @@ function mergeUserData(localData, cloudData) {
         selectedPlatforms,
         seriesLastWatchedDate,
         userRegion,
+        userRatings,
         updatedAt: Date.now()
     };
 }
@@ -213,6 +242,9 @@ function applyUserDataToLocalStorage(data) {
         }
         if (data.userRegion) {
             localStorage.setItem('userRegion', data.userRegion);
+        }
+        if (data.userRatings && typeof data.userRatings === 'object') {
+            localStorage.setItem('userRatings', JSON.stringify(data.userRatings));
         }
         const syncTs = String(data.updatedAt || Date.now());
         localStorage.setItem('lastCloudSync', syncTs);

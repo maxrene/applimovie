@@ -327,6 +327,13 @@ async function fetchUpdates(id, type) {
 }
 
 function updateUI(data, type, isLocal) {
+    window.currentMediaMetadata = {
+        id: data.id,
+        type,
+        title: data.title,
+        genres: data.genres || []
+    };
+
     const banner = document.getElementById('media-banner');
     if(banner) banner.src = data.bannerUrl;
     
@@ -1152,6 +1159,104 @@ function initializeWatchlistButton(mediaId) {
             toggleWatchlist(mediaId);
         };
     }
+
+    initializeUserRatingButtons(mediaId);
+
+    window.addEventListener('cloud-data-synced', () => {
+        updateWatchlistButton(mediaId);
+        updateNextEpisodeButton(mediaId);
+        updateUserRatingUI(mediaId);
+    });
+}
+
+function initializeUserRatingButtons(mediaId) {
+    const section = document.getElementById('user-rating-section');
+    if (!section) return;
+
+    const bodyType = document.body.dataset.type;
+    const isMovie = bodyType ? bodyType === 'movie' : window.location.pathname.includes('film.html');
+    const type = isMovie ? 'movie' : 'tv';
+
+    section.querySelectorAll('[data-rating-btn]').forEach(btn => {
+        btn.onclick = (e) => {
+            e.preventDefault();
+            const val = btn.getAttribute('data-rating-btn');
+            if (window.setUserRating) {
+                const meta = window.currentMediaMetadata || {
+                    title: document.getElementById('media-title')?.textContent || '',
+                    genres: []
+                };
+                window.setUserRating(mediaId, type, val, meta);
+                updateUserRatingUI(mediaId);
+            }
+        };
+    });
+
+    updateUserRatingUI(mediaId);
+}
+
+function updateUserRatingUI(mediaId) {
+    const section = document.getElementById('user-rating-section');
+    if (!section) return;
+
+    const mediaIdNum = parseInt(mediaId, 10);
+    const mediaIdStr = String(mediaId);
+    const bodyType = document.body.dataset.type;
+    const isMovie = bodyType ? bodyType === 'movie' : window.location.pathname.includes('film.html');
+    const type = isMovie ? 'movie' : 'tv';
+    const watchedListKey = isMovie ? 'watchedMovies' : 'watchedSeries';
+    const watchedList = getSafeLocalStorage(watchedListKey, []);
+    const isWatched = watchedList.includes(mediaIdNum);
+
+    let isCompleted = isWatched;
+    if (!isMovie && !isCompleted) {
+        const watchedEpisodes = getSafeLocalStorage('watchedEpisodes', {});
+        const watchedCount = (watchedEpisodes[mediaIdStr] || []).length;
+        const episodeInfo = window.currentSeriesData ? determineNextEpisode(mediaId) : null;
+        if (episodeInfo && episodeInfo.hasSeasonDetails) {
+            isCompleted = episodeInfo.totalReleasedEpisodes > 0 &&
+                episodeInfo.watchedReleasedCount >= episodeInfo.totalReleasedEpisodes &&
+                !episodeInfo.nextEpisode;
+        } else if (episodeInfo && episodeInfo.totalReleasedEpisodes > 0) {
+            isCompleted = watchedCount >= episodeInfo.totalReleasedEpisodes;
+        }
+    }
+
+    const currentEntry = window.getUserRating ? window.getUserRating(mediaIdNum, type) : null;
+    const activeRating = currentEntry ? currentEntry.rating : null;
+
+    if (!isCompleted && !activeRating) {
+        section.style.display = 'none';
+        return;
+    }
+
+    section.style.display = 'block';
+    const statusEl = document.getElementById('user-rating-status');
+    if (statusEl) {
+        statusEl.textContent = activeRating ? 'Pris en compte pour vos recos ✨' : 'Affinez vos recommandations';
+        statusEl.className = activeRating
+            ? 'text-[11px] font-semibold text-primary'
+            : 'text-[11px] font-medium text-gray-500';
+    }
+
+    const activeStyles = {
+        dislike: 'bg-red-500/20 text-red-400 border-red-500/60 shadow-md scale-[1.02]',
+        ok: 'bg-amber-500/20 text-amber-300 border-amber-500/60 shadow-md scale-[1.02]',
+        love: 'bg-pink-500/20 text-pink-400 border-pink-500/60 shadow-md scale-[1.02]'
+    };
+    const defaultStyle = 'border-white/10 bg-gray-800/70 text-gray-300 hover:bg-gray-800';
+
+    section.querySelectorAll('[data-rating-btn]').forEach(btn => {
+        const val = btn.getAttribute('data-rating-btn');
+        const iconEl = btn.querySelector('.material-symbols-outlined');
+        const isSelected = val === activeRating;
+
+        btn.className = `flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl border text-xs font-bold transition-all active:scale-95 ${isSelected ? activeStyles[val] : defaultStyle}`;
+        if (iconEl) {
+            if (isSelected) iconEl.classList.add('filled');
+            else iconEl.classList.remove('filled');
+        }
+    });
 }
 
 async function toggleWatchlist(mediaId) {
@@ -1172,6 +1277,7 @@ async function toggleWatchlist(mediaId) {
                 watchedList = watchedList.filter(id => id !== mediaIdNum);
                 localStorage.setItem('watchlist', JSON.stringify(watchlist));
                 localStorage.setItem(watchedListKey, JSON.stringify(watchedList));
+                if (window.setUserRating) window.setUserRating(mediaIdNum, 'movie', null);
             } else if (isInWatchlist) {
                 watchlist = watchlist.filter(item => item.id !== mediaIdNum);
                 localStorage.setItem('watchlist', JSON.stringify(watchlist));
@@ -1208,6 +1314,7 @@ async function toggleWatchlist(mediaId) {
             localStorage.setItem('watchlist', JSON.stringify(watchlist));
             localStorage.setItem(watchedListKey, JSON.stringify(watchedList));
             localStorage.setItem('watchedEpisodes', JSON.stringify(watchedEpisodes));
+            if (window.setUserRating) window.setUserRating(mediaIdNum, 'tv', null);
 
             // Réinitialiser visuellement les coches des saisons et épisodes
             document.querySelectorAll('.season-card').forEach(card => {
@@ -1563,6 +1670,7 @@ function updateWatchlistButton(mediaId) {
             icon.textContent = 'add';
             text.textContent = 'Ajouter à ma liste';
         }
+        updateUserRatingUI(mediaId);
         return;
     }
 
@@ -1611,6 +1719,7 @@ function updateWatchlistButton(mediaId) {
         icon.textContent = 'add';
         text.textContent = 'Ajouter à ma liste';
     }
+    updateUserRatingUI(mediaId);
 }
 // Fonction pour récupérer les notes (IMDb + Rotten Tomatoes multi-sources) et mettre à jour le HTML dynamiquement
 async function fetchOMDbRatings(imdbId, meta = {}) {

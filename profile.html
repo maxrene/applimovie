@@ -160,6 +160,29 @@
                         <span class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Épisodes vus</span>
                     </div>
                 </div>
+                <div class="grid grid-cols-3 gap-2.5 mt-1">
+                    <div class="bg-pink-500/10 rounded-xl p-2.5 flex items-center justify-center gap-2 border border-pink-500/20">
+                        <span class="material-symbols-outlined filled text-pink-500 text-lg">favorite</span>
+                        <div class="flex flex-col leading-tight">
+                            <span class="text-sm font-bold text-pink-400" x-text="stats.lovedCount">0</span>
+                            <span class="text-[10px] text-slate-400">Adorés</span>
+                        </div>
+                    </div>
+                    <div class="bg-amber-500/10 rounded-xl p-2.5 flex items-center justify-center gap-2 border border-amber-500/20">
+                        <span class="material-symbols-outlined filled text-amber-400 text-lg">thumb_up</span>
+                        <div class="flex flex-col leading-tight">
+                            <span class="text-sm font-bold text-amber-300" x-text="stats.okCount">0</span>
+                            <span class="text-[10px] text-slate-400">OK</span>
+                        </div>
+                    </div>
+                    <div class="bg-red-500/10 rounded-xl p-2.5 flex items-center justify-center gap-2 border border-red-500/20">
+                        <span class="material-symbols-outlined filled text-red-400 text-lg">thumb_down</span>
+                        <div class="flex flex-col leading-tight">
+                            <span class="text-sm font-bold text-red-400" x-text="stats.dislikedCount">0</span>
+                            <span class="text-[10px] text-slate-400">Pas aimés</span>
+                        </div>
+                    </div>
+                </div>
             </div>
             
             <div class="flex flex-col gap-2">
@@ -403,13 +426,17 @@
                 watchlistCount: 0,
                 watchedMoviesCount: 0,
                 watchedSeriesCount: 0,
-                watchedEpisodesCount: 0
+                watchedEpisodesCount: 0,
+                lovedCount: 0,
+                okCount: 0,
+                dislikedCount: 0
             },
 
             init() {
                 this.refreshProfileData();
                 window.addEventListener('cloud-data-synced', () => this.refreshProfileData());
                 window.addEventListener('watchlist-updated', () => this.refreshProfileData());
+                window.addEventListener('user-rating-changed', () => this.refreshProfileData());
             },
 
             refreshProfileData() {
@@ -421,17 +448,31 @@
                 const watchedMovies = getSafeLocalStorage('watchedMovies', []);
                 const watchedSeries = getSafeLocalStorage('watchedSeries', []);
                 const watchedEpisodes = getSafeLocalStorage('watchedEpisodes', {});
+                const userRatings = getSafeLocalStorage('userRatings', {});
 
                 let epCount = 0;
                 Object.values(watchedEpisodes).forEach(arr => {
                     if (Array.isArray(arr)) epCount += arr.length;
                 });
 
+                let lovedCount = 0;
+                let okCount = 0;
+                let dislikedCount = 0;
+                Object.values(userRatings || {}).forEach(entry => {
+                    const r = typeof entry === 'string' ? entry : entry?.rating;
+                    if (r === 'love') lovedCount++;
+                    else if (r === 'ok') okCount++;
+                    else if (r === 'dislike') dislikedCount++;
+                });
+
                 this.stats = {
                     watchlistCount: watchlist.length,
                     watchedMoviesCount: watchedMovies.length,
                     watchedSeriesCount: watchedSeries.length,
-                    watchedEpisodesCount: epCount
+                    watchedEpisodesCount: epCount,
+                    lovedCount,
+                    okCount,
+                    dislikedCount
                 };
             },
 
@@ -453,7 +494,7 @@
                     'watchlist', 'watchedMovies', 'watchedSeries', 'watchedEpisodes', 
                     'favoriteActors', 'selectedPlatforms', 'userRegion', 'userId',
                     'anonymousId', 'seriesLastWatchedDate', 'previousSearches', 'lastCloudSync',
-                    'cloudUserProfile', 'localUpdatedAt'
+                    'cloudUserProfile', 'localUpdatedAt', 'userRatings'
                 ];
                 
                 const keysToRemove = [];
@@ -498,6 +539,7 @@
             favoriteActors: localStorage.getItem('favoriteActors'),
             selectedPlatforms: localStorage.getItem('selectedPlatforms'),
             seriesLastWatchedDate: localStorage.getItem('seriesLastWatchedDate'),
+            userRatings: localStorage.getItem('userRatings'),
             userRegion: localStorage.getItem('userRegion')
         };
         const blob = new Blob([JSON.stringify(data)], {type: 'application/json'});
@@ -524,6 +566,7 @@
                 if(data.favoriteActors) localStorage.setItem('favoriteActors', typeof data.favoriteActors === 'string' ? data.favoriteActors : JSON.stringify(data.favoriteActors));
                 if(data.selectedPlatforms) localStorage.setItem('selectedPlatforms', typeof data.selectedPlatforms === 'string' ? data.selectedPlatforms : JSON.stringify(data.selectedPlatforms));
                 if(data.seriesLastWatchedDate) localStorage.setItem('seriesLastWatchedDate', typeof data.seriesLastWatchedDate === 'string' ? data.seriesLastWatchedDate : JSON.stringify(data.seriesLastWatchedDate));
+                if(data.userRatings) localStorage.setItem('userRatings', typeof data.userRatings === 'string' ? data.userRatings : JSON.stringify(data.userRatings));
                 if(data.userRegion) localStorage.setItem('userRegion', data.userRegion);
                 if (window.syncToCloud) {
                     await window.syncToCloud();
