@@ -426,6 +426,7 @@ window.compactMovieForCache = function(data) {
         release_date: data.release_date,
         runtime: data.runtime,
         vote_average: data.vote_average,
+        tagline: data.tagline || undefined,
         overview: data.overview,
         genres: (data.genres || []).map(g => ({ id: g.id, name: g.name })),
         'watch/providers': window.compactProviders(data['watch/providers']),
@@ -493,11 +494,22 @@ window.compactSeriesForCache = function(data) {
         number_of_seasons: data.number_of_seasons,
         number_of_episodes: data.number_of_episodes,
         vote_average: data.vote_average,
-        overview: data.overview ? data.overview.slice(0, 600) : '',
+        tagline: data.tagline || undefined,
+        overview: data.overview ? data.overview.slice(0, 800) : '',
         genres: (data.genres || []).map(g => ({ id: g.id, name: g.name })),
         created_by: (data.created_by || []).slice(0, 2).map(c => ({
             id: c.id, name: c.name, profile_path: c.profile_path
         })),
+        credits: data.credits ? {
+            cast: (data.credits.cast || []).slice(0, 10).map(c => ({
+                id: c.id, name: c.name, character: c.character, profile_path: c.profile_path
+            }))
+        } : undefined,
+        videos: data.videos ? {
+            results: (data.videos.results || []).filter(v => v.site === 'YouTube').slice(0, 5).map(v => ({
+                key: v.key, name: v.name, site: v.site, type: v.type
+            }))
+        } : undefined,
         next_episode_to_air: data.next_episode_to_air ? {
             id: data.next_episode_to_air.id,
             name: data.next_episode_to_air.name,

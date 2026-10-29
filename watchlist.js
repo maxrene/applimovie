@@ -80,6 +80,19 @@ document.addEventListener('alpine:init', () => {
         maxDuration: 0, // 0 = tous, 100 = <1h40, 130 = <2h10
         randomPickItem: null,
 
+        // Mode "Pitch Me" (Aide au choix du soir sous forme de deck de cartes)
+        showPitchModal: false,
+        pitchDeck: [],
+        pitchIndex: 0,
+        pitchFilterMyPlatforms: false,
+        pitchFilterShort: false,
+        pitchLoadingDetails: false,
+        pitchShowTrailer: false,
+        pitchCardAnim: '', // '' | 'swipe-left' | 'swipe-right'
+        pitchTouchStartX: 0,
+        pitchTouchStartY: 0,
+        pitchRtVersion: 0,
+
         userRegion: localStorage.getItem('userRegion') || 'FR',
         myPlatformIds: [],
         userSelectedPlatforms: [],
@@ -191,6 +204,9 @@ document.addEventListener('alpine:init', () => {
                         slot.innerHTML = window.createRTBadgeHTML(rt, 'sm');
                     }
                 });
+                if (this.showPitchModal) {
+                    this.pitchRtVersion++;
+                }
             });
 
             await this.renderMedia();
@@ -225,11 +241,539 @@ document.addEventListener('alpine:init', () => {
             this.showFilterModal = false;
         },
 
+        get unwatchedPoolForCurrentTab() {
+            const type = this.subTab === 'movie' ? 'movie' : 'serie';
+            const watchedMovies = getSafeLocalStorage('watchedMovies', []);
+            const watchedSeries = getSafeLocalStorage('watchedSeries', []);
+            const watchedEpisodes = getSafeLocalStorage('watchedEpisodes', {});
+
+            return this.enrichedWatchlist
+                .map(item => {
+                    if (!item.type && item.title) item.type = 'movie';
+                    if (!item.type && item.name) item.type = 'serie';
+                    const normalizedType = (item.type === 'tv') ? 'serie' : item.type;
+                    let isWatched = false;
+                    try {
+                        if (normalizedType === 'movie') {
+                            isWatched = watchedMovies.includes(Number(item.id));
+                        } else if (item.apiDetails && !item.apiDetails.error) {
+                            const seriesWatched = watchedEpisodes[item.id] || [];
+                            const totalEpisodes = this.getReleasedEpisodeCount(item.apiDetails);
+                            if (totalEpisodes > 0 && seriesWatched.length >= totalEpisodes) {
+                                isWatched = true;
+                            } else if (seriesWatched.length > 0 && seriesWatched.length < totalEpisodes) {
+                                isWatched = false;
+                            } else {
+                                isWatched = watchedSeries.includes(Number(item.id));
+                            }
+                        } else {
+                            isWatched = watchedSeries.includes(Number(item.id));
+                        }
+                    } catch (e) {
+                        isWatched = false;
+                    }
+                    const dynamicProviders = this.getProvidersForItem(item);
+                    return { ...item, type: normalizedType, isWatched, dynamicProviders };
+                })
+                .filter(item => item && item.type === type && !item.isWatched);
+        },
+
         pickRandomMedia() {
-            const pool = this.filteredMedia;
-            if (!pool || pool.length === 0) return;
-            const randomIndex = Math.floor(Math.random() * pool.length);
-            this.randomPickItem = pool[randomIndex];
+            this.openPitchMe();
+        },
+
+        openPitchMe() {
+            this.refreshUserPlatforms();
+            this.pitchShowTrailer = false;
+            this.pitchCardAnim = '';
+            this.buildPitchDeck();
+            this.showPitchModal = true;
+        },
+
+        closePitchMe() {
+            this.pitchShowTrailer = false;
+            this.showPitchModal = false;
+        },
+
+        togglePitchMyPlatforms() {
+            this.pitchFilterMyPlatforms = !this.pitchFilterMyPlatforms;
+            this.pitchShowTrailer = false;
+            this.buildPitchDeck();
+        },
+
+        togglePitchShort() {
+            this.pitchFilterShort = !this.pitchFilterShort;
+            this.pitchShowTrailer = false;
+            this.buildPitchDeck();
+        },
+
+        getUserTasteContext(targetType) {
+            const normTarget = (targetType === 'tv' || targetType === 'serie') ? 'tv' : 'movie';
+            const ratings = getSafeLocalStorage('userRatings', {});
+            const genreWeights = {};
+            const lovedByGenre = {};
+
+            Object.values(ratings).forEach(entry => {
+                if (!entry || typeof entry !== 'object') return;
+                const entryType = (entry.type === 'tv' || entry.type === 'serie') ? 'tv' : 'movie';
+                if (entryType !== normTarget) return;
+
+                const weight = entry.rating === 'love' ? 3 : (entry.rating === 'ok' ? 1 : (entry.rating === 'dislike' ? -2 : 0));
+                if (weight === 0) return;
+
+                let genres = Array.isArray(entry.genres) ? [...entry.genres] : [];
+                let title = entry.title || '';
+
+                if (genres.length === 0 || !title) {
+                    const cacheKey = normTarget === 'tv' ? `series-details-${entry.id}` : `movie-details-${entry.id}`;
+                    const cached = memoryMediaCache.get(cacheKey) || this.getCachedData(cacheKey, true);
+                    if (cached && !cached.error) {
+                        if (!title) title = cached.title || cached.name || '';
+                        if (genres.length === 0 && Array.isArray(cached.genres)) {
+                            genres = cached.genres.map(g => (typeof g === 'string' ? g : g.name)).filter(Boolean);
+                        }
+                    }
+                }
+
+                genres.forEach(gName => {
+                    const cleanName = typeof gName === 'string' ? gName : (gName?.name || '');
+                    if (!cleanName) return;
+                    genreWeights[cleanName] = (genreWeights[cleanName] || 0) + weight;
+                    if (entry.rating === 'love' && title) {
+                        if (!lovedByGenre[cleanName]) lovedByGenre[cleanName] = [];
+                        if (!lovedByGenre[cleanName].includes(title)) {
+                            lovedByGenre[cleanName].push(title);
+                        }
+                    }
+                });
+            });
+
+            return { genreWeights, lovedByGenre };
+        },
+
+        buildPitchDeck() {
+            const type = this.subTab === 'movie' ? 'movie' : 'serie';
+            let pool = [...this.unwatchedPoolForCurrentTab];
+
+            // Appliquer les filtres de la barre principale s'ils sont actifs
+            if (this.activePlatformFilters.length > 0) {
+                pool = pool.filter(item =>
+                    Array.isArray(item.dynamicProviders) && item.dynamicProviders.some(p =>
+                        this.activePlatformFilters.includes(this.getInternalPlatformId(p.provider_name, p.provider_id))
+                    )
+                );
+            }
+
+            if (this.selectedGenre) {
+                pool = pool.filter(item =>
+                    Array.isArray(item.genres) && item.genres.some(g => (typeof g === 'string' ? g : g.name) === this.selectedGenre)
+                );
+            }
+
+            if (this.maxDuration > 0 && type === 'movie') {
+                pool = pool.filter(item => {
+                    const runtime = item.runtime || item.apiDetails?.runtime || 0;
+                    return runtime > 0 && runtime <= this.maxDuration;
+                });
+            }
+
+            // Appliquer les filtres rapides internes au mode Pitch Me
+            if (this.pitchFilterMyPlatforms && this.myPlatformIds.length > 0) {
+                pool = pool.filter(item =>
+                    Array.isArray(item.dynamicProviders) && item.dynamicProviders.some(p =>
+                        this.myPlatformIds.includes(this.getInternalPlatformId(p.provider_name, p.provider_id))
+                    )
+                );
+            }
+
+            if (this.pitchFilterShort && type === 'movie') {
+                pool = pool.filter(item => {
+                    const runtime = item.runtime || item.apiDetails?.runtime || 0;
+                    return runtime > 0 && runtime <= 115;
+                });
+            }
+
+            const { genreWeights } = this.getUserTasteContext(type);
+
+            const scored = pool.map(item => {
+                const itemGenres = (item.genres || []).map(g => (typeof g === 'string' ? g : g.name)).filter(Boolean);
+                let tasteScore = 0;
+                itemGenres.forEach(g => {
+                    if (genreWeights[g]) tasteScore += genreWeights[g];
+                });
+
+                const isOnMyPlatforms = this.myPlatformIds.length > 0 && Array.isArray(item.dynamicProviders) &&
+                    item.dynamicProviders.some(p => this.myPlatformIds.includes(this.getInternalPlatformId(p.provider_name, p.provider_id)));
+
+                const imdbNum = parseFloat(item.imdb || item.apiDetails?.vote_average || 0) || 0;
+                const priorityScore =
+                    (isOnMyPlatforms ? 6 : 0) +
+                    Math.max(-4, Math.min(10, tasteScore)) * 1.4 +
+                    (imdbNum >= 7.5 ? 2 : 0) +
+                    (Math.random() * 5.5);
+
+                return { item, priorityScore };
+            });
+
+            scored.sort((a, b) => b.priorityScore - a.priorityScore);
+            this.pitchDeck = scored.map(s => s.item);
+            this.pitchIndex = 0;
+            this.enrichActivePitchWindow();
+        },
+
+        async enrichPitchItem(item) {
+            if (!item || !item.id) return;
+            const isMovie = item.type === 'movie';
+            const cacheKey = isMovie ? `movie-details-${item.id}` : `series-details-${item.id}`;
+            const details = item.apiDetails || memoryMediaCache.get(cacheKey) || this.getCachedData(cacheKey, true);
+
+            // Déclencher la récupération prioritaire Rotten Tomatoes / IMDb
+            const normType = isMovie ? 'movie' : 'tv';
+            if (window.fetchMediaRatings && details && !details.error) {
+                window.fetchMediaRatings({
+                    tmdbId: item.id,
+                    type: normType,
+                    imdbId: details.imdb_id || details.external_ids?.imdb_id || null,
+                    wikidataId: details.external_ids?.wikidata_id || null,
+                    title: item.title || details.title || details.name || '',
+                    originalTitle: details.original_title || details.original_name || '',
+                    year: String(item.year || '').split(' - ')[0],
+                    priority: true
+                });
+            }
+
+            // Si les crédits et vidéos sont déjà chargés, rien de plus à requêter
+            if (details && !details.error && details.credits && details.videos) {
+                return;
+            }
+
+            try {
+                if (this.pitchDeck[this.pitchIndex] && Number(this.pitchDeck[this.pitchIndex].id) === Number(item.id)) {
+                    this.pitchLoadingDetails = true;
+                }
+                const endpoint = isMovie ? `movie/${item.id}` : `tv/${item.id}`;
+                const res = await apiQueue.add(
+                    () => fetch(`https://api.themoviedb.org/3/${endpoint}?api_key=${TMDB_API_KEY}&language=fr-FR&append_to_response=watch/providers,external_ids,credits,videos&include_video_language=fr,en,null`),
+                    true
+                );
+                if (!res.ok) return;
+                const fullData = await res.json();
+
+                // Conserver les saisons déjà chargées si c'est une série
+                if (!isMovie && details && Array.isArray(details.seasons)) {
+                    fullData.seasons = details.seasons;
+                }
+
+                const compacted = this.setCachedData(cacheKey, fullData, isMovie);
+                const hydrated = this.hydrateEnrichedItem(item, compacted);
+
+                // Mettre à jour dans pitchDeck et enrichedWatchlist
+                const deckIdx = this.pitchDeck.findIndex(i => Number(i.id) === Number(item.id));
+                if (deckIdx !== -1) {
+                    const dynamicProviders = this.getProvidersForItem(hydrated);
+                    this.pitchDeck[deckIdx] = { ...hydrated, type: item.type, dynamicProviders };
+                }
+                const listIdx = this.enrichedWatchlist.findIndex(i => Number(i.id) === Number(item.id));
+                if (listIdx !== -1) {
+                    this.enrichedWatchlist[listIdx] = hydrated;
+                }
+
+                if (window.fetchMediaRatings) {
+                    window.fetchMediaRatings({
+                        tmdbId: item.id,
+                        type: normType,
+                        imdbId: compacted.imdb_id || compacted.external_ids?.imdb_id || null,
+                        wikidataId: compacted.external_ids?.wikidata_id || null,
+                        title: compacted.title || compacted.name || '',
+                        originalTitle: compacted.original_title || compacted.original_name || '',
+                        year: String(hydrated.year || '').split(' - ')[0],
+                        priority: true
+                    });
+                }
+            } catch (e) {
+                console.warn('[PitchMe] Erreur enrichissement carte:', e);
+            } finally {
+                this.pitchLoadingDetails = false;
+            }
+        },
+
+        enrichActivePitchWindow() {
+            const current = this.pitchDeck[this.pitchIndex];
+            const next = this.pitchDeck[this.pitchIndex + 1];
+            if (current) this.enrichPitchItem(current);
+            if (next) this.enrichPitchItem(next);
+        },
+
+        pitchNextCard() {
+            if (this.pitchDeck.length === 0) return;
+            this.pitchShowTrailer = false;
+            this.pitchCardAnim = 'swipe-left';
+            setTimeout(() => {
+                if (this.pitchIndex < this.pitchDeck.length - 1) {
+                    this.pitchIndex++;
+                } else {
+                    // Boucler avec un nouveau mélange intelligent
+                    this.buildPitchDeck();
+                }
+                this.pitchCardAnim = '';
+                this.enrichActivePitchWindow();
+            }, 140);
+        },
+
+        pitchPrevCard() {
+            if (this.pitchIndex <= 0) return;
+            this.pitchShowTrailer = false;
+            this.pitchCardAnim = 'swipe-right';
+            setTimeout(() => {
+                this.pitchIndex = Math.max(0, this.pitchIndex - 1);
+                this.pitchCardAnim = '';
+            }, 140);
+        },
+
+        handlePitchTouchStart(e) {
+            if (!e.touches || e.touches.length === 0) return;
+            this.pitchTouchStartX = e.touches[0].clientX;
+            this.pitchTouchStartY = e.touches[0].clientY;
+        },
+
+        handlePitchTouchEnd(e) {
+            if (!e.changedTouches || e.changedTouches.length === 0) return;
+            const dx = e.changedTouches[0].clientX - this.pitchTouchStartX;
+            const dy = e.changedTouches[0].clientY - this.pitchTouchStartY;
+            if (Math.abs(dx) > 65 && Math.abs(dx) > Math.abs(dy) * 1.4) {
+                if (dx < 0) {
+                    this.pitchNextCard();
+                } else if (dx > 0 && this.pitchIndex > 0) {
+                    this.pitchPrevCard();
+                }
+            }
+        },
+
+        get currentPitchCard() {
+            // Dépendance réactive pour rafraîchir dès que Rotten Tomatoes arrive
+            void this.pitchRtVersion;
+            if (!this.pitchDeck || this.pitchDeck.length === 0) return null;
+            const item = this.pitchDeck[this.pitchIndex];
+            if (!item) return null;
+
+            const isMovie = item.type === 'movie';
+            const normType = isMovie ? 'movie' : 'tv';
+            const details = item.apiDetails && !item.apiDetails.error ? item.apiDetails : {};
+
+            const title = details.title || details.name || item.title || 'Sans titre';
+            const year = String(item.year || details.release_date || details.first_air_date || '').split('-')[0].trim();
+            const posterUrl = item.posterUrl || (details.poster_path ? `https://image.tmdb.org/t/p/w500${details.poster_path}` : 'https://placehold.co/300x450?text=No+Image');
+            const backdropUrl = details.backdrop_path
+                ? `https://image.tmdb.org/t/p/w780${details.backdrop_path}`
+                : posterUrl;
+
+            const genres = (details.genres || item.genres || [])
+                .map(g => (typeof g === 'string' ? g : g.name))
+                .filter(Boolean)
+                .slice(0, 3);
+
+            const runtime = details.runtime || item.runtime || 0;
+            const totalSeasons = details.number_of_seasons || (Array.isArray(details.seasons) ? details.seasons.length : 0);
+            const durationLabel = isMovie
+                ? (runtime > 0 ? this.formatDuration(runtime) : '')
+                : (totalSeasons > 0 ? `${totalSeasons} Saison${totalSeasons > 1 ? 's' : ''}` : '');
+
+            const cachedRatings = window.getCachedMediaRatings ? window.getCachedMediaRatings(item.id, normType) : null;
+            const imdbScore = cachedRatings?.imdb || (details.vote_average ? Number(details.vote_average).toFixed(1) : (item.imdb && item.imdb !== '0' ? item.imdb : ''));
+            const rtScore = cachedRatings?.rt || ((item.rottenTomatoes && item.rottenTomatoes !== 'xx' && item.rottenTomatoes !== 'N/A') ? item.rottenTomatoes : null);
+            const rtIconUrl = rtScore && window.getRTIconUrl ? window.getRTIconUrl(rtScore) : 'https://upload.wikimedia.org/wikipedia/commons/5/5b/Rotten_Tomatoes.svg';
+
+            // Plateformes disponibles
+            const providers = item.dynamicProviders || this.getProvidersForItem(item);
+            const myPlatforms = [];
+            const otherPlatforms = [];
+            const seenPlat = new Set();
+
+            providers.forEach(p => {
+                const internalId = this.getInternalPlatformId(p.provider_name, p.provider_id);
+                const key = internalId !== 'other' ? internalId : p.provider_id;
+                if (seenPlat.has(key)) return;
+                seenPlat.add(key);
+
+                const catObj = this.availablePlatforms.find(ap => ap.id === internalId);
+                const platInfo = {
+                    id: internalId,
+                    name: catObj ? catObj.name : p.provider_name,
+                    logoUrl: catObj ? catObj.logoUrl : (p.logo_path ? `https://image.tmdb.org/t/p/original${p.logo_path}` : '')
+                };
+
+                if (this.myPlatformIds.includes(internalId)) {
+                    myPlatforms.push(platInfo);
+                } else {
+                    otherPlatforms.push(platInfo);
+                }
+            });
+
+            // Réalisateur / Créateur & Casting
+            let directorOrCreator = '';
+            if (isMovie && details.credits && Array.isArray(details.credits.crew)) {
+                const dirs = details.credits.crew.filter(c => c.job === 'Director').map(c => c.name);
+                if (dirs.length > 0) directorOrCreator = dirs.slice(0, 2).join(', ');
+            } else if (!isMovie && Array.isArray(details.created_by) && details.created_by.length > 0) {
+                directorOrCreator = details.created_by.map(c => c.name).slice(0, 2).join(', ');
+            }
+
+            const castNames = (details.credits && Array.isArray(details.credits.cast))
+                ? details.credits.cast.slice(0, 3).map(c => c.name).filter(Boolean)
+                : [];
+
+            // Bande-annonce YouTube
+            let trailerKey = null;
+            if (details.videos && Array.isArray(details.videos.results)) {
+                const ytVideos = details.videos.results.filter(v => v.site === 'YouTube' && v.key);
+                const trailer = ytVideos.find(v => v.type === 'Trailer') || ytVideos.find(v => v.type === 'Teaser') || ytVideos[0];
+                if (trailer) trailerKey = trailer.key;
+            }
+
+            // Génération des arguments "Pourquoi ce soir ?" (Pitch Hooks)
+            const { genreWeights, lovedByGenre } = this.getUserTasteContext(isMovie ? 'movie' : 'tv');
+            const pitchPoints = [];
+
+            // 1. Hook d'affinité avec les films/séries notés par l'utilisateur
+            let matchedLovedTitle = null;
+            let matchedLovedGenre = null;
+            let bestPositiveGenre = null;
+            for (const g of genres) {
+                if (lovedByGenre[g] && lovedByGenre[g].length > 0 && !matchedLovedTitle) {
+                    const candidates = lovedByGenre[g].filter(t => t.toLowerCase() !== title.toLowerCase());
+                    if (candidates.length > 0) {
+                        matchedLovedTitle = candidates[0];
+                        matchedLovedGenre = g;
+                    }
+                }
+                if ((genreWeights[g] || 0) > 0 && !bestPositiveGenre) {
+                    bestPositiveGenre = g;
+                }
+            }
+
+            if (matchedLovedTitle) {
+                pitchPoints.push({
+                    icon: 'favorite',
+                    badgeClass: 'bg-pink-500/15 text-pink-300 border-pink-500/30',
+                    iconClass: 'text-pink-400 filled',
+                    text: `Dans la veine de « ${matchedLovedTitle} » que vous avez adoré (${matchedLovedGenre})`
+                });
+            } else if (bestPositiveGenre) {
+                pitchPoints.push({
+                    icon: 'thumb_up',
+                    badgeClass: 'bg-amber-500/15 text-amber-200 border-amber-500/30',
+                    iconClass: 'text-amber-400 filled',
+                    text: `Pile dans vos goûts du moment : ${bestPositiveGenre}`
+                });
+            }
+
+            // 2. Hook Format & Rythme pour la soirée
+            if (isMovie && runtime > 0) {
+                if (runtime <= 100) {
+                    pitchPoints.push({
+                        icon: 'bolt',
+                        badgeClass: 'bg-emerald-500/15 text-emerald-200 border-emerald-500/30',
+                        iconClass: 'text-emerald-400',
+                        text: `Format court & intense (${durationLabel}) — idéal pour se lancer sans veiller tard`
+                    });
+                } else if (runtime <= 125) {
+                    pitchPoints.push({
+                        icon: 'schedule',
+                        badgeClass: 'bg-sky-500/15 text-sky-200 border-sky-500/30',
+                        iconClass: 'text-sky-400',
+                        text: `Format équilibré pour ce soir (${durationLabel})`
+                    });
+                } else {
+                    pitchPoints.push({
+                        icon: 'theaters',
+                        badgeClass: 'bg-purple-500/15 text-purple-200 border-purple-500/30',
+                        iconClass: 'text-purple-400',
+                        text: `Grande fresque cinéma (${durationLabel}) pour une immersion totale`
+                    });
+                }
+            } else if (!isMovie) {
+                const watchedEpisodes = getSafeLocalStorage('watchedEpisodes', {});
+                const epCount = (watchedEpisodes[item.id] || []).length;
+                if (epCount > 0) {
+                    pitchPoints.push({
+                        icon: 'play_circle',
+                        badgeClass: 'bg-primary/15 text-blue-200 border-primary/30',
+                        iconClass: 'text-primary filled',
+                        text: `Série déjà commencée (${epCount} ép. vus) — prête à reprendre ce soir`
+                    });
+                } else if (totalSeasons === 1) {
+                    pitchPoints.push({
+                        icon: 'bolt',
+                        badgeClass: 'bg-emerald-500/15 text-emerald-200 border-emerald-500/30',
+                        iconClass: 'text-emerald-400',
+                        text: `Format court (1 seule saison) — parfait pour commencer sans s'engager sur 10 ans`
+                    });
+                } else if (totalSeasons > 1) {
+                    pitchPoints.push({
+                        icon: 'tv',
+                        badgeClass: 'bg-sky-500/15 text-sky-200 border-sky-500/30',
+                        iconClass: 'text-sky-400',
+                        text: `${totalSeasons} saisons disponibles — un univers riche où plonger`
+                    });
+                }
+            }
+
+            // 3. Hook Critique / Prestige
+            const rtNumeric = rtScore ? parseInt(String(rtScore).replace(/[^0-9]/g, ''), 10) : 0;
+            const imdbNumeric = parseFloat(imdbScore || '0') || 0;
+            if (rtNumeric >= 85 || imdbNumeric >= 7.8) {
+                const scoreMention = rtNumeric >= 85 && imdbNumeric >= 7.5
+                    ? `${rtScore} sur Rotten Tomatoes • ${imdbScore}/10 IMDb`
+                    : (rtNumeric >= 85 ? `${rtScore} d'avis positifs sur Rotten Tomatoes` : `Noté ${imdbScore}/10 sur IMDb`);
+                pitchPoints.push({
+                    icon: 'workspace_premium',
+                    badgeClass: 'bg-yellow-500/15 text-yellow-200 border-yellow-500/30',
+                    iconClass: 'text-yellow-400 filled',
+                    text: `Valeur sûre plébiscitée (${scoreMention})`
+                });
+            }
+
+            // 4. Hook Casting / Réalisation
+            if (directorOrCreator || castNames.length > 0) {
+                const parts = [];
+                if (directorOrCreator) parts.push(`${isMovie ? 'Réalisé par' : 'Créé par'} ${directorOrCreator}`);
+                if (castNames.length > 0) parts.push(`avec ${castNames.join(', ')}`);
+                pitchPoints.push({
+                    icon: 'movie_filter',
+                    badgeClass: 'bg-white/5 text-gray-200 border-white/10',
+                    iconClass: 'text-primary',
+                    text: parts.join(' • ')
+                });
+            }
+
+            const tagline = details.tagline && String(details.tagline).trim().length > 0
+                ? String(details.tagline).trim()
+                : '';
+
+            const overview = details.overview && String(details.overview).trim().length > 0
+                ? String(details.overview).trim()
+                : (item.synopsis || 'Découvrez cette œuvre dès ce soir depuis votre liste.');
+
+            return {
+                id: item.id,
+                type: isMovie ? 'movie' : 'serie',
+                detailUrl: `${isMovie ? 'film.html' : 'serie.html'}?id=${item.id}`,
+                title,
+                year,
+                posterUrl,
+                backdropUrl,
+                genres,
+                durationLabel,
+                imdbScore,
+                rtScore,
+                rtIconUrl,
+                myPlatforms,
+                otherPlatforms,
+                tagline,
+                overview,
+                trailerKey,
+                pitchPoints: pitchPoints.slice(0, 4)
+            };
         },
 
         togglePlatformFilter(platformId) {

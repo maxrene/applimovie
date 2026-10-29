@@ -590,9 +590,9 @@
                     </button>
                 </div>
                 <div class="flex items-center gap-1.5 flex-shrink-0">
-                    <button @click="pickRandomMedia()" title="Choisir au hasard" class="flex items-center space-x-1 rounded-full bg-primary/15 text-primary hover:bg-primary/25 p-2 px-2.5 text-xs font-semibold transition-colors touch-feedback">
-                        <span class="material-symbols-outlined text-base">casino</span>
-                        <span class="hidden sm:inline">Au hasard</span>
+                    <button @click="openPitchMe()" title="Pitch-moi un programme pour ce soir" class="flex items-center gap-1 rounded-full bg-gradient-to-r from-primary/20 to-amber-500/20 border border-primary/40 text-primary hover:from-primary hover:to-amber-500 hover:text-white p-2 px-3 text-xs font-bold shadow-sm transition-all active:scale-95 touch-feedback">
+                        <span class="material-symbols-outlined text-base filled">auto_awesome</span>
+                        <span>Pitch Me</span>
                     </button>
                     <div class="relative" x-data="{ open: false }">
                         <button @click="open = !open" class="flex items-center space-x-1 rounded-full bg-gray-200 dark:bg-gray-800 p-2 px-3 text-xs text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors touch-feedback">
@@ -670,6 +670,27 @@
         </header>
 
         <main class="flex-1 overflow-y-auto pb-24" x-cloak>
+            <!-- Bannière d'aide au choix du soir ("Pitch Me") -->
+            <div x-show="watchStatusFilter === 'unwatched' && unwatchedPoolForCurrentTab.length > 1" class="px-4 pt-3 pb-1" x-cloak>
+                <div @click="openPitchMe()" class="cursor-pointer rounded-2xl bg-gradient-to-r from-[#1c2536] via-[#1a1f2c] to-[#251e2e] border border-primary/30 p-3.5 flex items-center justify-between gap-3 shadow-md hover:border-primary/60 transition-all active:scale-[0.99]">
+                    <div class="flex items-center gap-3 min-w-0">
+                        <div class="w-10 h-10 rounded-xl bg-primary/20 border border-primary/40 flex items-center justify-center text-primary shrink-0">
+                            <span class="material-symbols-outlined text-xl filled">style</span>
+                        </div>
+                        <div class="min-w-0">
+                            <p class="text-xs font-extrabold uppercase tracking-wider text-primary flex items-center gap-1">
+                                <span>Indécis ce soir ?</span>
+                            </p>
+                            <p class="text-xs sm:text-sm font-medium text-gray-200 truncate" x-text="subTab === 'movie' ? 'Laissez-vous pitcher un film de votre liste carte par carte' : 'Laissez-vous pitcher une série de votre liste carte par carte'"></p>
+                        </div>
+                    </div>
+                    <button type="button" class="shrink-0 px-3.5 py-2 rounded-xl bg-primary text-white text-xs font-bold shadow-sm hover:bg-primary/90 transition-colors flex items-center gap-1">
+                        <span x-text="subTab === 'movie' ? 'Pitch-moi un film' : 'Pitch-moi une série'"></span>
+                        <span class="material-symbols-outlined text-sm">arrow_forward</span>
+                    </button>
+                </div>
+            </div>
+
             <div id="media-list" class="divide-y divide-gray-200/20 dark:divide-gray-700/50"></div>
             <div id="empty-state" class="hidden text-center p-8 flex flex-col items-center justify-center h-full">
                 <span class="material-symbols-outlined text-6xl text-gray-700 mb-4">movie_filter</span>
@@ -677,29 +698,196 @@
             </div>
         </main>
 
-        <!-- Modal "Au hasard" -->
-        <div x-show="randomPickItem" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm" x-transition.opacity x-cloak>
-            <template x-if="randomPickItem">
-                <div @click.away="randomPickItem = null" class="bg-white dark:bg-[#1c1c1c] w-full max-w-xs rounded-2xl shadow-2xl overflow-hidden border border-gray-200 dark:border-gray-800 p-5 flex flex-col items-center text-center">
-                    <div class="flex items-center gap-1.5 text-primary text-xs font-bold uppercase tracking-wider mb-3">
-                        <span class="material-symbols-outlined text-base">casino</span>
-                        <span>Suggestion au hasard</span>
-                    </div>
-                    <img :src="randomPickItem.poster_path ? 'https://image.tmdb.org/t/p/w342' + randomPickItem.poster_path : 'https://placehold.co/200x300?text=No+Image'" class="w-36 aspect-[2/3] rounded-xl object-cover shadow-lg mb-3">
-                    <h3 class="text-lg font-bold text-gray-900 dark:text-white leading-snug" x-text="randomPickItem.title || randomPickItem.name"></h3>
-                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1" x-text="(randomPickItem.genres || []).slice(0, 2).map(g => g.name).join(', ')"></p>
-                    <div class="flex gap-2 w-full mt-5">
-                        <button @click="pickRandomMedia()" class="flex-1 py-2.5 rounded-xl bg-gray-200 dark:bg-gray-800 text-gray-800 dark:text-gray-200 text-xs font-bold hover:bg-gray-300 dark:hover:bg-gray-700 transition-colors flex items-center justify-center gap-1">
-                            <span class="material-symbols-outlined text-sm">refresh</span>
-                            <span>Autre idée</span>
+        <!-- Modal Deck "Pitch Me" -->
+        <div x-show="showPitchModal" class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md" x-transition.opacity x-cloak>
+            <div @click.away="closePitchMe()" class="bg-[#161618] text-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden border border-white/10 flex flex-col max-h-[90vh]">
+                <!-- En-tête du Deck Pitch Me -->
+                <div class="px-4 pt-3.5 pb-2.5 border-b border-white/10 bg-[#121214]">
+                    <div class="flex items-center justify-between gap-2">
+                        <div class="flex items-center gap-2">
+                            <span class="material-symbols-outlined text-primary text-lg filled">auto_awesome</span>
+                            <span class="text-xs font-extrabold uppercase tracking-wider text-white" x-text="subTab === 'movie' ? 'Pitch Me • Film du soir' : 'Pitch Me • Série du soir'"></span>
+                            <template x-if="pitchDeck.length > 0">
+                                <span class="px-2 py-0.5 rounded-full bg-white/10 text-[11px] font-bold text-gray-300" x-text="(pitchIndex + 1) + ' / ' + pitchDeck.length"></span>
+                            </template>
+                        </div>
+                        <button @click="closePitchMe()" class="w-8 h-8 rounded-full bg-white/5 hover:bg-white/15 flex items-center justify-center text-gray-400 hover:text-white transition-colors">
+                            <span class="material-symbols-outlined text-lg">close</span>
                         </button>
-                        <a :href="(randomPickItem.media_type === 'movie' ? 'film.html' : 'serie.html') + '?id=' + randomPickItem.id" class="flex-1 py-2.5 rounded-xl bg-primary text-white text-xs font-bold hover:bg-primary/90 transition-colors flex items-center justify-center gap-1">
-                            <span>Voir la fiche</span>
-                            <span class="material-symbols-outlined text-sm">arrow_forward</span>
-                        </a>
+                    </div>
+
+                    <!-- Filtres rapides dans le Pitch Deck -->
+                    <div class="flex items-center gap-1.5 mt-2.5 overflow-x-auto no-scrollbar">
+                        <template x-if="myPlatformIds.length > 0">
+                            <button @click="togglePitchMyPlatforms()" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-all shrink-0" :class="pitchFilterMyPlatforms ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50' : 'bg-white/5 text-gray-400 border-white/10 hover:text-gray-200'">
+                                <span class="material-symbols-outlined text-[13px]" :class="pitchFilterMyPlatforms ? 'filled text-emerald-400' : ''">smart_display</span>
+                                <span>Dispo sur mes plateformes</span>
+                            </button>
+                        </template>
+                        <template x-if="subTab === 'movie'">
+                            <button @click="togglePitchShort()" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-all shrink-0" :class="pitchFilterShort ? 'bg-sky-500/20 text-sky-300 border-sky-500/50' : 'bg-white/5 text-gray-400 border-white/10 hover:text-gray-200'">
+                                <span class="material-symbols-outlined text-[13px]">bolt</span>
+                                <span>Format court (&lt; 1h55)</span>
+                            </button>
+                        </template>
                     </div>
                 </div>
-            </template>
+
+                <!-- État vide si aucun titre ne correspond aux filtres -->
+                <template x-if="!currentPitchCard">
+                    <div class="p-8 text-center flex flex-col items-center justify-center space-y-3">
+                        <span class="material-symbols-outlined text-5xl text-gray-600">style</span>
+                        <p class="text-sm font-bold text-white">Aucune carte disponible avec ces filtres</p>
+                        <p class="text-xs text-gray-400 max-w-xs">Désactivez un filtre rapide ou ajoutez des titres à votre liste pour lancer le Pitch Me.</p>
+                        <div class="flex gap-2 pt-2">
+                            <button x-show="pitchFilterMyPlatforms || pitchFilterShort" @click="pitchFilterMyPlatforms = false; pitchFilterShort = false; buildPitchDeck()" class="px-4 py-2 rounded-xl bg-primary text-white text-xs font-bold">Tout afficher</button>
+                            <button @click="closePitchMe()" class="px-4 py-2 rounded-xl bg-white/10 text-gray-300 text-xs font-bold">Fermer</button>
+                        </div>
+                    </div>
+                </template>
+
+                <!-- Carte Active du Deck -->
+                <template x-if="currentPitchCard">
+                    <div class="flex-1 overflow-y-auto no-scrollbar flex flex-col transition-all duration-150"
+                         :class="pitchCardAnim === 'swipe-left' ? '-translate-x-6 opacity-40' : (pitchCardAnim === 'swipe-right' ? 'translate-x-6 opacity-40' : 'translate-x-0 opacity-100')"
+                         @touchstart.passive="handlePitchTouchStart($event)"
+                         @touchend.passive="handlePitchTouchEnd($event)">
+
+                        <!-- Visuel Hero / Bande-annonce -->
+                        <div class="relative w-full h-52 sm:h-56 bg-black shrink-0 overflow-hidden">
+                            <template x-if="!pitchShowTrailer">
+                                <div class="w-full h-full relative">
+                                    <img :src="currentPitchCard.backdropUrl" :alt="currentPitchCard.title" class="w-full h-full object-cover opacity-80">
+                                    <div class="absolute inset-0 bg-gradient-to-t from-[#161618] via-[#161618]/55 to-black/30"></div>
+
+                                    <!-- Bouton Bande-annonce sur le Hero -->
+                                    <template x-if="currentPitchCard.trailerKey">
+                                        <button @click.stop="pitchShowTrailer = true" class="absolute top-3 right-3 px-3 py-1.5 rounded-full bg-black/70 hover:bg-black/90 border border-white/20 text-white text-xs font-bold flex items-center gap-1.5 backdrop-blur-md shadow-lg transition-transform active:scale-95">
+                                            <span class="material-symbols-outlined text-sm text-red-500 filled">play_circle</span>
+                                            <span>Bande-annonce</span>
+                                        </button>
+                                    </template>
+
+                                    <!-- Infos principales ancrées en bas du Hero -->
+                                    <div class="absolute bottom-3 left-4 right-4 flex items-end gap-3.5">
+                                        <img :src="currentPitchCard.posterUrl" :alt="currentPitchCard.title" class="w-20 aspect-[2/3] rounded-xl object-cover shadow-2xl border border-white/15 shrink-0 bg-gray-800">
+                                        <div class="min-w-0 flex-1 pb-0.5">
+                                            <div class="flex flex-wrap items-center gap-1.5 mb-1">
+                                                <template x-for="g in currentPitchCard.genres" :key="g">
+                                                    <span class="px-2 py-0.5 rounded-md bg-white/15 backdrop-blur-sm text-[10px] font-bold uppercase tracking-wide text-gray-100" x-text="g"></span>
+                                                </template>
+                                            </div>
+                                            <h3 class="text-lg sm:text-xl font-extrabold text-white leading-tight line-clamp-2 drop-shadow" x-text="currentPitchCard.title"></h3>
+                                            <div class="flex items-center flex-wrap gap-2 text-xs text-gray-300 mt-1 font-medium">
+                                                <span x-show="currentPitchCard.year" x-text="currentPitchCard.year"></span>
+                                                <span x-show="currentPitchCard.durationLabel" class="before:content-['•'] before:mr-2" x-text="currentPitchCard.durationLabel"></span>
+                                                <template x-if="currentPitchCard.imdbScore">
+                                                    <span class="inline-flex items-center gap-0.5 text-yellow-400 font-bold">
+                                                        <span class="material-symbols-outlined text-[13px] filled">star</span>
+                                                        <span x-text="currentPitchCard.imdbScore"></span>
+                                                    </span>
+                                                </template>
+                                                <template x-if="currentPitchCard.rtScore">
+                                                    <span class="inline-flex items-center gap-1 text-gray-100 font-bold">
+                                                        <img :src="currentPitchCard.rtIconUrl" alt="RT" class="w-3.5 h-3.5 object-contain">
+                                                        <span x-text="currentPitchCard.rtScore"></span>
+                                                    </span>
+                                                </template>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </template>
+
+                            <!-- Lecteur Bande-annonce intégré -->
+                            <template x-if="pitchShowTrailer && currentPitchCard.trailerKey">
+                                <div class="w-full h-full relative bg-black">
+                                    <iframe class="w-full h-full" :src="'https://www.youtube.com/embed/' + currentPitchCard.trailerKey + '?autoplay=1&rel=0'" frameborder="0" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>
+                                    <button @click.stop="pitchShowTrailer = false" class="absolute top-2.5 right-2.5 px-2.5 py-1 rounded-full bg-black/80 text-white text-xs font-bold flex items-center gap-1 border border-white/20">
+                                        <span class="material-symbols-outlined text-sm">close</span>
+                                        <span>Fermer la vidéo</span>
+                                    </button>
+                                </div>
+                            </template>
+                        </div>
+
+                        <!-- Corps du Pitch -->
+                        <div class="p-4 space-y-3.5">
+                            <!-- Disponibilité Plateformes -->
+                            <template x-if="currentPitchCard.myPlatforms.length > 0">
+                                <div class="flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30">
+                                    <div class="flex items-center gap-1.5 text-xs font-bold text-emerald-300">
+                                        <span class="material-symbols-outlined text-base text-emerald-400 filled">check_circle</span>
+                                        <span>Dispo sur vos plateformes</span>
+                                    </div>
+                                    <div class="flex items-center gap-1.5">
+                                        <template x-for="plat in currentPitchCard.myPlatforms" :key="plat.id">
+                                            <div class="flex items-center gap-1 bg-black/40 px-2 py-0.5 rounded-md border border-white/10">
+                                                <img :src="plat.logoUrl" :alt="plat.name" class="w-4 h-4 rounded-sm object-cover">
+                                                <span class="text-[11px] font-semibold text-white" x-text="plat.name"></span>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </div>
+                            </template>
+
+                            <template x-if="currentPitchCard.myPlatforms.length === 0 && currentPitchCard.otherPlatforms.length > 0">
+                                <div class="flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-white/5 border border-white/10">
+                                    <span class="text-xs font-medium text-gray-400">Streaming disponible sur :</span>
+                                    <div class="flex items-center gap-1.5">
+                                        <template x-for="plat in currentPitchCard.otherPlatforms.slice(0, 3)" :key="plat.name">
+                                            <img :src="plat.logoUrl" :alt="plat.name" :title="plat.name" class="w-5 h-5 rounded-md object-cover">
+                                        </template>
+                                    </div>
+                                </div>
+                            </template>
+
+                            <!-- Arguments "Pourquoi le voir ce soir ?" -->
+                            <div class="space-y-2" x-show="currentPitchCard.pitchPoints.length > 0">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-[11px] font-extrabold uppercase tracking-wider text-primary">Pourquoi le regarder ce soir ?</span>
+                                    <span x-show="pitchLoadingDetails" class="material-symbols-outlined text-xs text-gray-500 animate-spin">progress_activity</span>
+                                </div>
+                                <div class="space-y-1.5">
+                                    <template x-for="(pt, idx) in currentPitchCard.pitchPoints" :key="idx">
+                                        <div class="flex items-start gap-2.5 px-3 py-2 rounded-xl border text-xs leading-snug font-medium" :class="pt.badgeClass">
+                                            <span class="material-symbols-outlined text-base shrink-0 mt-0.5" :class="pt.iconClass" x-text="pt.icon"></span>
+                                            <span x-text="pt.text"></span>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+
+                            <!-- Accroche (Tagline) + Synopsis (Le Pitch) -->
+                            <div class="rounded-2xl bg-white/[0.04] border border-white/10 p-3.5 space-y-2">
+                                <div class="flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wider text-gray-400">
+                                    <span class="material-symbols-outlined text-sm text-amber-400">format_quote</span>
+                                    <span>Le Pitch</span>
+                                </div>
+                                <p x-show="currentPitchCard.tagline" class="text-xs sm:text-sm font-bold italic text-amber-300/95 leading-snug" x-text="'« ' + currentPitchCard.tagline + ' »'"></p>
+                                <p class="text-xs sm:text-sm text-gray-200 leading-relaxed" x-text="currentPitchCard.overview"></p>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+
+                <!-- Barre d'actions en bas de la carte (Passer / Regarder) -->
+                <template x-if="currentPitchCard">
+                    <div class="p-3.5 border-t border-white/10 bg-[#121214] flex items-center gap-2.5 shrink-0">
+                        <button @click="pitchPrevCard()" :disabled="pitchIndex === 0" title="Carte précédente" class="w-11 h-11 rounded-2xl border border-white/10 bg-white/5 flex items-center justify-center text-gray-300 hover:bg-white/10 disabled:opacity-30 disabled:pointer-events-none transition-all active:scale-95 shrink-0">
+                            <span class="material-symbols-outlined text-xl">undo</span>
+                        </button>
+                        <button @click="pitchNextCard()" class="flex-1 h-11 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/10 text-gray-100 text-xs sm:text-sm font-bold flex items-center justify-center gap-1.5 transition-all active:scale-95">
+                            <span class="material-symbols-outlined text-lg text-gray-400">close</span>
+                            <span>Passer</span>
+                        </button>
+                        <a :href="currentPitchCard.detailUrl" @click="closePitchMe()" class="flex-[1.35] h-11 rounded-2xl bg-primary hover:bg-primary/90 text-white text-xs sm:text-sm font-extrabold flex items-center justify-center gap-1.5 shadow-lg shadow-primary/25 transition-all active:scale-95">
+                            <span class="material-symbols-outlined text-lg filled">play_arrow</span>
+                            <span>Je regarde ça !</span>
+                        </a>
+                    </div>
+                </template>
+            </div>
         </div>
     </div>
 
