@@ -1,7 +1,7 @@
 // sw.js
-// VERSION V26 - MODE PITCH ME (DECK D'AIDE AU CHOIX DU SOIR DANS MA LISTE)
-const CACHE_NAME = 'cinematch-v26-offline-capable';
-const IMAGE_CACHE_NAME = 'cinematch-images-v26';
+// VERSION V27 - FIX POSITION BARRE DU BAS SUR MOBILE (H-SCREEN & FOOTER H-20 PB-2)
+const CACHE_NAME = 'cinematch-v27-offline-capable';
+const IMAGE_CACHE_NAME = 'cinematch-images-v27';
 const MAX_IMAGES = 200;
 
 const ASSETS_TO_CACHE = [
