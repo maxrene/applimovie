@@ -772,7 +772,7 @@ document.addEventListener('alpine:init', () => {
                 tagline,
                 overview,
                 trailerKey,
-                pitchPoints: pitchPoints.slice(0, 4)
+                pitchPoints: pitchPoints.slice(0, 3)
             };
         },
 

@@ -1,7 +1,7 @@
 // sw.js
-// VERSION V27 - FIX POSITION BARRE DU BAS SUR MOBILE (H-SCREEN & FOOTER H-20 PB-2)
-const CACHE_NAME = 'cinematch-v27-offline-capable';
-const IMAGE_CACHE_NAME = 'cinematch-images-v27';
+// VERSION V28 - CARTE PITCH ME COMPACTE 100% VISIBLE AU-DESSUS DU FOOTER
+const CACHE_NAME = 'cinematch-v28-offline-capable';
+const IMAGE_CACHE_NAME = 'cinematch-images-v28';
 const MAX_IMAGES = 200;
 
 const ASSETS_TO_CACHE = [
